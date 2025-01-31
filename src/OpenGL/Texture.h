@@ -2,6 +2,7 @@ class Texture {
 	public:
 		Texture();
 		~Texture();
+		void Load(const unsigned int* data, int width, int height);
 		void Load(const char* filename);
 		void Bind();
 		void Unbind();

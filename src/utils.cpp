@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <tiffio.h>
+
 namespace utils {
 	std::string OpenFileDialog(const char* open_path, const bool folders_only, const char* filter) {
 #ifdef _WIN32
@@ -55,5 +57,44 @@ namespace utils {
 		else
 			return std::string(output);
 #endif
+	}
+
+	unsigned int* LoadTiff(const char* path, int& width, int& height) {
+		TIFF* tif = TIFFOpen(path, "r");
+		if (!tif) {
+			printf("Could not open file %s\n", path);
+			return NULL;
+		}
+		size_t npixels;
+		uint32_t* raster;
+
+		TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
+		TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
+
+		TIFFRGBAImage img;
+		char emsg[1024];
+		if (!TIFFRGBAImageBegin(&img, tif, 0, emsg)) {
+			TIFFError(path, emsg);
+			TIFFClose(tif);
+			return NULL;
+		}
+		npixels = width * height;
+		raster = (uint32_t*)_TIFFmalloc(npixels * sizeof(uint32_t));
+		if (raster) {
+			if (TIFFRGBAImageGet(&img, raster, width, height)) {
+				printf("Loaded %s, %d x %d\n", path, width, height);
+				// flip the image
+				uint32_t* temp = (uint32_t*)_TIFFmalloc(npixels * sizeof(uint32_t));
+				for (int i = 0; i < height; i++) {
+					memcpy(temp + i * width, raster + (height - i - 1) * width, width * sizeof(uint32_t));
+				}
+				_TIFFfree(raster);
+				TIFFClose(tif);
+				return temp;
+			}
+		}
+		_TIFFfree(raster);
+		TIFFClose(tif);
+		return NULL;
 	}
 }

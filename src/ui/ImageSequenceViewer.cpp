@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <algorithm>
 
 ImageSequenceViewer::ImageSequenceViewer() {}
 
@@ -18,6 +19,9 @@ void ImageSequenceViewer::Display() {
 			delete m_textures[i];
 		}
 		m_textures.clear();
+		for (int i = 0; i < m_images.size(); i++) {
+			free(m_images[i]);
+		}
 		std::string path = utils::OpenFileDialog(".", false);
 		LoadImages(path);
 	}
@@ -59,11 +63,20 @@ void ImageSequenceViewer::LoadImages(const std::string& path) {
 		printf("Path does not exist\n");
 		return;
 	}
+	std::vector<std::string> files;
 	for (const auto& entry : std::filesystem::directory_iterator(path)) {
 		if (entry.path().string().find(".tif") == std::string::npos)
 			continue;
-		Texture* t = new Texture();
-		t->Load(entry.path().c_str());
-		m_textures.push_back(t);
+		files.push_back(entry.path().string());
 	}
+	std::sort(files.begin(), files.end());
+	for (const auto& file : files) {
+		int width, height;
+		uint32_t* temp = utils::LoadTiff(file.c_str(), width, height);
+		Texture* t = new Texture();
+		t->Load(temp, width, height);
+		m_textures.push_back(t);
+		m_images.push_back(temp);
+	}
+
 }

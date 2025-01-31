@@ -14,6 +14,7 @@ public:
 private:
 	void LoadImages(const std::string& path); 
 	std::vector<Texture*> m_textures;
+	std::vector<uint32_t*> m_images;
 	int m_currentFrame = 0;
 	bool m_playing = false;
 	std::chrono::time_point<std::chrono::steady_clock> m_lasttime;

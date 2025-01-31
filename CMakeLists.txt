@@ -16,6 +16,8 @@ file(GLOB_RECURSE SOURCES "${SRC_DIR}/**.cpp" "${SRC_DIR}/**.h")
 SET(GLFW_BUILD_X11 ON CACHE BOOL "Build for X11")
 SET(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build for Wayland")
 
+find_package(OpenCV REQUIRED)
+
 add_subdirectory(libs/glfw)
 
 # Don't let glfw build examples/tests/docs or install
@@ -37,7 +39,12 @@ target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE tiff)
 # Include directories
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE src/ libs/ libs/glad/include/ libs/imgui/)
 
+target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLUDE_DIRS})
+
 # Set C++ standard to 20
 target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
 
 target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -Wall -O2)
+
+# Link to python
+target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -L/usr/lib/python3.12/config-3.12-x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu -lpython3.12 -ldl -lm)
