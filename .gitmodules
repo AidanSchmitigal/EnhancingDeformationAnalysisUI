@@ -9,3 +9,6 @@
 	path = libs/pybind11
 	url = git@github.com:pybind/pybind11.git
 	branch = stable
+[submodule "libs/libtiff"]
+	path = libs/libtiff
+	url = https://gitlab.com/libtiff/libtiff.git

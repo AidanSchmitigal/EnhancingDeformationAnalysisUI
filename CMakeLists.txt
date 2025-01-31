@@ -23,6 +23,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
 add_subdirectory(libs/glfw)
 add_subdirectory(libs/pybind11)
+add_subdirectory(libs/libtiff)
 
 # Don't let glfw build examples/tests/docs or install
 SET(GLFW_BUILD_DOCS OFF CACHE BOOL "GLFW lib only")
