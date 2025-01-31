@@ -22,7 +22,10 @@ void ImageSequenceViewer::Display() {
 		LoadImages(path);
 	}
 
-	if (ImGui::Button("Play")) {
+	if (!m_playing && ImGui::Button("Play")) {
+		m_playing = !m_playing;
+	}
+	if (m_playing && ImGui::Button("Stop")) {
 		m_playing = !m_playing;
 	}
 
@@ -43,8 +46,10 @@ void ImageSequenceViewer::Display() {
 		ImGui::End();
 		return;
 	}
-	else
+	else {
+		ImGui::SliderInt("Frame", &m_currentFrame, 0, m_textures.size() - 1);
 		ImGui::Image((intptr_t)m_textures[m_currentFrame]->GetID(), ImVec2(m_textures[m_currentFrame]->GetWidth(), m_textures[m_currentFrame]->GetHeight()));
+	}
 
 	ImGui::End();
 }

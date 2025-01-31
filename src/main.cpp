@@ -14,7 +14,7 @@ int main() {
 		return -1;
 	}
 
-	GLFWwindow* window = glfwCreateWindow(640, 480, "Hello, World!", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(1400, 1050, "Enhancing Deformation Analysis UI", NULL, NULL);
 	glfwMakeContextCurrent(window);
 	int status = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 	if (!status) {
