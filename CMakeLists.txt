@@ -51,7 +51,6 @@ target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLU
 
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/pybind11/include)
 
-message(STATUS "Python3 include directories: ${Python3_INCLUDE_DIRS}")
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${Python3_INCLUDE_DIRS})
 
 # Set C++ standard to 20
