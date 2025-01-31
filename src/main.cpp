@@ -8,8 +8,6 @@
 #include <ImGuiImpl.h>
 #include <ui/ImageSequenceViewer.h>
 
-#include <pybind11/pybind11.h>
-
 int main() {
 	if (!glfwInit()) {
 		printf("Failed to initialize GLFW\n");

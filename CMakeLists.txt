@@ -57,4 +57,4 @@ target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${Python3_INCL
 # Set C++ standard to 20
 target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
 
-target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -Wall -O2)
+target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O2)

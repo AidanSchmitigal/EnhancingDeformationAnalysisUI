@@ -5,33 +5,50 @@
 
 #include <tiffio.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <shobjidl.h>
+#endif
+
 namespace utils {
 	std::string OpenFileDialog(const char* open_path, const bool folders_only, const char* filter) {
 #ifdef _WIN32
-		OPENFILENAMEA ofn;      // common dialog box structure
-		CHAR szFile[260] = {0}; // if using TCHAR macros
+			CoInitialize(nullptr);
+			IFileDialog* pFileDialog = nullptr;
+			std::wstring folderPath;
 
-		// Initialize OPENFILENAME (memset to zero)
-		ZeroMemory(&ofn, sizeof(OPENFILENAME));
-		ofn.lStructSize = sizeof(OPENFILENAME);
-		ofn.hwndOwner = NULL;
-		ofn.lpstrFile = szFile;
-		ofn.nMaxFile = sizeof(szFile);
-		ofn.lpstrFilter = filter;
-		ofn.nFilterIndex = 1;
-		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+			if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_IFileDialog, reinterpret_cast<void**>(&pFileDialog))))
+			{
+					DWORD dwOptions;
+					if (SUCCEEDED(pFileDialog->GetOptions(&dwOptions)))
+					{
+							pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS);
+					}
 
-		if (GetOpenFileNameA(&ofn) == TRUE) {
-			std::string fp = ofn.lpstrFile;
-			for (size_t i = 0; i < fp.size(); i++) {
-				if (fp[i] == '\\')
-					fp[i] = '/';
+					if (SUCCEEDED(pFileDialog->Show(nullptr)))
+					{
+							IShellItem* pItem;
+							if (SUCCEEDED(pFileDialog->GetResult(&pItem)))
+							{
+									PWSTR pszFilePath;
+									if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath)))
+									{
+											folderPath = pszFilePath;
+											CoTaskMemFree(pszFilePath);
+									}
+									pItem->Release();
+							}
+					}
+					pFileDialog->Release();
 			}
-			// std::replace(fp.begin(), fp.end(), '\\', '/');
-			return fp;
-		}
 
-		return std::string();
+			CoUninitialize();
+			if (folderPath.empty()) return std::string();
+
+			int size_needed = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, nullptr, 0, nullptr, nullptr);
+			std::string str(size_needed - 1, 0);
+			WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, &str[0], size_needed, nullptr, nullptr);
+			return str;
 #else
 
 		// Set zenity to open in our current directory
