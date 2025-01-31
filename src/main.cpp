@@ -6,6 +6,7 @@
 #include <imgui.h>
 
 #include <ImGuiImpl.h>
+#include <ui/ImageSequenceViewer.h>
 
 int main() {
 	if (!glfwInit()) {
@@ -24,6 +25,7 @@ int main() {
 	ImGuiInit(window);
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+	ImageSequenceViewer viewer;
 	while (!glfwWindowShouldClose(window)) {
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -35,6 +37,8 @@ int main() {
 		ImGui::Begin("Hello, World!");
 		ImGui::Text("Hello, World!");
 		ImGui::End();
+
+		viewer.Display();
 
 		ImGuiEndFrame();
 
