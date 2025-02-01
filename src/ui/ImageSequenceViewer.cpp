@@ -14,6 +14,7 @@ void ImageSequenceViewer::Display() {
 	ImGui::Begin("Image Sequence Viewer");
 
 	if (ImGui::Button("Load Images")) {
+		m_currentFrame = 0;
 		// load the images
 		for (int i = 0; i < m_textures.size(); i++) {
 			delete m_textures[i];
@@ -22,6 +23,7 @@ void ImageSequenceViewer::Display() {
 		for (int i = 0; i < m_images.size(); i++) {
 			free(m_images[i]);
 		}
+		m_images.clear();
 		std::string path = utils::OpenFileDialog(".", false);
 		LoadImages(path);
 	}
