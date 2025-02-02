@@ -2,20 +2,20 @@
 
 #include <OpenGL/Texture.h>
 
-#include <string>
 #include <vector>
 #include <chrono>
 
 class ImageSequenceViewer {
 public:
-	ImageSequenceViewer();
+	ImageSequenceViewer() = default;
+	ImageSequenceViewer(std::vector<Texture*>& textures);
 
 	void Display();
 private:
-	void LoadImages(const std::string& path); 
 	std::vector<Texture*> m_textures;
-	std::vector<uint32_t*> m_images;
 	int m_currentFrame = 0;
 	bool m_playing = false;
 	std::chrono::time_point<std::chrono::steady_clock> m_lasttime;
+	int m_instanceId = s_instanceCount++;
+	static int s_instanceCount;
 };

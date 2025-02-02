@@ -49,6 +49,12 @@ void Texture::Load(const char* filename) {
 	free(temp);
 }
 
+void Texture::GetData(uint32_t* data) {
+	Bind();
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	Unbind();
+}
+
 void Texture::Bind() {
 	glBindTexture(GL_TEXTURE_2D, m_id);
 }

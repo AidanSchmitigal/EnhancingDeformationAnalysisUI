@@ -4,36 +4,34 @@
 #include <imgui.h>
 
 #include <cstdint>
-#include <filesystem>
-#include <algorithm>
 
-ImageSequenceViewer::ImageSequenceViewer() {}
+int ImageSequenceViewer::s_instanceCount = 0;
+
+ImageSequenceViewer::ImageSequenceViewer(std::vector<Texture*>& textures) : m_textures(textures) {}
 
 void ImageSequenceViewer::Display() {
-	// use imgui to display the images
-	ImGui::Begin("Image Sequence Viewer");
+	ImGui::BeginGroup();
 
-	if (ImGui::Button("Load Images")) {
-		m_currentFrame = 0;
-		// load the images
-		for (int i = 0; i < m_textures.size(); i++) {
-			delete m_textures[i];
-		}
-		m_textures.clear();
-		for (int i = 0; i < m_images.size(); i++) {
-			free(m_images[i]);
-		}
-		m_images.clear();
-		std::string path = utils::OpenFileDialog(".", false);
-		LoadImages(path);
+	if (m_textures.size() == 0) {
+		ImGui::Text("No images loaded");
 	}
-
+	else {
+		ImGui::PushID(m_instanceId);
+		ImVec2 size = ImGui::GetIO().DisplaySize;
+		ImGui::Image((intptr_t)m_textures[m_currentFrame]->GetID(), ImVec2(size.x / 2.1, size.y / 1.5));
+		ImGui::SetNextItemWidth(size.x / 2.2);
+		ImGui::SliderInt("Frame", &m_currentFrame, 0, m_textures.size() - 1);
+		ImGui::PopID();
+	}
+	ImGui::PushID(m_instanceId);
 	if (!m_playing && ImGui::Button("Play")) {
 		m_playing = !m_playing;
 	}
 	if (m_playing && ImGui::Button("Stop")) {
 		m_playing = !m_playing;
 	}
+	ImGui::PopID();
+	ImGui::EndGroup();
 
 	if (m_playing) {
 		const auto now = std::chrono::steady_clock::now();
@@ -46,39 +44,4 @@ void ImageSequenceViewer::Display() {
 			}
 		}
 	}
-
-	if (m_textures.size() == 0) {
-		ImGui::Text("No images loaded");
-		ImGui::End();
-		return;
-	}
-	else {
-		ImGui::SliderInt("Frame", &m_currentFrame, 0, m_textures.size() - 1);
-		ImGui::Image((intptr_t)m_textures[m_currentFrame]->GetID(), ImVec2(m_textures[m_currentFrame]->GetWidth(), m_textures[m_currentFrame]->GetHeight()));
-	}
-
-	ImGui::End();
-}
-
-void ImageSequenceViewer::LoadImages(const std::string& path) {
-	if (!std::filesystem::exists(path)) {
-		printf("Path does not exist\n");
-		return;
-	}
-	std::vector<std::string> files;
-	for (const auto& entry : std::filesystem::directory_iterator(path)) {
-		if (entry.path().string().find(".tif") == std::string::npos)
-			continue;
-		files.push_back(entry.path().string());
-	}
-	std::sort(files.begin(), files.end());
-	for (const auto& file : files) {
-		int width, height;
-		uint32_t* temp = utils::LoadTiff(file.c_str(), width, height);
-		Texture* t = new Texture();
-		t->Load(temp, width, height);
-		m_textures.push_back(t);
-		m_images.push_back(temp);
-	}
-
 }

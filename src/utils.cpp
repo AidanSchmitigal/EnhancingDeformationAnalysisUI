@@ -53,7 +53,7 @@ namespace utils {
 
 		// Set zenity to open in our current directory
 		char buf[256];
-		if (!folders_only)
+		if (folders_only)
 			snprintf(buf, 256, "zenity --file-selection --title=\"Choose an Image Folder\" --directory --filename=%s/", open_path);
 		else
 			snprintf(buf, 256, "zenity --file-selection --title=\"Choose an Image Folder\" --filename=%s/", open_path);
