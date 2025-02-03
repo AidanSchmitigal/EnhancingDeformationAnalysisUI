@@ -78,7 +78,7 @@ void Stabilizer::stabilize(std::vector<uint32_t*>& frames, int width, int height
         
         // Apply transformation
         cv::Mat stabilized;
-        cv::warpAffine(mats[i], stabilized, transformMatrix, mats[i].size(), cv::INTER_LINEAR, cv::BORDER_REPLICATE);
+        cv::warpAffine(mats[i], stabilized, transformMatrix, mats[i].size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
         stabilizedFrames.push_back(stabilized);
     }
     
