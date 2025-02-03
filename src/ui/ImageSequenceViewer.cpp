@@ -7,10 +7,12 @@
 
 int ImageSequenceViewer::s_instanceCount = 0;
 
-ImageSequenceViewer::ImageSequenceViewer(std::vector<Texture*>& textures) : m_textures(textures) {}
+ImageSequenceViewer::ImageSequenceViewer(std::vector<Texture*>& textures, const std::string& image_sequence_name) : m_textures(textures), m_imageSequenceName(image_sequence_name) {}
 
 void ImageSequenceViewer::Display() {
 	ImGui::BeginGroup();
+
+	ImGui::Text("%s", m_imageSequenceName.c_str());
 
 	if (m_textures.size() == 0) {
 		ImGui::Text("No images loaded");
@@ -36,7 +38,7 @@ void ImageSequenceViewer::Display() {
 	if (m_playing) {
 		const auto now = std::chrono::steady_clock::now();
 		auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lasttime).count();
-		if (diff > 500) {
+		if (diff > 1000 / m_playSpeed) {
 			m_lasttime = now;
 			m_currentFrame++;
 			if (m_currentFrame >= m_textures.size()) {

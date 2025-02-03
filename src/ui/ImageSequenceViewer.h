@@ -8,13 +8,18 @@
 class ImageSequenceViewer {
 public:
 	ImageSequenceViewer() = default;
-	ImageSequenceViewer(std::vector<Texture*>& textures);
+	ImageSequenceViewer(std::vector<Texture*>& textures, const std::string& image_sequence_name = "Image Sequence");
 
 	void Display();
+
+	void StartStopPlay() { m_playing = !m_playing; }
+	void SetPlaySpeed(int speed) { m_playSpeed = speed; }
 private:
 	std::vector<Texture*> m_textures;
+	std::string m_imageSequenceName;
 	int m_currentFrame = 0;
 	bool m_playing = false;
+	int m_playSpeed = 1;
 	std::chrono::time_point<std::chrono::steady_clock> m_lasttime;
 	int m_instanceId = s_instanceCount++;
 	static int s_instanceCount;

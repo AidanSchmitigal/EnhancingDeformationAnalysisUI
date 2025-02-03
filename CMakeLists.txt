@@ -41,6 +41,8 @@ target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE glfw)
 
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE tiff)
 
+target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
+
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${Python3_LIBRARIES})
 
 # Include directories
