@@ -77,6 +77,7 @@ void ImageSet::Display() {
 			if (ImGui::Button("Stabilize")) {
 				for (auto& item : selected_textures_map) {
 					int i = item.first;
+					delete m_processed_textures[i];
 					m_processed_textures.erase(m_processed_textures.begin() + i);
 				}
 				std::vector<uint32_t*> frames;
@@ -101,7 +102,8 @@ void ImageSet::Display() {
 				}
 				std::sort(to_remove.begin(), to_remove.end());
 				for (int i = to_remove.size() - 1; i >= 0; i--) {
-						m_processed_textures.erase(m_processed_textures.begin() + to_remove[i]);
+					delete m_processed_textures[to_remove[i]];
+					m_processed_textures.erase(m_processed_textures.begin() + to_remove[i]);
 				}
 				selected_textures_map.clear();
 				m_processed_sequence_viewer.SetTextures(m_processed_textures);
@@ -135,21 +137,21 @@ void ImageSet::Display() {
 		ImGui::EndTabItem();
 	}
 	if (ImGui::BeginTabItem("Crack Detection")) {
-			if (ImGui::Button("Detect Cracks")) {
-					std::vector<uint32_t*> frames;
-					for (int i = 0; i < m_processed_textures.size(); i++) {
-							uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
-							m_processed_textures[i]->GetData(data);
-							frames.push_back(data);
-					}
-					CrackDetector::detectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-					for (int i = 0; i < frames.size(); i++) {
-							m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
-							free(frames[i]);
-					}
+		if (ImGui::Button("Detect Cracks")) {
+			std::vector<uint32_t*> frames;
+			for (int i = 0; i < m_processed_textures.size(); i++) {
+				uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
+				m_processed_textures[i]->GetData(data);
+				frames.push_back(data);
 			}
+			CrackDetector::detectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			for (int i = 0; i < frames.size(); i++) {
+				m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+				free(frames[i]);
+			}
+		}
 
-			ImGui::EndTabItem();
+		ImGui::EndTabItem();
 	}
 	if (ImGui::BeginTabItem("Deformation Analysis/Prediction")) {
 		ImGui::Text("Deformation Analysis tab");

@@ -56,5 +56,8 @@ int main() {
 
 		glfwSwapBuffers(window);
 	}
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
 	return 0;
 }
