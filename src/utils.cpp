@@ -110,6 +110,7 @@ namespace utils {
 				return temp;
 			}
 		}
+		TIFFRGBAImageEnd(&img);
 		_TIFFfree(raster);
 		TIFFClose(tif);
 		return NULL;

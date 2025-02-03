@@ -94,9 +94,13 @@ void ImageSet::Display() {
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Remove Selected")) {
+				std::vector<int> to_remove;
 				for (auto& item : selected_textures_map) {
-					int i = item.first;
-					m_processed_textures.erase(m_processed_textures.begin() + i);
+					to_remove.push_back(item.first);
+				}
+				std::sort(to_remove.begin(), to_remove.end());
+				for (int i = to_remove.size() - 1; i >= 0; i--) {
+						m_processed_textures.erase(m_processed_textures.begin() + to_remove[i]);
 				}
 				selected_textures_map.clear();
 				m_processed_sequence_viewer.SetTextures(m_processed_textures);
