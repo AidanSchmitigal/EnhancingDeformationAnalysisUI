@@ -105,6 +105,7 @@ namespace utils {
 				for (int i = 0; i < height; i++) {
 					memcpy(temp + i * width, raster + (height - i - 1) * width, width * sizeof(uint32_t));
 				}
+				TIFFRGBAImageEnd(&img);
 				_TIFFfree(raster);
 				TIFFClose(tif);
 				return temp;

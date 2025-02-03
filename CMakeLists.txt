@@ -31,7 +31,7 @@ SET(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "GLFW lib only")
 SET(GLFW_BUILD_TESTS OFF CACHE BOOL "GLFW lib only")
 SET(GLFW_INSTALL OFF CACHE BOOL "GLFW lib only")
 
-add_executable(EnhancingDeformationAnalysisUI ${SOURCES} libs/stb_image/stb_image_write.h libs/stb_image/stb_image.h libs/glad/src/glad.c ${IMGUI_SOURCES} libs/stb_image/stb_image.cpp libs/stb_image/stb_image_write.cpp src/utils.h src/utils.cpp)
+add_executable(EnhancingDeformationAnalysisUI ${SOURCES} libs/stb_image/stb_image_write.h libs/stb_image/stb_image.h libs/glad/src/glad.c ${IMGUI_SOURCES} libs/stb_image/stb_image.cpp libs/stb_image/stb_image_write.cpp)
 
 # For imgui to not try and load OpenGL itself
 target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE IMGUI_IMPL_OPENGL_LOADER_CUSTOM)
@@ -58,4 +58,9 @@ target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${Python3_INCL
 # Set C++ standard to 20
 target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
 
-target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O2)
+if (WIN32)
+	# enabling optimizations leads to issues when using visual studio, it conflicts with /RTC1
+	# to enable optimizations, create a release configuration and build from there
+else()
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O2)
+endif()
