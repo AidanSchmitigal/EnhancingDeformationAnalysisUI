@@ -14,6 +14,7 @@ public:
 
 	void StartStopPlay() { m_playing = !m_playing; }
 	void SetPlaySpeed(int speed) { m_playSpeed = speed; }
+	void SetTextures(std::vector<Texture*>& textures) { m_textures = textures; }
 private:
 	std::vector<Texture*> m_textures;
 	std::string m_imageSequenceName;

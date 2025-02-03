@@ -8,10 +8,12 @@
 
 #include <string>
 #include <filesystem>
+#include <unordered_map>
 
 int ImageSet::m_id_counter = 0;
 
 int playspeed = 1;
+std::unordered_map<int, int> selected_textures_map;
 
 ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_path) {
 	m_window_name = "ImageSet " + std::to_string(m_id_counter++);
@@ -31,6 +33,21 @@ void ImageSet::Display() {
 		if (ImGui::Button("Play Both")) {
 			m_sequence_viewer.StartStopPlay();
 			m_processed_sequence_viewer.StartStopPlay();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reset Processed Images")) {
+			if (m_textures.size() != m_processed_textures.size()) {
+				for (int i = m_processed_textures.size(); i < m_textures.size(); i++) {
+					m_processed_textures.push_back(new Texture());
+				}
+			}
+			for (int i = 0; i < m_textures.size(); i++) {
+				uint32_t* data = (uint32_t*)malloc(m_textures[i]->GetWidth() * m_textures[i]->GetHeight() * 4);
+				m_textures[i]->GetData(data);
+				m_processed_textures[i]->Load(data, m_textures[i]->GetWidth(), m_textures[i]->GetHeight());
+				free(data);
+			}
+			m_processed_sequence_viewer.SetTextures(m_processed_textures);
 		}
 		ImGui::SameLine();
 		ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 2.2);
@@ -57,16 +74,54 @@ void ImageSet::Display() {
 		}
 		if (ImGui::TreeNode("Stabilization")) {
 			if (ImGui::Button("Stabilize")) {
+				for (auto& item : selected_textures_map) {
+					int i = item.first;
+					m_processed_textures.erase(m_processed_textures.begin() + i);
+				}
 				std::vector<uint32_t*> frames;
-				for (auto texture : m_processed_textures) {
-					uint32_t* data = (uint32_t*)malloc(texture->GetWidth() * texture->GetHeight() * 4);
-					texture->GetData(data);
+				for (int i = 0; i < m_processed_textures.size(); i++) {
+					uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
+					m_processed_textures[i]->GetData(data);
 					frames.push_back(data);
 				}
 				Stabilizer::stabilize(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 				for (int i = 0; i < frames.size(); i++) {
 					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 					free(frames[i]);
+				}
+				selected_textures_map.clear();
+				m_processed_sequence_viewer.SetTextures(m_processed_textures);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Remove Selected")) {
+				for (auto& item : selected_textures_map) {
+					int i = item.first;
+					m_processed_textures.erase(m_processed_textures.begin() + i);
+				}
+				selected_textures_map.clear();
+				m_processed_sequence_viewer.SetTextures(m_processed_textures);
+			}
+			for (int i = 0; i < m_processed_textures.size(); i++) {
+				char name[100];
+				sprintf(name, "Frame %d", i);
+				bool selected = selected_textures_map.find(i) != selected_textures_map.end();
+				if (selected) {
+					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(200, 0, 0, 255));
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(255, 0, 0, 255));
+				}
+				if (ImGui::ImageButton(name, (ImTextureID)m_processed_textures[i]->GetID(), ImVec2(100, 100))) {
+					if (selected_textures_map.find(i) == selected_textures_map.end()) {
+						selected_textures_map[i] = 1;
+					}
+					else {
+						selected_textures_map.erase(i);
+					}
+				}
+				if (selected) {
+					ImGui::PopStyleColor(2);
+				}
+				if (i % 7 != 6) {
+					ImGui::SameLine();
 				}
 			}
 			ImGui::TreePop();
