@@ -14,6 +14,8 @@ public:
 
 private:
 	void LoadImages();
+	void DisplayImageComparisonTab();
+	void DisplayPreprocessingTab();
 
 	static int m_id_counter;
 	std::string m_window_name;

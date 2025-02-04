@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <stdio.h>
 
 #include <glad/glad.h>
@@ -34,6 +35,7 @@ int main() {
 		glfwPollEvents();
 
 		ImGuiBeginFrame();
+
 		ImGui::DockSpaceOverViewport();
 		ImGui::ShowDemoWindow();
 
@@ -42,7 +44,7 @@ int main() {
 		ImGui::Begin("Image Folder Selector");
 		if (ImGui::Button("Select Folder")) {
 			std::string folder_path = utils::OpenFileDialog(".", true);
-			if (!folder_path.empty()) {
+			if (!folder_path.empty() && std::filesystem::is_directory(folder_path)) {
 				image_sets.emplace_back(ImageSet(folder_path));
 			}
 		}
