@@ -113,7 +113,7 @@ void ImageSet::DisplayImageComparisonTab() {
 		}
 		ImGui::SameLine();
 		ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 2.2);
-		ImGui::SliderInt("Speed", &playspeed, 1, 10);
+		ImGui::SliderInt("Images / Second", &playspeed, 1, 10);
 		m_sequence_viewer.SetPlaySpeed(playspeed);
 		m_processed_sequence_viewer.SetPlaySpeed(playspeed);
 		m_sequence_viewer.Display();
@@ -144,6 +144,7 @@ void ImageSet::DisplayPreprocessingTab() {
 					m_processed_textures[i]->GetData(data);
 					frames.push_back(data);
 				}
+
 				Stabilizer::Stabilize(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 				for (int i = 0; i < frames.size(); i++) {
 					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());

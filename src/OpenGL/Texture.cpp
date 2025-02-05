@@ -15,7 +15,9 @@ Texture::~Texture() {
 
 void Texture::Load(const uint32_t* data, int width, int height) {
 	if (m_loaded && m_width == width && m_height == height) {
+		Bind();
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, data);
+		Unbind();
 		return;
 	}
 	m_width = width;
