@@ -31,7 +31,7 @@ void Stabilizer::stabilize_old(std::vector<uint32_t *> &frames, int width, int h
 	}
 }
 
-void Stabilizer::stabilize(std::vector<uint32_t*>& frames, int width, int height) {
+void Stabilizer::Stabilize(std::vector<uint32_t*>& frames, int width, int height) {
     if (frames.empty()) return;
     
     std::vector<cv::Mat> mats;

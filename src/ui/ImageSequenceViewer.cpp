@@ -26,10 +26,7 @@ void ImageSequenceViewer::Display() {
 		ImGui::PopID();
 	}
 	ImGui::PushID(m_instanceId);
-	if (!m_playing && ImGui::Button("Play")) {
-		m_playing = !m_playing;
-	}
-	if (m_playing && ImGui::Button("Stop")) {
+	if (ImGui::Button(m_playing ? "Stop" : "Play")) {
 		m_playing = !m_playing;
 	}
 	ImGui::PopID();

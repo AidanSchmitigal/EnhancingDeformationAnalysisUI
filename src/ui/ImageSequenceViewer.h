@@ -13,6 +13,8 @@ public:
 	void Display();
 
 	void StartStopPlay() { m_playing = !m_playing; }
+	bool GetPlaying() const { return m_playing; }
+	void SetCurrentFrame(int frame) { m_currentFrame = frame; }
 	void SetPlaySpeed(int speed) { m_playSpeed = speed; }
 	void SetTextures(std::vector<Texture*>& textures) { m_textures = textures; m_currentFrame = 0; }
 private:

@@ -29,6 +29,7 @@ void ImageSet::Display() {
 	ImGui::Begin(m_window_name.c_str());
 	ImGui::BeginTabBar("PreProcessing");
 
+	// TODO: Add tabs for histograms and deformation analysis
 	DisplayImageComparisonTab();
 	DisplayPreprocessingTab();
 
@@ -40,7 +41,8 @@ void ImageSet::Display() {
 				m_processed_textures[i]->GetData(data);
 				frames.push_back(data);
 			}
-			CrackDetector::detectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+
+			CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			for (int i = 0; i < frames.size(); i++) {
 				m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 				free(frames[i]);
@@ -85,9 +87,14 @@ void ImageSet::LoadImages() {
 void ImageSet::DisplayImageComparisonTab() {
 	if (ImGui::BeginTabItem("Image Comparison")) {
 		ImGui::NewLine();
-		if (ImGui::Button("Play Both")) {
+		if (ImGui::Button((m_sequence_viewer.GetPlaying() && m_processed_sequence_viewer.GetPlaying()) ? "Stop Both" : "Play Both")) {
 			m_sequence_viewer.StartStopPlay();
 			m_processed_sequence_viewer.StartStopPlay();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reset Frame Counters")) {
+			m_sequence_viewer.SetCurrentFrame(0);
+			m_processed_sequence_viewer.SetCurrentFrame(0);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Reset Processed Images")) {
@@ -137,7 +144,7 @@ void ImageSet::DisplayPreprocessingTab() {
 					m_processed_textures[i]->GetData(data);
 					frames.push_back(data);
 				}
-				Stabilizer::stabilize(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+				Stabilizer::Stabilize(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 				for (int i = 0; i < frames.size(); i++) {
 					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 					free(frames[i]);

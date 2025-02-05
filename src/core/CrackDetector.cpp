@@ -2,7 +2,7 @@
 
 #include <opencv2/opencv.hpp>
 
-void CrackDetector::detectCracks(std::vector<uint32_t*>& frames, int width, int height) {
+void CrackDetector::DetectCracks(std::vector<uint32_t*>& frames, int width, int height) {
         if (frames.empty()) return;
 
         for (auto& ptr : frames) {

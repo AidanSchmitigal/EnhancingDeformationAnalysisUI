@@ -14,6 +14,10 @@ Texture::~Texture() {
 }
 
 void Texture::Load(const uint32_t* data, int width, int height) {
+	if (m_loaded && m_width == width && m_height == height) {
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, data);
+		return;
+	}
 	m_width = width;
 	m_height = height;
 
@@ -28,6 +32,8 @@ void Texture::Load(const uint32_t* data, int width, int height) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_width, m_height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
 
 	Unbind();
+
+	m_loaded = true;
 }
 
 // assumes we want to use bytes and not floats
@@ -47,6 +53,7 @@ void Texture::Load(const char* filename) {
 	Unbind();
 
 	free(temp);
+	m_loaded = true;
 }
 
 void Texture::GetData(uint32_t* data) {

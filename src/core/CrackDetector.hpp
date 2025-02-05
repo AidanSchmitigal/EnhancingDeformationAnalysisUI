@@ -5,5 +5,5 @@
 
 class CrackDetector {
 public:
-		static void detectCracks(std::vector<uint32_t*>& frames, int width, int height);
+		static void DetectCracks(std::vector<uint32_t*>& frames, int width, int height);
 };
