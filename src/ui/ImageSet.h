@@ -9,15 +9,18 @@
 class ImageSet {
 public:
 	ImageSet(const std::string_view &folder_path);
+	~ImageSet();
 
 	void Display();
 
+	bool Closed() { return !m_open; }
 private:
 	void LoadImages();
 	void DisplayImageComparisonTab();
 	void DisplayPreprocessingTab();
 
 	static int m_id_counter;
+	bool m_open = true;
 	std::string m_window_name;
 	std::string m_folder_path;
 	std::vector<Texture *> m_textures;

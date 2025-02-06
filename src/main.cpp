@@ -28,7 +28,7 @@ int main() {
 	ImGuiInit(window);
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-	std::vector<ImageSet> image_sets;
+	std::vector<ImageSet*> image_sets;
 	while (!glfwWindowShouldClose(window)) {
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -45,13 +45,19 @@ int main() {
 		if (ImGui::Button("Select Folder")) {
 			std::string folder_path = utils::OpenFileDialog(".", true);
 			if (!folder_path.empty() && std::filesystem::is_directory(folder_path)) {
-				image_sets.emplace_back(ImageSet(folder_path));
+				image_sets.emplace_back(new ImageSet(folder_path));
 			}
 		}
 		ImGui::End();
 
-		for (auto& image_set : image_sets) {
-			image_set.Display();
+		for (int i = 0; i < image_sets.size(); i++) {
+			if (image_sets[i]->Closed()) {
+				delete image_sets[i];
+				image_sets.erase(image_sets.begin() + i);
+				i--;
+				continue;
+			}
+			image_sets[i]->Display();
 		}
 
 		ImGuiEndFrame();

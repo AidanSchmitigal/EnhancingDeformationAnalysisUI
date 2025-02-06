@@ -25,8 +25,17 @@ ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_p
 	m_processed_sequence_viewer = ImageSequenceViewer(m_processed_textures, "Processed Images");
 }
 
+ImageSet::~ImageSet() {
+	for (auto& texture : m_textures) {
+		delete texture;
+	}
+	for (auto& texture : m_processed_textures) {
+		delete texture;
+	}
+}
+
 void ImageSet::Display() {
-	ImGui::Begin(m_window_name.c_str());
+	ImGui::Begin(m_window_name.c_str(), &m_open);
 	ImGui::BeginTabBar("PreProcessing");
 
 	// TODO: Add tabs for histograms and deformation analysis

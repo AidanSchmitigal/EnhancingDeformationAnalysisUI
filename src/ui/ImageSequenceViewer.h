@@ -9,6 +9,7 @@ class ImageSequenceViewer {
 public:
 	ImageSequenceViewer() = default;
 	ImageSequenceViewer(std::vector<Texture*>& textures, const std::string& image_sequence_name = "Image Sequence");
+	~ImageSequenceViewer() {}
 
 	void Display();
 
@@ -17,6 +18,7 @@ public:
 	void SetCurrentFrame(int frame) { m_currentFrame = frame; }
 	void SetPlaySpeed(int speed) { m_playSpeed = speed; }
 	void SetTextures(std::vector<Texture*>& textures) { m_textures = textures; m_currentFrame = 0; }
+
 private:
 	std::vector<Texture*> m_textures;
 	std::string m_imageSequenceName;
