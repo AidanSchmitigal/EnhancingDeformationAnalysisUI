@@ -3,6 +3,7 @@
 #include <ui/ImageSequenceViewer.h>
 #include <core/stabilizer.hpp>
 #include <core/CrackDetector.hpp>
+#include <core/DenoiseInterface.hpp>
 #include <utils.h>
 
 #include <imgui.h>
@@ -41,6 +42,25 @@ void ImageSet::Display() {
 	// TODO: Add tabs for histograms and deformation analysis
 	DisplayImageComparisonTab();
 	DisplayPreprocessingTab();
+
+	if (ImGui::BeginTabItem("Denoising")) {
+		if (ImGui::Button("Denoise")) {
+			std::vector<uint32_t*> frames;
+			for (int i = 0; i < m_processed_textures.size(); i++) {
+				uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
+				m_processed_textures[i]->GetData(data);
+				frames.push_back(data);
+			}
+
+			DenoiseInterface::Denoise(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), "sfr_lrsem", 5, 1.0f);
+			for (int i = 0; i < frames.size(); i++) {
+				m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+				free(frames[i]);
+			}
+
+		}
+		ImGui::EndTabItem();
+	}
 
 	if (ImGui::BeginTabItem("Crack Detection")) {
 		if (ImGui::Button("Detect Cracks")) {
