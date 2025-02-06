@@ -14,7 +14,7 @@ class Texture {
 		int GetHeight() const { return m_height; }
 	private:
 		unsigned int m_id;
-		bool m_loaded;
-		int m_width, m_height, m_channels;
+		bool m_loaded = false;
+		int m_width = 0, m_height = 0, m_channels = 0;
 		unsigned char* m_data;
 };
