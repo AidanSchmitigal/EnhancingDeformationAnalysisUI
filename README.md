@@ -7,6 +7,7 @@ Don't miss the recursive part of that command! If you missed that part, you need
 - CMake 3.5 or higher
 - OpenCV 4.5.1 or higher with the OpenCV_DIR environment variable set to the path to the OpenCVConfig.cmake file
 - Python3.8 or higher (for compatibility with pybind11) with python development installed
+- [Tensorflow C API](https://www.tensorflow.org/install/lang_c) installed on system path (findable by CMake)
 
 ### Compilation
 #### Linux (maybe MacOS?)
