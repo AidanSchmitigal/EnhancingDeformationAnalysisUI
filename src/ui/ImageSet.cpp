@@ -191,7 +191,7 @@ void ImageSet::DisplayPreprocessingTab() {
 				if (selected) {
 					ImGui::PopStyleColor(2);
 				}
-				if (i % 7 != 6) {
+				if (i % 7 != 6 && i != m_processed_textures.size() - 1) {
 					ImGui::SameLine();
 				}
 			}
@@ -265,7 +265,6 @@ void ImageSet::DisplayImageAnalysisTab() {
 			if (imageStatsCache[i].computed) {
 				continue;
 			}
-			printf("Computing stats for image %d\n", i);
 			imageStatsCache.push_back(ImageStatsCache());
 			uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_processed_textures[i]->GetData(data);
