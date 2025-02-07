@@ -26,8 +26,6 @@ py::array_t<uint8_t> mat_to_numpy(const cv::Mat& mat) {
 	return py::array_t<uint8_t>(shape, mat.ptr<uint8_t>());
 }
 
-bool DenoiseInterface::initialized = false;
-
 bool DenoiseInterface::Denoise(std::vector<uint32_t*>& images, int width, int height, const std::string& model_name, int kernel_size, float sigma) {
 	if (model_name == "Blur") {
 		for (int i = 0; i < images.size(); i++) {
@@ -132,7 +130,7 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 		for (int j = 0; j < width * height * 4; j++) {
 			image_data.push_back(images[i][j] / 255.0f);
 		}
-		cppflow::tensor input = cppflow::tensor(image_data, {1, width, height, 4});
+		cppflow::tensor input = cppflow::tensor(image_data, {1, width, height-1, 1});
 
 		std::cerr << "Starting model...\n";
 		std::vector<cppflow::tensor> output;
@@ -145,8 +143,11 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 		}
 		std::cerr << "Model finished\n";
 
-		// Show the predicted class
-		std::cout << cppflow::arg_max(output, 1) << std::endl;
+		image_data = output[0].get_data<float>();
+		for (int j = 0; j < width * height; j++) {
+			images[i][j] = (uint32_t)(image_data[j] * 255.0f);
+		}
+		std::cerr << "Finished image " << i << "\n";
 	}
 	return true;
 }
