@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <stdio.h>
+#include <cstdlib>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -12,6 +13,12 @@
 #include <utils.h>
 
 int main() {
+#ifdef WIN32
+	_putenv_s("TF_ENABLE_ONEDNN_OPTS", "0");
+#else
+	setenv("TF_ENABLE_ONEDNN_OPTS", "0", 1);
+#endif
+
 	if (!glfwInit()) {
 		printf("Failed to initialize GLFW\n");
 		return -1;

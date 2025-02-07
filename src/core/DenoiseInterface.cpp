@@ -141,7 +141,6 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 			std::cerr << "Error: " << e.what() << std::endl;
 			return false;
 		}
-		std::cerr << "Model finished\n";
 
 		image_data = output[0].get_data<float>();
 		for (int j = 0; j < width * height; j++) {

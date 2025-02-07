@@ -18,6 +18,7 @@ private:
 	void LoadImages();
 	void DisplayImageComparisonTab();
 	void DisplayPreprocessingTab();
+	void DisplayImageAnalysisTab();
 
 	static int m_id_counter;
 	bool m_open = true;

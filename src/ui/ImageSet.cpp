@@ -8,6 +8,8 @@
 
 #include <imgui.h>
 
+#include <opencv2/opencv.hpp>
+
 #include <string>
 #include <filesystem>
 #include <unordered_map>
@@ -42,6 +44,7 @@ void ImageSet::Display() {
 	// TODO: Add tabs for histograms and deformation analysis
 	DisplayImageComparisonTab();
 	DisplayPreprocessingTab();
+	DisplayImageAnalysisTab();
 
 	if (ImGui::BeginTabItem("Deformation Analysis/Prediction")) {
 		ImGui::Text("Deformation Analysis tab");
@@ -236,6 +239,66 @@ void ImageSet::DisplayPreprocessingTab() {
 					free(frames[i]);
 				}
 			}
+		}
+		ImGui::EndTabItem();
+	}
+}
+
+void ImageSet::DisplayImageAnalysisTab() {
+	struct ImageStatsCache {
+		double snr = 0.0;
+		std::vector<float> histogram;
+		bool computed = false; // Flag to avoid unnecessary recomputation
+	};
+	static std::vector<ImageStatsCache> imageStatsCache;
+	if (ImGui::BeginTabItem("Image Analysis")) {
+		ImGui::Text("Image Analysis tab");
+		if (ImGui::Button("Recalculate Stats")) {
+			for (int i = 0; i < imageStatsCache.size(); i++) {
+				imageStatsCache[i].computed = false;
+			}
+		}
+		for (int i = 0; i < m_processed_textures.size(); i++) {	
+			if (i >= imageStatsCache.size()) {
+				imageStatsCache.push_back(ImageStatsCache());
+			}
+			if (imageStatsCache[i].computed) {
+				continue;
+			}
+			printf("Computing stats for image %d\n", i);
+			imageStatsCache.push_back(ImageStatsCache());
+			uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_processed_textures[i]->GetData(data);
+			cv::Mat img(m_processed_textures[i]->GetHeight(), m_processed_textures[i]->GetWidth(), CV_8UC4, data);
+			free(data);
+			cv::cvtColor(img, img, cv::COLOR_BGRA2GRAY);
+			cv::Scalar mean, stddev;
+			cv::meanStdDev(img, mean, stddev);
+			cv::Scalar snr = mean[0] / stddev[0];
+			imageStatsCache[i].snr = snr[0];
+
+			int bins = 256;
+			imageStatsCache[i].histogram.resize(bins);
+			cv::Mat hist;
+			float range[] = {0, 256};
+			const float* histRange = {range};
+			bool uniform = true, accumulate = false;
+			cv::calcHist(&img, 1, 0, cv::Mat(), hist, 1, &bins, &histRange, uniform, accumulate);
+			// Normalize for display
+			cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
+
+			for (int j = 0; j < bins; j++)
+				imageStatsCache[i].histogram[j] = hist.at<float>(j);
+
+			imageStatsCache[i].computed = true;
+		}
+		for (int i = 0; i < imageStatsCache.size(); i++) {
+			if (!imageStatsCache[i].computed)
+				continue;
+			ImGui::Text("SNR: %.2f", imageStatsCache[i].snr);
+			char hist_text[100];
+			snprintf(hist_text, 100, "Image %d", i);
+			ImGui::PlotHistogram(hist_text, imageStatsCache[i].histogram.data(), imageStatsCache[i].histogram.size(), 0, NULL, 0, 1.0f, ImVec2(0, 80));
 		}
 		ImGui::EndTabItem();
 	}
