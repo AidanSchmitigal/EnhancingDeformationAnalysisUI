@@ -13,7 +13,11 @@ void ImGuiInit(GLFWwindow* window) {
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init();
 
-	ImGui::GetIO().Fonts->AddFontFromFileTTF("../assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
+#ifdef WIN32
+	ImGui::GetIO().Fonts->AddFontFromFileTTF("../../../assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
+#else
+    ImGui::GetIO().Fonts->AddFontFromFileTTF("../assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
+#endif
 
 	SetImGuiColors();
 }

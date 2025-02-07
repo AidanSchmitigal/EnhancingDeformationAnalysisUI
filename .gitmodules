@@ -12,3 +12,6 @@
 [submodule "libs/libtiff"]
 	path = libs/libtiff
 	url = https://gitlab.com/libtiff/libtiff.git
+[submodule "libs/cppflow"]
+	path = libs/cppflow
+	url = https://github.com/serizba/cppflow
