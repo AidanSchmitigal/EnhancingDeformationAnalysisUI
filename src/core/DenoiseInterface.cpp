@@ -117,12 +117,6 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 	}
 
 	cppflow::model model = cppflow::model("../assets/models/" + model_name);
-	// Get and print all operation names
-	auto ops = model.get_operations();
-	std::cout << "Available operations in the model:\n";
-	for (const auto& op : ops) {
-		std::cout << op << std::endl;
-	}
 
 	for (int i = 0; i < images.size(); i++) {
 		std::vector<float> image_data;
@@ -143,10 +137,10 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 		}
 
 		image_data = output[0].get_data<float>();
-		for (int j = 0; j < width * height; j++) {
-			images[i][j] = (uint32_t)(image_data[j] * 255.0f);
-		}
-		std::cerr << "Finished image " << i << "\n";
+		cv::Mat output_image(height, width, CV_8UC1, image_data.data());
+		cv::cvtColor(output_image, output_image, cv::COLOR_GRAY2BGRA);
+		memcpy(images[i], output_image.data, width * height * 4);
+		return true;
 	}
 	return true;
 }

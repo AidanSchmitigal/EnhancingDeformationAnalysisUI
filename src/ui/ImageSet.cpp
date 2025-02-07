@@ -217,6 +217,13 @@ void ImageSet::DisplayPreprocessingTab() {
 				}
 
 			}
+			ImGui::SameLine();
+			ImGui::TextDisabled("(?)");
+			if (ImGui::IsItemHovered()) {
+				ImGui::BeginTooltip();
+				ImGui::Text("Denoising with anything other than Blur is NOT IMPLEMENTED at this time.\nIf you want to use something other than Blur, it will take FOREVER and not set the images properly.");
+				ImGui::EndTooltip();
+			}
 			if (!result) {
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0, 0, 1));
 				ImGui::Text("Model exited with an error!");
@@ -238,6 +245,14 @@ void ImageSet::DisplayPreprocessingTab() {
 					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 					free(frames[i]);
 				}
+			}
+			ImGui::SameLine();
+			ImGui::TextDisabled("(?)");
+			if (ImGui::IsItemHovered()) {
+				ImGui::BeginTooltip();
+				ImGui::Text("This is a very early version of the crack detection algorithm. It works best on images with high contrast between the cracks and the background. \n\n"
+					"To use it, first denoise the images using the \"Denoising\" section. Then, click the \"Detect Cracks\" button. The algorithm will then process the images and display the results.");
+				ImGui::EndTooltip();
 			}
 		}
 		ImGui::EndTabItem();
