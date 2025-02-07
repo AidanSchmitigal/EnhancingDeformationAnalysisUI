@@ -4,6 +4,8 @@
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
+#include <cppflow/cppflow.h>
+
 #include <opencv2/opencv.hpp>
 
 #include <iostream>
@@ -101,5 +103,50 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t*>& images, int width, int he
 		return false;
 	}
 
+	return true;
+}
+
+bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, int kernel_size, float sigma) {
+	if (model_name == "Blur") {
+		for (int i = 0; i < images.size(); i++) {
+			cv::Mat image(height, width, CV_8UC4, images[i]);
+			cv::Mat output_image;
+			cv::GaussianBlur(image, output_image, cv::Size(kernel_size, kernel_size), sigma);
+			output_image.copyTo(image);
+			memcpy(images[i], image.data, width * height * 4);
+		}
+		return true;
+	}
+
+	cppflow::model model = cppflow::model("../assets/models/" + model_name);
+	// Get and print all operation names
+	auto ops = model.get_operations();
+	std::cout << "Available operations in the model:\n";
+	for (const auto& op : ops) {
+		std::cout << op << std::endl;
+	}
+
+	for (int i = 0; i < images.size(); i++) {
+		std::vector<float> image_data;
+		image_data.reserve(width * height * 4);
+		for (int j = 0; j < width * height * 4; j++) {
+			image_data.push_back(images[i][j] / 255.0f);
+		}
+		cppflow::tensor input = cppflow::tensor(image_data, {1, width, height, 4});
+
+		std::cerr << "Starting model...\n";
+		std::vector<cppflow::tensor> output;
+		try {
+			output = model({{ "serving_default_input_gen", input}}, {"StatefulPartitionedCall"});
+		}
+		catch (const std::runtime_error& e) {
+			std::cerr << "Error: " << e.what() << std::endl;
+			return false;
+		}
+		std::cerr << "Model finished\n";
+
+		// Show the predicted class
+		std::cout << cppflow::arg_max(output, 1) << std::endl;
+	}
 	return true;
 }

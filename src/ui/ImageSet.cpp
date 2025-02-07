@@ -44,6 +44,9 @@ void ImageSet::Display() {
 	DisplayPreprocessingTab();
 
 	if (ImGui::BeginTabItem("Denoising")) {
+		static int selected_model = 0;
+		const char* models[] = { "Blur", "sfr_hrsem", "sfr_hrstem", "sfr_hrtem", "sfr_lrsem", "sfr_lrstem", "sfr_lrtem" };
+		ImGui::Combo("Model", &selected_model, models, IM_ARRAYSIZE(models));
 		if (ImGui::Button("Denoise")) {
 			std::vector<uint32_t*> frames;
 			for (int i = 0; i < m_processed_textures.size(); i++) {
@@ -52,7 +55,7 @@ void ImageSet::Display() {
 				frames.push_back(data);
 			}
 
-			DenoiseInterface::Denoise(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), "sfr_lrsem", 5, 1.0f);
+			DenoiseInterface::DenoiseNew(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), models[selected_model], 5, 1.0f);
 			for (int i = 0; i < frames.size(); i++) {
 				m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 				free(frames[i]);

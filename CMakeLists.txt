@@ -7,6 +7,7 @@ project(EnhancingDeformationAnalysisUI VERSION 0.1
 # Enable compile_commands.json for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libs/cppflow/cmake/modules)
 # Set the source directory
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -19,11 +20,13 @@ SET(GLFW_BUILD_X11 ON CACHE BOOL "Build for X11")
 SET(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build for Wayland")
 
 find_package(OpenCV REQUIRED)
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
 add_subdirectory(libs/glfw)
 add_subdirectory(libs/pybind11)
 add_subdirectory(libs/libtiff)
+add_subdirectory(libs/cppflow)
 
 # Don't let glfw build examples/tests/docs or install
 SET(GLFW_BUILD_DOCS OFF CACHE BOOL "GLFW lib only")
@@ -41,6 +44,8 @@ target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE glfw)
 
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE tiff)
 
+target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE cppflow)
+
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
 
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${Python3_LIBRARIES})
@@ -54,6 +59,8 @@ target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLU
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/pybind11/include)
 
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${Python3_INCLUDE_DIRS})
+
+target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/cppflow/include)
 
 # Set C++ standard to 20
 target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
