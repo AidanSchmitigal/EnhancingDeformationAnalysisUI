@@ -16,7 +16,8 @@ int main() {
 #ifdef WIN32
 	_putenv_s("TF_ENABLE_ONEDNN_OPTS", "0");
 #else
-	setenv("TF_ENABLE_ONEDNN_OPTS", "0", 1);
+	//setenv("TF_ENABLE_ONEDNN_OPTS", "0", 1);
+	//setenv("CUDA_VISIBLE_DEVICES", "-1", 1);
 #endif
 
 	if (!glfwInit()) {

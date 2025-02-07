@@ -104,6 +104,69 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t*>& images, int width, int he
 	return true;
 }
 
+// Structure to hold tile information
+struct ImageTile {
+	cv::Mat data;       // The processed tile
+	cv::Point position; // Top-left position in original image
+	cv::Size size;      // Size of the tile
+};
+
+// Function to split an image into tiles
+std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap = 0) {
+	std::vector<ImageTile> tiles;
+
+	int step = tileSize - overlap;  // Move by tileSize - overlap
+	for (int y = 0; y <= image.rows - tileSize; y += step) {
+		for (int x = 0; x <= image.cols - tileSize; x += step) {
+			// Extract tile
+			cv::Rect roi(x, y, tileSize, tileSize);
+			cv::Mat tile = image(roi).clone();  // Copy to avoid reference issues
+
+			// Store tile info
+			tiles.push_back({tile, cv::Point(x, y), cv::Size(tileSize, tileSize)});
+		}
+	}
+
+	return tiles;
+}
+
+// Function to reconstruct the image from tiles
+cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap) {
+	if (tiles.empty()) {
+		std::cerr << "No tiles provided!" << std::endl;
+		return cv::Mat();
+	}
+
+	cv::Mat reconstructed = cv::Mat::zeros(originalSize, tiles[0].data.type()); // Empty image
+	cv::Mat weight = cv::Mat::zeros(originalSize, CV_32F);  // Accumulate blending weights
+
+	int tileSize = tiles[0].size.width;  // Assuming square tiles
+
+	// Iterate over each tile and place it in the reconstructed image
+	for (const auto& tile : tiles) {
+		cv::Rect roi(tile.position, tile.size);
+
+		// Add tile values to reconstructed image
+		reconstructed(roi) += tile.data;
+
+		// Create a weight mask (for averaging overlapping regions)
+		cv::Mat tileWeight = cv::Mat::ones(tile.size, CV_32F);
+		weight(roi) += tileWeight;
+	}
+
+	// Normalize by dividing by the accumulated weight (to handle overlaps)
+	for (int y = 0; y < reconstructed.rows; y++) {
+		for (int x = 0; x < reconstructed.cols; x++) {
+			if (weight.at<float>(y, x) > 0) {  
+				reconstructed.at<uchar>(y, x) = static_cast<uchar>(
+						reconstructed.at<uchar>(y, x) / weight.at<float>(y, x));
+			}
+		}
+	}
+
+	return reconstructed;
+}
+
 bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, int kernel_size, float sigma) {
 	if (model_name == "Blur") {
 		for (int i = 0; i < images.size(); i++) {
@@ -119,28 +182,49 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 	cppflow::model model = cppflow::model("../assets/models/" + model_name);
 
 	for (int i = 0; i < images.size(); i++) {
-		std::vector<float> image_data;
-		image_data.reserve(width * height * 4);
-		for (int j = 0; j < width * height * 4; j++) {
-			image_data.push_back(images[i][j] / 255.0f);
-		}
-		cppflow::tensor input = cppflow::tensor(image_data, {1, width, height-1, 1});
+		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
+		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
+		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
+		auto tiles = splitImageIntoTiles(image, 256, 0);
 
-		std::cerr << "Starting model...\n";
 		std::vector<cppflow::tensor> output;
-		try {
-			output = model({{ "serving_default_input_gen", input}}, {"StatefulPartitionedCall"});
-		}
-		catch (const std::runtime_error& e) {
-			std::cerr << "Error: " << e.what() << std::endl;
-			return false;
+		for (auto& tile : tiles) {
+			std::vector<float> image_data;
+			for (int y = 0; y < tile.data.rows; y++) {
+				for (int x = 0; x < tile.data.cols; x++) {
+					image_data.push_back(tile.data.at<float>(y, x));
+				}
+			}
+			cppflow::tensor input = cppflow::tensor(image_data, {1, tile.data.rows, tile.data.cols, 1});
+
+			std::cerr << "Starting model...\n";
+			try {
+				cppflow::tensor output2 = model({{ "serving_default_input_gen", input}}, {"StatefulPartitionedCall"});
+				output.push_back(output2);
+			}
+			catch (const std::runtime_error& e) {
+				std::cerr << "Error: " << e.what() << std::endl;
+				return false;
+			}
 		}
 
-		image_data = output[0].get_data<float>();
-		cv::Mat output_image(height, width, CV_8UC1, image_data.data());
-		cv::cvtColor(output_image, output_image, cv::COLOR_GRAY2BGRA);
-		memcpy(images[i], output_image.data, width * height * 4);
-		return true;
+		// convert tensors to cv::Mat and recombine
+		for (int j = 0; j < tiles.size(); j++) {
+			auto output_data = output[j].get_data<float>();
+			cv::Mat output_image(tiles[j].size, CV_32F);
+			for (int y = 0; y < tiles[j].size.height; y++) {
+			for (int x = 0; x < tiles[j].size.width; x++) {
+				output_image.at<float>(y, x) = output_data[y * tiles[j].size.width + x];
+			}
+			}
+			output_image.convertTo(output_image, CV_8U, 255.0);
+			tiles[j].data = output_image;
+		}
+		cv::Mat reconstructed = reconstructImageFromTiles(tiles, image.size(), 0);
+		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
+		memcpy(images[i], reconstructed.data, width * height * 4);
+
+		std::cerr << "Image " << i << " denoised\n";
 	}
 	return true;
 }
