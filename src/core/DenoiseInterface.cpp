@@ -117,7 +117,9 @@ std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, i
 
 	int step = tileSize - overlap;  // Move by tileSize - overlap
 	for (int y = 0; y <= image.rows - tileSize; y += step) {
+		if (y + tileSize > image.rows) y = image.rows - tileSize;
 		for (int x = 0; x <= image.cols - tileSize; x += step) {
+			if (x + tileSize > image.cols) x = image.cols - tileSize;
 			// Extract tile
 			cv::Rect roi(x, y, tileSize, tileSize);
 			cv::Mat tile = image(roi).clone();  // Copy to avoid reference issues
@@ -130,41 +132,56 @@ std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, i
 	return tiles;
 }
 
-// Function to reconstruct the image from tiles
 cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap) {
 	if (tiles.empty()) {
 		std::cerr << "No tiles provided!" << std::endl;
 		return cv::Mat();
 	}
 
-	cv::Mat reconstructed = cv::Mat::zeros(originalSize, tiles[0].data.type()); // Empty image
-	cv::Mat weight = cv::Mat::zeros(originalSize, CV_32F);  // Accumulate blending weights
+	cv::Mat reconstructed = cv::Mat::zeros(originalSize, tiles[0].data.type()); // Output image
+	cv::Mat weight = cv::Mat::zeros(originalSize, CV_32F); // Accumulate blending weights
 
-	int tileSize = tiles[0].size.width;  // Assuming square tiles
+	int tileSize = tiles[0].size.width; // Assuming square tiles
 
-	// Iterate over each tile and place it in the reconstructed image
+	// Create a blending mask to smooth tile overlaps (cosine ramp)
+	cv::Mat blendMask = cv::Mat::ones(tileSize, tileSize, CV_32F);
+	for (int y = 0; y < tileSize; ++y) {
+		for (int x = 0; x < tileSize; ++x) {
+			float wx = (x < overlap) ? (x / float(overlap)) : (x > tileSize - overlap ? (tileSize - x) / float(overlap) : 1.0f);
+			float wy = (y < overlap) ? (y / float(overlap)) : (y > tileSize - overlap ? (tileSize - y) / float(overlap) : 1.0f);
+			blendMask.at<float>(y, x) = wx * wy; // Combine horizontal and vertical weights
+		}
+	}
+
+	// Iterate over each tile and blend it into the reconstructed image
 	for (const auto& tile : tiles) {
 		cv::Rect roi(tile.position, tile.size);
 
-		// Add tile values to reconstructed image
-		reconstructed(roi) += tile.data;
+		// Convert tile data to float for blending
+		cv::Mat tileFloat;
+		tile.data.copyTo(tileFloat);
 
-		// Create a weight mask (for averaging overlapping regions)
-		cv::Mat tileWeight = cv::Mat::ones(tile.size, CV_32F);
-		weight(roi) += tileWeight;
+		// Apply blending mask
+		cv::Mat weightedTile;
+		cv::multiply(tileFloat, blendMask, weightedTile);
+
+		// Accumulate weighted tile values and blending weights
+		reconstructed(roi) += weightedTile;
+		weight(roi) += blendMask;
 	}
 
-	// Normalize by dividing by the accumulated weight (to handle overlaps)
+	// Normalize by accumulated weights (avoid division by zero)
+	cv::Mat normalized;
+	reconstructed.copyTo(normalized);
 	for (int y = 0; y < reconstructed.rows; y++) {
 		for (int x = 0; x < reconstructed.cols; x++) {
-			if (weight.at<float>(y, x) > 0) {  
-				reconstructed.at<uchar>(y, x) = static_cast<uchar>(
-						reconstructed.at<uchar>(y, x) / weight.at<float>(y, x));
+			if (weight.at<float>(y, x) > 0.0f) {
+				normalized.at<float>(y, x) = reconstructed.at<float>(y, x) / weight.at<float>(y, x);
 			}
 		}
 	}
 
-	return reconstructed;
+	return normalized;
 }
 
 // unbelievable amount of allocations in this function...
@@ -186,7 +203,8 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
-		auto tiles = splitImageIntoTiles(image, 256, 0);
+		auto tiles = splitImageIntoTiles(image, 128, 64);
+		std::cerr << "Tiles: " << tiles.size() << std::endl;
 
 		std::vector<cppflow::tensor> output;
 		for (auto& tile : tiles) {
@@ -213,14 +231,15 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 			auto output_data = output[j].get_data<float>();
 			cv::Mat output_image(tiles[j].size, CV_32F);
 			for (int y = 0; y < tiles[j].size.height; y++) {
-			for (int x = 0; x < tiles[j].size.width; x++) {
-				output_image.at<float>(y, x) = output_data[y * tiles[j].size.width + x];
+				for (int x = 0; x < tiles[j].size.width; x++) {
+					output_image.at<float>(y, x) = output_data[y * tiles[j].size.width + x];
+				}
 			}
-			}
-			output_image.convertTo(output_image, CV_8U, 255.0);
+			//output_image.convertTo(output_image, CV_8UC1, 255.0);
 			tiles[j].data = output_image;
 		}
-		cv::Mat reconstructed = reconstructImageFromTiles(tiles, image.size(), 0);
+		cv::Mat reconstructed = reconstructImageFromTiles(tiles, image.size(), 64);
+		reconstructed.convertTo(reconstructed, CV_8UC1, 255.0);
 		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
 		memcpy(images[i], reconstructed.data, width * height * 4);
 	}
