@@ -167,6 +167,7 @@ cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size 
 	return reconstructed;
 }
 
+// unbelievable amount of allocations in this function...
 bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, int kernel_size, float sigma) {
 	if (model_name == "Blur") {
 		for (int i = 0; i < images.size(); i++) {
@@ -197,10 +198,9 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 			}
 			cppflow::tensor input = cppflow::tensor(image_data, {1, tile.data.rows, tile.data.cols, 1});
 
-			std::cerr << "Starting model...\n";
 			try {
-				cppflow::tensor output2 = model({{ "serving_default_input_gen", input}}, {"StatefulPartitionedCall"});
-				output.push_back(output2);
+				auto output2 = model({{ "serving_default_input_gen", input}}, {"StatefulPartitionedCall"});
+				output.push_back(output2[0]);
 			}
 			catch (const std::runtime_error& e) {
 				std::cerr << "Error: " << e.what() << std::endl;
@@ -223,8 +223,6 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 		cv::Mat reconstructed = reconstructImageFromTiles(tiles, image.size(), 0);
 		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
 		memcpy(images[i], reconstructed.data, width * height * 4);
-
-		std::cerr << "Image " << i << " denoised\n";
 	}
 	return true;
 }
