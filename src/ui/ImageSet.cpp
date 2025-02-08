@@ -284,7 +284,6 @@ void ImageSet::DisplayImageAnalysisTab() {
 			uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_processed_textures[i]->GetData(data);
 			cv::Mat img(m_processed_textures[i]->GetHeight(), m_processed_textures[i]->GetWidth(), CV_8UC4, data);
-			free(data);
 			cv::cvtColor(img, img, cv::COLOR_BGRA2GRAY);
 			cv::Scalar mean, stddev;
 			cv::meanStdDev(img, mean, stddev);
@@ -305,6 +304,7 @@ void ImageSet::DisplayImageAnalysisTab() {
 				imageStatsCache[i].histogram[j] = hist.at<float>(j);
 
 			imageStatsCache[i].computed = true;
+			free(data);
 		}
 		for (int i = 0; i < imageStatsCache.size(); i++) {
 			if (!imageStatsCache[i].computed)

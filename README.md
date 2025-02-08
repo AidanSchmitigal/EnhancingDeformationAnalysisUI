@@ -9,6 +9,8 @@ Don't miss the recursive part of that command!
 - OpenCV ~4.0.0 or higher with the OpenCV_DIR environment variable set to the path of the OpenCVConfig.cmake file
 - Python3.8 or higher (for compatibility with pybind11) with python development installed
 - [Tensorflow C API](https://www.tensorflow.org/install/lang_c) installed on system path (findable by CMake)
+- On windows: CUDA 11 & cuDNN 8.x.x installed to PATH
+- On linux: CUDA 12.x & cuDNN 9.x.x installed to PATH
 
 ### Compilation
 #### Linux (maybe MacOS?)

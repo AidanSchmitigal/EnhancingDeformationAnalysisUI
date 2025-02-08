@@ -197,13 +197,21 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 		return true;
 	}
 
+#ifdef WIN32
+#ifdef UI_RELEASE
+	cppflow::model model = cppflow::model("assets/models/" + model_name);
+#else
+	cppflow::model model = cppflow::model("../../../assets/models/" + model_name);
+#endif
+#else
 	cppflow::model model = cppflow::model("../assets/models/" + model_name);
+#endif
 
 	for (int i = 0; i < images.size(); i++) {
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
-		auto tiles = splitImageIntoTiles(image, 128, 64);
+		auto tiles = splitImageIntoTiles(image, 256, 128);
 		std::cerr << "Tiles: " << tiles.size() << std::endl;
 
 		std::vector<cppflow::tensor> output;

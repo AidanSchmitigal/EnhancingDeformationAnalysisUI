@@ -14,10 +14,14 @@ void ImGuiInit(GLFWwindow* window) {
 	ImGui_ImplOpenGL3_Init();
 
 #ifdef WIN32
+#ifdef UI_RELEASE
+	ImGui::GetIO().Fonts->AddFontFromFileTTF("assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
+#else
 	ImGui::GetIO().Fonts->AddFontFromFileTTF("../../../assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
+#endif // UI_RELEASE
 #else
     ImGui::GetIO().Fonts->AddFontFromFileTTF("../assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
-#endif
+#endif // WIN32
 
 	SetImGuiColors();
 }
