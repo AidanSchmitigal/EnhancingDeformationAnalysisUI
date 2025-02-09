@@ -2,6 +2,7 @@
 - To clone this repo, do `git clone --recursive git@github.com:OSU-Enhancing-Deformation-Analysis/EnhancingDeformationAnalysisUI`
 Don't miss the recursive part of that command!
 - If you missed that part, you need to initialize the submodules with the command `git submodule update --init`
+- This program uses [tk_r_em](https://github.com/Ivanlh20/tk_r_em)'s models for denoising.
 
 ## Building
 ### Prerequisites
@@ -21,6 +22,7 @@ Don't miss the recursive part of that command!
 - This also seems to be required for Cuda support on Linux: `export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda`
 
 #### Windows
-- Use visual studio with cmake installed
-- Open the EnhancingDeformationAnalysisUI folder with visual studio
-- It should generate a .sln file using CMake, autosetup to run.
+- Use powershell and `cd EnhancingDeformationAnalysisUI && mkdir build`
+- `cd build && cmake ..`
+- This will generate a Visual Studio solution, which you can open with `./EnhancingDeformationAnalysisUI.sln`
+- From there you can build by pressing F7, however, it doesn't launch properly through Visual Studio and requires to be launched either through the command line or file explorer.
