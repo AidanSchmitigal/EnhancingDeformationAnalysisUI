@@ -185,18 +185,7 @@ cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size 
 }
 
 // unbelievable amount of allocations in this function...
-bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, int kernel_size, float sigma) {
-	if (model_name == "Blur") {
-		for (int i = 0; i < images.size(); i++) {
-			cv::Mat image(height, width, CV_8UC4, images[i]);
-			cv::Mat output_image;
-			cv::GaussianBlur(image, output_image, cv::Size(kernel_size, kernel_size), sigma);
-			output_image.copyTo(image);
-			memcpy(images[i], image.data, width * height * 4);
-		}
-		return true;
-	}
-
+bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
 #ifdef WIN32
 #ifdef UI_RELEASE
 	cppflow::model model = cppflow::model("assets/models/" + model_name);
@@ -211,7 +200,7 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
-		auto tiles = splitImageIntoTiles(image, 256, 128);
+		auto tiles = splitImageIntoTiles(image, tile_size, overlap);
 		std::cerr << "Tiles: " << tiles.size() << std::endl;
 
 		std::vector<cppflow::tensor> output;
@@ -246,10 +235,21 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 			//output_image.convertTo(output_image, CV_8UC1, 255.0);
 			tiles[j].data = output_image;
 		}
-		cv::Mat reconstructed = reconstructImageFromTiles(tiles, image.size(), 64);
+		cv::Mat reconstructed = reconstructImageFromTiles(tiles, image.size(), overlap);
 		reconstructed.convertTo(reconstructed, CV_8UC1, 255.0);
 		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
 		memcpy(images[i], reconstructed.data, width * height * 4);
+	}
+	return true;
+}
+
+bool DenoiseInterface::Blur(std::vector<uint32_t *> &images, int width, int height, int kernel_size, float sigma) {
+	for (int i = 0; i < images.size(); i++) {
+		cv::Mat image(height, width, CV_8UC4, images[i]);
+		cv::Mat output_image;
+		cv::GaussianBlur(image, output_image, cv::Size(kernel_size, kernel_size), sigma);
+		output_image.copyTo(image);
+		memcpy(images[i], image.data, width * height * 4);
 	}
 	return true;
 }

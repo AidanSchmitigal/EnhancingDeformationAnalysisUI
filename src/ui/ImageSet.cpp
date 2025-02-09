@@ -19,6 +19,9 @@ int ImageSet::m_id_counter = 0;
 int playspeed = 1;
 std::unordered_map<int, int> selected_textures_map;
 
+inline size_t key(int i,int j) {return (size_t) i << 32 | (unsigned int) j;}
+std::unordered_map<size_t, float> selected_pixels_map;
+
 ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_path) {
 	m_window_name = "ImageSet " + std::to_string(m_id_counter++);
 
@@ -48,6 +51,37 @@ void ImageSet::Display() {
 
 	if (ImGui::BeginTabItem("Deformation Analysis/Prediction")) {
 		ImGui::Text("Deformation Analysis tab");
+		ImGui::EndTabItem();
+	}
+
+	if (ImGui::BeginTabItem("Pixel Picking")) {
+		if (ImGui::Button("Clear Selection")) {
+			uint32_t* data = (uint32_t*)alloca(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_textures[0]->GetData(data);
+			m_processed_textures[0]->Load(data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			selected_pixels_map.clear();
+		}
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::ImageButton("Image!", m_processed_textures[0]->GetID(), ImVec2(512, 512));
+		ImGui::PopStyleVar();
+		ImGui::PopStyleVar();
+		if(ImGui::IsItemActive() && ImGui::IsItemHovered()) {
+			uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x) / 512 * m_processed_textures[0]->GetWidth();
+			uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y) / 512 * m_processed_textures[0]->GetHeight();
+			ImGui::Text("%i, %i", coordX, coordY);
+			selected_pixels_map[key(coordX, coordY)] = 1.0f;
+		}
+		else if (selected_pixels_map.size() > 0) {
+			uint32_t* data = (uint32_t*)alloca(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_processed_textures[0]->GetData(data);
+			for (auto& item : selected_pixels_map) {
+				int i = (int)(item.first >> 32);
+				int j = (int)(item.first);
+				data[j * m_processed_textures[0]->GetWidth() + i] = 0xFFFF0000;
+			}
+			m_processed_textures[0]->Load((uint32_t*)data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+		}
 		ImGui::EndTabItem();
 	}
 
@@ -198,10 +232,49 @@ void ImageSet::DisplayPreprocessingTab() {
 		}
 
 		if (ImGui::CollapsingHeader("Denoising")) {
+			static int m_kernel_size = 3;
+			static float m_sigma = 1.0f;
+			ImGui::Text("Gaussian Blur");
+			ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 2.3);
+			if (ImGui::SliderInt("Kernel Size", &m_kernel_size, 1, 9, "%.0d")) {
+				if (m_kernel_size % 2 == 0) {
+					m_kernel_size++;
+				}
+			}
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 2.3);
+			ImGui::SliderFloat("Sigma", &m_sigma, 0.0f, 10.0f);
+			if (ImGui::Button("Blur")) {
+				std::vector<uint32_t*> frames;
+				for (int i = 0; i < m_processed_textures.size(); i++) {
+					uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
+					m_processed_textures[i]->GetData(data);
+					frames.push_back(data);
+				}
+				DenoiseInterface::Blur(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_kernel_size, m_sigma);
+				for (int i = 0; i < frames.size(); i++) {
+					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+					free(frames[i]);
+				}
+			}
+
+			ImGui::NewLine();
+
+			static int tile_size = 256;
+			static int overlap = 0;
+			ImGui::Text("Denoising using tk_r_em AI models");
 			static int selected_model = 0;
-			const char* models[] = { "Blur", "sfr_hrsem", "sfr_hrstem", "sfr_hrtem", "sfr_lrsem", "sfr_lrstem", "sfr_lrtem" };
+			const char* models[] = { "sfr_hrsem", "sfr_hrstem", "sfr_hrtem", "sfr_lrsem", "sfr_lrstem", "sfr_lrtem" };
+			ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 3.5);
 			ImGui::Combo("Model", &selected_model, models, IM_ARRAYSIZE(models));
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 3.5);
+			ImGui::SliderInt("Tile Size", &tile_size, 32, 512);
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 3.5);
+			ImGui::SliderInt("Overlap", &overlap, 0, 256);
 			static bool result = true;
+
 			if (ImGui::Button("Denoise")) {
 				std::vector<uint32_t*> frames;
 				for (int i = 0; i < m_processed_textures.size(); i++) {
@@ -210,7 +283,7 @@ void ImageSet::DisplayPreprocessingTab() {
 					frames.push_back(data);
 				}
 
-				result = DenoiseInterface::DenoiseNew(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), models[selected_model], 5, 1.0f);
+				result = DenoiseInterface::DenoiseNew(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), models[selected_model], tile_size, overlap);
 				for (int i = 0; i < frames.size(); i++) {
 					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 					free(frames[i]);
@@ -221,7 +294,7 @@ void ImageSet::DisplayPreprocessingTab() {
 			ImGui::TextDisabled("(?)");
 			if (ImGui::IsItemHovered()) {
 				ImGui::BeginTooltip();
-				ImGui::Text("Denoising with anything other than Blur is NOT IMPLEMENTED at this time.\nIf you want to use something other than Blur, it will take FOREVER and not set the images properly.");
+				ImGui::Text("Denoising using tk_r_em will attempt to use an Nvidia GPU if you have one with cuda and cuDNN installed.\nIf you do not have an Nvidia GPU, it will take a VERY long time.");
 				ImGui::EndTooltip();
 			}
 			if (!result) {
@@ -251,7 +324,7 @@ void ImageSet::DisplayPreprocessingTab() {
 			if (ImGui::IsItemHovered()) {
 				ImGui::BeginTooltip();
 				ImGui::Text("This is a very early version of the crack detection algorithm. It works best on images with high contrast between the cracks and the background. \n\n"
-					"To use it, first denoise the images using the \"Denoising\" section. Then, click the \"Detect Cracks\" button. The algorithm will then process the images and display the results.");
+						"To use it, first denoise the images using the \"Denoising\" section. Then, click the \"Detect Cracks\" button. The algorithm will then process the images and display the results.");
 				ImGui::EndTooltip();
 			}
 		}
@@ -266,12 +339,27 @@ void ImageSet::DisplayImageAnalysisTab() {
 		bool computed = false; // Flag to avoid unnecessary recomputation
 	};
 	static std::vector<ImageStatsCache> imageStatsCache;
+	static std::vector<float> avg_histogram;
+	static float avg_snr = 0.0f;
+	static bool avg_computed = false;
 	if (ImGui::BeginTabItem("Image Analysis")) {
-		ImGui::Text("Image Analysis tab");
 		if (ImGui::Button("Recalculate Stats")) {
+			avg_histogram.clear();
+			avg_snr = 0.0f;
+			avg_computed = false;
 			for (int i = 0; i < imageStatsCache.size(); i++) {
 				imageStatsCache[i].computed = false;
 			}
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::IsItemHovered()) {
+			ImGui::BeginTooltip();
+			ImGui::Text("To reduce memory usage, the image stats are shared between the image sets. If you want to recalculate the stats, click this button.");
+			ImGui::EndTooltip();
+		}
+		if (avg_histogram.size() == 0) {
+			avg_histogram.resize(256);
 		}
 		for (int i = 0; i < m_processed_textures.size(); i++) {	
 			if (i >= imageStatsCache.size()) {
@@ -289,6 +377,7 @@ void ImageSet::DisplayImageAnalysisTab() {
 			cv::meanStdDev(img, mean, stddev);
 			cv::Scalar snr = mean[0] / stddev[0];
 			imageStatsCache[i].snr = snr[0];
+			avg_snr += snr[0];
 
 			int bins = 256;
 			imageStatsCache[i].histogram.resize(bins);
@@ -300,12 +389,24 @@ void ImageSet::DisplayImageAnalysisTab() {
 			// Normalize for display
 			cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
 
-			for (int j = 0; j < bins; j++)
+			for (int j = 0; j < bins; j++) {
 				imageStatsCache[i].histogram[j] = hist.at<float>(j);
+				avg_histogram[j] += hist.at<float>(j);
+			}
 
 			imageStatsCache[i].computed = true;
 			free(data);
 		}
+		if (!avg_computed) {
+			avg_snr /= m_processed_textures.size();
+			for (int i = 0; i < avg_histogram.size(); i++) {
+				avg_histogram[i] /= m_processed_textures.size();
+			}
+			avg_computed = true;
+		}
+
+		ImGui::Text("Average SNR: %.2f", avg_snr);
+		ImGui::PlotHistogram("Average Histogram", avg_histogram.data(), avg_histogram.size(), 0, NULL, 0, 1.0f, ImVec2(0, 80));
 		for (int i = 0; i < imageStatsCache.size(); i++) {
 			if (!imageStatsCache[i].computed)
 				continue;
