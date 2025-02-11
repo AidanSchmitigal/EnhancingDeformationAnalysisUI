@@ -19,9 +19,6 @@ int ImageSet::m_id_counter = 0;
 int playspeed = 1;
 std::unordered_map<int, int> selected_textures_map;
 
-inline size_t key(int i,int j) {return (size_t) i << 32 | (unsigned int) j;}
-std::unordered_map<size_t, float> selected_pixels_map;
-
 ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_path) {
 	m_window_name = "ImageSet " + std::to_string(m_id_counter++);
 
@@ -40,6 +37,7 @@ ImageSet::~ImageSet() {
 	}
 }
 
+static uint32_t* picking_data = nullptr;
 void ImageSet::Display() {
 	ImGui::Begin(m_window_name.c_str(), &m_open);
 	ImGui::BeginTabBar("PreProcessing");
@@ -55,32 +53,25 @@ void ImageSet::Display() {
 	}
 
 	if (ImGui::BeginTabItem("Pixel Picking")) {
+		if (picking_data == nullptr) {
+			picking_data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+		}
 		if (ImGui::Button("Clear Selection")) {
-			uint32_t* data = (uint32_t*)alloca(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_textures[0]->GetData(data);
-			m_processed_textures[0]->Load(data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-			selected_pixels_map.clear();
+			// FIXME: reallocate if the size of the image is different
+			m_textures[0]->GetData(picking_data);
+			m_processed_textures[0]->Load(picking_data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::ImageButton("Image!", m_processed_textures[0]->GetID(), ImVec2(512, 512));
+		ImGui::ImageButton("Image!", m_processed_textures[0]->GetID(), ImVec2(m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight()));
 		ImGui::PopStyleVar();
 		ImGui::PopStyleVar();
 		if(ImGui::IsItemActive() && ImGui::IsItemHovered()) {
-			uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x) / 512 * m_processed_textures[0]->GetWidth();
-			uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y) / 512 * m_processed_textures[0]->GetHeight();
+			uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
+			uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
 			ImGui::Text("%i, %i", coordX, coordY);
-			selected_pixels_map[key(coordX, coordY)] = 1.0f;
-		}
-		else if (selected_pixels_map.size() > 0) {
-			uint32_t* data = (uint32_t*)alloca(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_processed_textures[0]->GetData(data);
-			for (auto& item : selected_pixels_map) {
-				int i = (int)(item.first >> 32);
-				int j = (int)(item.first);
-				data[j * m_processed_textures[0]->GetWidth() + i] = 0xFFFF0000;
-			}
-			m_processed_textures[0]->Load((uint32_t*)data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			picking_data[coordY * m_processed_textures[0]->GetWidth() + coordX] = 0xFFFF0000;
+			m_processed_textures[0]->Load(picking_data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 		ImGui::EndTabItem();
 	}
