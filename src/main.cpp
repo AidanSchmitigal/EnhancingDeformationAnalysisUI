@@ -14,10 +14,15 @@
 
 int main() {
 #ifdef WIN32
-	_putenv_s("TF_ENABLE_ONEDNN_OPTS", "0");
+	_putenv_s("TF_ENABLE_ONEDNN_OPTS", "1");
+#ifndef UI_RELEASE
+	std::filesystem::current_path("../");
+#endif
 #else
+#ifndef UI_RELEASE
+		std::filesystem::current_path("../../../");
+#endif
 	//setenv("TF_ENABLE_ONEDNN_OPTS", "0", 1);
-	//setenv("CUDA_VISIBLE_DEVICES", "-1", 1);
 #endif
 
 	if (!glfwInit()) {
