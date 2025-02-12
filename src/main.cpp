@@ -20,10 +20,15 @@ int main() {
 #endif
 #else
 #ifndef UI_RELEASE
-		std::filesystem::current_path("../../../");
+	std::filesystem::current_path("../");
 #endif
 	//setenv("TF_ENABLE_ONEDNN_OPTS", "0", 1);
 #endif
+
+	if (!std::filesystem::exists("assets")) {
+		fprintf(stderr, "ERROR: Assets folder not found! The folder is required for this program to function.\n");
+		return -1;
+	}
 
 	if (!glfwInit()) {
 		printf("Failed to initialize GLFW\n");
@@ -50,7 +55,10 @@ int main() {
 		ImGuiBeginFrame();
 
 		ImGui::DockSpaceOverViewport();
+
+#ifndef UI_RELEASE
 		ImGui::ShowDemoWindow();
+#endif
 
 		// for each image set, create a window that will be tabbed in the main window
 		// for each image set tab, have tabs for stabilization and preprocessing etc.
