@@ -186,15 +186,7 @@ cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size 
 
 // unbelievable amount of allocations in this function...
 bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
-#ifdef WIN32
-#ifdef UI_RELEASE
 	cppflow::model model = cppflow::model("assets/models/" + model_name);
-#else
-	cppflow::model model = cppflow::model("../../../assets/models/" + model_name);
-#endif
-#else
-	cppflow::model model = cppflow::model("../assets/models/" + model_name);
-#endif
 
 	for (int i = 0; i < images.size(); i++) {
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);

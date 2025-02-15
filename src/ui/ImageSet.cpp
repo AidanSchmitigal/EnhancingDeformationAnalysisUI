@@ -54,8 +54,6 @@ void ImageSet::Display() {
 		ImGui::EndTabItem();
 	}
 
-
-
 	ImGui::EndTabBar();
 	ImGui::End();
 }
@@ -187,6 +185,7 @@ void ImageSet::DisplayPreprocessingTab() {
 				selected_textures_map.clear();
 				m_processed_sequence_viewer.SetTextures(m_processed_textures);
 			}
+			int images_per_line = ImGui::GetIO().DisplaySize.x / 115;
 			for (int i = 0; i < m_processed_textures.size(); i++) {
 				char name[100];
 				sprintf(name, "Frame %d", i);
@@ -206,7 +205,7 @@ void ImageSet::DisplayPreprocessingTab() {
 				if (selected) {
 					ImGui::PopStyleColor(2);
 				}
-				if (i % 7 != 6 && i != m_processed_textures.size() - 1) {
+				if (i % images_per_line != images_per_line-1 && i != m_processed_textures.size() - 1) {
 					ImGui::SameLine();
 				}
 			}
