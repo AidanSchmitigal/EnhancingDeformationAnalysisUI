@@ -2,38 +2,78 @@
 
 #include <opencv2/opencv.hpp>
 
-void CrackDetector::DetectCracks(std::vector<uint32_t*>& frames, int width, int height) {
-        if (frames.empty()) return;
+void CrackDetector::DetectCracks(const std::vector<uint32_t*>& images, int width, int height, int crack_darkness, int fill_threshold, int sharpness, int resolution, int amount) {
+	cv::Mat result;
+	for (uint32_t* img_ptr : images) {
+		cv::Mat image(height, width, CV_8UC4, img_ptr);
 
-        for (auto& ptr : frames) {
-                cv::Mat img(height, width, CV_8UC4, ptr);
-                cv::Mat gray, edges, cracks;
+		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 
-                // Convert to grayscale
-                cv::cvtColor(img, gray, cv::COLOR_RGBA2GRAY);
+		cv::Mat blurred;
+		cv::GaussianBlur(image, blurred, cv::Size(5, 5), 0);
 
-                // Apply Gaussian blur to reduce noise
-                cv::GaussianBlur(gray, gray, cv::Size(5, 5), 1.5);
+		cv::Mat dark_mask;
+		cv::inRange(blurred, 0, crack_darkness, dark_mask);
 
-                // Apply Canny edge detection with adjusted thresholds
-                cv::Canny(gray, edges, 100, 200);
+		cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+		cv::Mat dilated;
+		cv::dilate(dark_mask, dilated, kernel, cv::Point(-1, -1), fill_threshold);
 
-                // Morphological operations to enhance cracks
-                cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
-                cv::morphologyEx(edges, cracks, cv::MORPH_CLOSE, kernel);
+		cv::Mat inverted;
+		cv::bitwise_not(dilated, inverted);
 
-                // Highlight detected cracks in red
-                cv::Mat result;
-                cv::cvtColor(gray, result, cv::COLOR_GRAY2RGBA);
-                for (int y = 0; y < result.rows; y++) {
-                        for (int x = 0; x < result.cols; x++) {
-                                if (cracks.at<uchar>(y, x) > 0) {
-                                        result.at<cv::Vec4b>(y, x) = cv::Vec4b(0, 0, 255, 255);
-                                }
-                        }
-                }
+		cv::Mat labels, stats, centroids;
+		int num_labels = cv::connectedComponentsWithStats(inverted, labels, stats, centroids);
 
-                // Copy result back to original frame
-                std::memcpy(ptr, result.data, width * height * 4);
-        }
+		cv::Mat filled_img = dilated.clone();
+		const int max_hole_area = 20000;
+		for (int i = 1; i < num_labels; ++i) {
+			int area = stats.at<int>(i, cv::CC_STAT_AREA);
+			if (area < max_hole_area) {
+				filled_img.setTo(255, labels == i);
+			}
+		}
+
+		kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+		cv::Mat eroded;
+		cv::erode(filled_img, eroded, kernel);
+
+		cv::Mat clean_img = eroded.clone();
+		int clean_num_labels = cv::connectedComponentsWithStats(eroded, labels, stats, centroids);
+		std::vector<int> areas;
+		for (int i = 1; i < clean_num_labels; ++i) {
+			int area = stats.at<int>(i, cv::CC_STAT_AREA);
+			areas.push_back(area);
+		}
+		std::sort(areas.begin(), areas.end());
+		for (int i = 1; i < clean_num_labels; ++i) {
+			int area = stats.at<int>(i, cv::CC_STAT_AREA);
+			if (area < areas[std::max(0, (int)areas.size() - amount)]) {
+				clean_img.setTo(0, labels == i);
+			}
+		}
+
+		cv::Mat smooth_mask;
+		cv::GaussianBlur(clean_img, smooth_mask, cv::Size(13, 13), 0);
+		cv::inRange(smooth_mask, sharpness, 255, smooth_mask);
+
+		std::vector<std::vector<cv::Point>> contours;
+		cv::findContours(smooth_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+		std::vector<std::vector<cv::Point>> approx_polygons;
+		for (int i = 0; i < std::min((int)contours.size(), amount); ++i) {
+			std::vector<cv::Point> approx;
+			double epsilon = resolution;
+			cv::approxPolyDP(contours[i], approx, epsilon, true);
+			approx_polygons.push_back(approx);
+		}
+
+		cv::Mat color_img;
+		image.copyTo(color_img);
+		cv::cvtColor(image, color_img, cv::COLOR_GRAY2BGRA);
+		cv::polylines(color_img, approx_polygons, true, cv::Scalar(0, 0, 255), 2);
+
+		result = color_img.clone();
+		memcpy(img_ptr, result.data, width * height * 4);
+	}
 }

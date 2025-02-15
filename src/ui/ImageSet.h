@@ -6,6 +6,8 @@
 #include <ui/ImageSequenceViewer.h>
 #include <OpenGL/Texture.h>
 
+#include <core/FeatureTracker.hpp>
+
 class ImageSet {
 public:
 	ImageSet(const std::string_view &folder_path);
@@ -19,8 +21,13 @@ private:
 	void DisplayImageComparisonTab();
 	void DisplayPreprocessingTab();
 	void DisplayImageAnalysisTab();
+	void DisplayFeatureTrackingTab();
 
 	static int m_id_counter;
+	uint32_t m_num_points = 0;
+	TrackingPoint m_points[2];
+	uint32_t* m_point_image = nullptr;
+	Texture m_point_texture;
 	bool m_open = true;
 	std::string m_window_name;
 	std::string m_folder_path;

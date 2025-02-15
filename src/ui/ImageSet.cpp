@@ -4,6 +4,7 @@
 #include <core/stabilizer.hpp>
 #include <core/CrackDetector.hpp>
 #include <core/DenoiseInterface.hpp>
+#include <core/FeatureTracker.hpp>
 #include <utils.h>
 
 #include <imgui.h>
@@ -24,6 +25,7 @@ ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_p
 
 	LoadImages();
 
+	m_point_texture = Texture();
 	m_sequence_viewer = ImageSequenceViewer(m_textures, "Original Images");
 	m_processed_sequence_viewer = ImageSequenceViewer(m_processed_textures, "Processed Images");
 }
@@ -37,7 +39,6 @@ ImageSet::~ImageSet() {
 	}
 }
 
-static uint32_t* picking_data = nullptr;
 void ImageSet::Display() {
 	ImGui::Begin(m_window_name.c_str(), &m_open);
 	ImGui::BeginTabBar("PreProcessing");
@@ -46,35 +47,14 @@ void ImageSet::Display() {
 	DisplayImageComparisonTab();
 	DisplayPreprocessingTab();
 	DisplayImageAnalysisTab();
+	DisplayFeatureTrackingTab();
 
 	if (ImGui::BeginTabItem("Deformation Analysis/Prediction")) {
 		ImGui::Text("Deformation Analysis tab");
 		ImGui::EndTabItem();
 	}
 
-	if (ImGui::BeginTabItem("Pixel Picking")) {
-		if (picking_data == nullptr) {
-			picking_data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-		}
-		if (ImGui::Button("Clear Selection")) {
-			// FIXME: reallocate if the size of the image is different
-			m_textures[0]->GetData(picking_data);
-			m_processed_textures[0]->Load(picking_data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-		}
-		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::ImageButton("Image!", m_processed_textures[0]->GetID(), ImVec2(m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight()));
-		ImGui::PopStyleVar();
-		ImGui::PopStyleVar();
-		if(ImGui::IsItemActive() && ImGui::IsItemHovered()) {
-			uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
-			uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
-			ImGui::Text("%i, %i", coordX, coordY);
-			picking_data[coordY * m_processed_textures[0]->GetWidth() + coordX] = 0xFFFF0000;
-			m_processed_textures[0]->Load(picking_data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-		}
-		ImGui::EndTabItem();
-	}
+
 
 	ImGui::EndTabBar();
 	ImGui::End();
@@ -147,14 +127,24 @@ void ImageSet::DisplayImageComparisonTab() {
 void ImageSet::DisplayPreprocessingTab() {
 	if (ImGui::BeginTabItem("Preprocessing")) {
 		if (ImGui::CollapsingHeader("Crop")) {
+			static int crop = 60;
+			ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 2.3);
+			ImGui::SliderInt("Pixels to Crop", &crop, 0, 100);
 			if (ImGui::Button("Crop Bottom of Image")) {
 				// crop off 60 pixels from the bottom of the images
-				for (int i = 0; i < m_textures.size(); i++) {
-					uint32_t* data = (uint32_t*)malloc(m_textures[i]->GetWidth() * (m_textures[i]->GetHeight()) * 4);
-					m_textures[i]->GetData(data);
-					m_processed_textures[i]->Load(data, m_textures[i]->GetWidth(), m_textures[i]->GetHeight() - 60);
+				for (int i = 0; i < m_processed_textures.size(); i++) {
+					uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * (m_processed_textures[i]->GetHeight()) * 4);
+					m_processed_textures[i]->GetData(data);
+					m_processed_textures[i]->Load(data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight() - crop);
 					free(data);
 				}
+			}
+			ImGui::SameLine();
+			ImGui::TextDisabled("(?)");
+			if (ImGui::IsItemHovered()) {
+				ImGui::BeginTooltip();
+				ImGui::Text("This will crop off the bottom of the image by the specified number of pixels.\nThe default is 60 pixels, which is the size of the infobar on many SEM images.");
+				ImGui::EndTooltip();
 			}
 		}
 		if (ImGui::CollapsingHeader("Stabilization")) {
@@ -405,6 +395,62 @@ void ImageSet::DisplayImageAnalysisTab() {
 			char hist_text[100];
 			snprintf(hist_text, 100, "Image %d", i);
 			ImGui::PlotHistogram(hist_text, imageStatsCache[i].histogram.data(), imageStatsCache[i].histogram.size(), 0, NULL, 0, 1.0f, ImVec2(0, 80));
+		}
+		ImGui::EndTabItem();
+	}
+}
+
+void ImageSet::DisplayFeatureTrackingTab() {
+	if (ImGui::BeginTabItem("Feature Tracking")) {
+		if (m_point_image == nullptr) {
+			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_processed_textures[0]->GetData(m_point_image);
+			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+		}
+		if (ImGui::Button("Clear Selection")) {
+			// FIXME: reallocate if the size of the image is different
+			m_textures[0]->GetData(m_point_image);
+			m_processed_textures[0]->Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			m_num_points = 0;
+		}
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::ImageButton("Image!", m_point_texture.GetID(), ImVec2(m_point_texture.GetWidth(), m_point_texture.GetHeight()));
+		ImGui::PopStyleVar(2);
+		if (ImGui::IsItemActive() && ImGui::IsItemHovered() && m_num_points < 2) {
+			uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
+			uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
+			m_points[m_num_points] = TrackingPoint(coordX, coordY);
+
+			for (int i = coordX - 1; i < coordX + 2; i++) {
+				for (int j = coordY - 1; j < coordY + 2; j++) {
+					if (i < 0 || j < 0 || i >= m_processed_textures[0]->GetWidth() || j >= m_processed_textures[0]->GetHeight()) {
+						continue;
+					}
+					m_point_image[j * m_processed_textures[0]->GetWidth() + i] = 0xFFFF0000;
+				}
+			}
+			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			m_num_points++;
+		}
+		if (m_num_points == 2) {
+			if (ImGui::Button("Track Features")) {
+				std::vector<uint32_t*> frames;
+				for (int i = 0; i < m_processed_textures.size(); i++) {
+					uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
+					m_processed_textures[i]->GetData(data);
+					frames.push_back(data);
+				}
+				FeatureTracker::TrackFeatures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_points[0], m_points[1]);
+				for (int i = 0; i < frames.size(); i++) {
+					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+					free(frames[i]);
+				}
+				m_points[0] = TrackingPoint();
+				m_points[1] = TrackingPoint();
+				m_num_points = 0;
+				m_processed_textures[0]->Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			}
 		}
 		ImGui::EndTabItem();
 	}
