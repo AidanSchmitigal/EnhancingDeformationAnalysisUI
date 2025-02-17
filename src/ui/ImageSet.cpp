@@ -43,16 +43,11 @@ void ImageSet::Display() {
 	ImGui::Begin(m_window_name.c_str(), &m_open);
 	ImGui::BeginTabBar("PreProcessing");
 
-	// TODO: Add tabs for histograms and deformation analysis
 	DisplayImageComparisonTab();
 	DisplayPreprocessingTab();
 	DisplayImageAnalysisTab();
 	DisplayFeatureTrackingTab();
-
-	if (ImGui::BeginTabItem("Deformation Analysis/Prediction")) {
-		ImGui::Text("Deformation Analysis tab");
-		ImGui::EndTabItem();
-	}
+	DisplayDeformationAnalysisTab();
 
 	ImGui::EndTabBar();
 	ImGui::End();
@@ -85,7 +80,6 @@ void ImageSet::LoadImages() {
 
 void ImageSet::DisplayImageComparisonTab() {
 	if (ImGui::BeginTabItem("Image Comparison")) {
-		ImGui::NewLine();
 		if (ImGui::Button((m_sequence_viewer.GetPlaying() && m_processed_sequence_viewer.GetPlaying()) ? "Stop Both" : "Play Both")) {
 			m_sequence_viewer.StartStopPlay();
 			m_processed_sequence_viewer.StartStopPlay();
@@ -408,8 +402,12 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		}
 		if (ImGui::Button("Clear Selection")) {
 			// FIXME: reallocate if the size of the image is different
-			m_textures[0]->GetData(m_point_image);
-			m_processed_textures[0]->Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+				free(m_point_image);
+				m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			}
+			m_processed_textures[0]->GetData(m_point_image);
+			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			m_num_points = 0;
 		}
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
@@ -451,6 +449,13 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				m_processed_textures[0]->Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
 		}
+		ImGui::EndTabItem();
+	}
+}
+
+void ImageSet::DisplayDeformationAnalysisTab() {
+	if (ImGui::BeginTabItem("Deformation Analysis")) {
+		ImGui::Text("This tab is under construction.");
 		ImGui::EndTabItem();
 	}
 }

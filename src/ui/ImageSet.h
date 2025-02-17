@@ -22,6 +22,7 @@ private:
 	void DisplayPreprocessingTab();
 	void DisplayImageAnalysisTab();
 	void DisplayFeatureTrackingTab();
+	void DisplayDeformationAnalysisTab();
 
 	static int m_id_counter;
 	uint32_t m_num_points = 0;
