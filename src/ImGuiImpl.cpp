@@ -6,16 +6,17 @@
 
 void SetImGuiColors();
 
-void ImGuiInit(GLFWwindow* window) {
+void ImGuiInit(GLFWwindow* window, bool set_colors, bool set_fonts) {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	ImGui::StyleColorsDark();
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init();
 
-	ImGui::GetIO().Fonts->AddFontFromFileTTF("assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
+	if (set_fonts)
+		ImGui::GetIO().Fonts->AddFontFromFileTTF("assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
 
-	SetImGuiColors();
+	if (set_colors)
+		SetImGuiColors();
 }
 
 void ImGuiShutdown() {
