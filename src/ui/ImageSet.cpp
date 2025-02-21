@@ -37,6 +37,7 @@ ImageSet::~ImageSet() {
 	for (auto& texture : m_processed_textures) {
 		delete texture;
 	}
+	free(m_point_image);
 }
 
 void ImageSet::Display() {
@@ -394,6 +395,7 @@ void ImageSet::DisplayImageAnalysisTab() {
 }
 
 void ImageSet::DisplayFeatureTrackingTab() {
+	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
 		if (m_point_image == nullptr) {
 			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
@@ -414,13 +416,17 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::ImageButton("Image!", m_point_texture.GetID(), ImVec2(m_point_texture.GetWidth(), m_point_texture.GetHeight()));
 		ImGui::PopStyleVar(2);
-		if (ImGui::IsItemActive() && ImGui::IsItemHovered() && m_num_points < 2) {
+		const auto now = std::chrono::system_clock::now();
+		if (ImGui::IsItemActive() && ImGui::IsItemHovered() && m_num_points < 2 && std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count() > 250) {
+			last_time = now;
 			uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
 			uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
-			m_points[m_num_points] = TrackingPoint(coordX, coordY);
+			m_points.push_back(cv::Point2f(coordX, coordY));
 
-			for (int i = coordX - 1; i < coordX + 2; i++) {
-				for (int j = coordY - 1; j < coordY + 2; j++) {
+			// size of the point, 3 == 3x3
+			int size = 3;
+			for (int i = coordX - size; i < coordX + size + 1; i++) {
+				for (int j = coordY - size; j < coordY + size + 1; j++) {
 					if (i < 0 || j < 0 || i >= m_processed_textures[0]->GetWidth() || j >= m_processed_textures[0]->GetHeight()) {
 						continue;
 					}
@@ -438,15 +444,16 @@ void ImageSet::DisplayFeatureTrackingTab() {
 					m_processed_textures[i]->GetData(data);
 					frames.push_back(data);
 				}
-				FeatureTracker::TrackFeatures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_points[0], m_points[1]);
+				std::vector<std::vector<cv::Point2f>> tracked_points;
+				FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+				memcpy(m_point_image, frames[0], m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+				m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 				for (int i = 0; i < frames.size(); i++) {
 					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 					free(frames[i]);
 				}
-				m_points[0] = TrackingPoint();
-				m_points[1] = TrackingPoint();
+				m_points.clear();
 				m_num_points = 0;
-				m_processed_textures[0]->Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
 		}
 		ImGui::EndTabItem();

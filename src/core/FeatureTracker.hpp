@@ -3,11 +3,12 @@
 #include <vector>
 #include <cstdint>
 
-struct TrackingPoint {
-    float x;
-    float y;
-};
+namespace cv {
+	template<typename _Tp> class Point_;
+	typedef Point_<float> Point2f;
+}
+
 class FeatureTracker {
-public:
-	static std::vector<std::pair<TrackingPoint, TrackingPoint>> TrackFeatures(const std::vector<uint32_t*>& imageSequence, int width, int height, TrackingPoint point1, TrackingPoint point2);
+	public:
+		static void TrackFeatures(const std::vector<uint32_t*>& imageSequence, std::vector<cv::Point2f>& points, std::vector<std::vector<cv::Point2f>>& trackedPoints, int width, int height);
 };
