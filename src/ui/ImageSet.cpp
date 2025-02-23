@@ -466,3 +466,9 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		ImGui::EndTabItem();
 	}
 }
+
+void ImageSet::DisplayTestTab() {
+	if (ImGui::BeginTabItem("Test")) {
+		ImGui::EndTabItem();
+	}
+}

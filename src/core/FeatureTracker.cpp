@@ -15,27 +15,21 @@ void FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::ve
 	cv::Mat displayImage = firstImage.clone();
 	cv::cvtColor(firstImage, prevGray, cv::COLOR_BGRA2GRAY);
 
-	// Refine the user’s two points with goodFeaturesToTrack
-	std::vector<cv::Point2f> refinedPts;
-	cv::Mat mask = cv::Mat::zeros(height, width, CV_8U);
-	int margin = 20; // Small region around points
-	cv::rectangle(mask, cv::Point(points[0].x - margin, points[0].y - margin),
-			cv::Point(points[1].x + margin, points[1].y + margin), 255, -1);
-	cv::goodFeaturesToTrack(prevGray, refinedPts, 2, 0.01, 10, mask, 3, false, 0.04);
-	if (refinedPts.size() < 2) prevPts = points; // Fallback to user points
-	else {
-		printf("Using refined points\n");
-		for (int i = 0; i < 2; i++) {
-			float minDist = cv::norm(points[i] - refinedPts[0]);
-			int bestIdx = 0;
-			for (int j = 1; j < refinedPts.size(); j++) {
-				float dist = cv::norm(points[i] - refinedPts[j]);
-				if (dist < minDist) {
-					minDist = dist;
-					bestIdx = j;
-				}
-			}
-			prevPts.push_back(refinedPts[bestIdx]);
+	// Refine each point separately with its own mask
+	int radius = 10; // Adjust radius as needed
+	prevPts.resize(2); // Pre-allocate for 2 points
+	for (int i = 0; i < 2; i++) {
+		// Create a mask for this point only
+		cv::Mat mask = cv::Mat::zeros(height, width, CV_8U);
+		cv::circle(mask, points[i], radius, 255, -1); // Mask around this point
+
+		// Find one good feature in this region
+		std::vector<cv::Point2f> refinedPts;
+		cv::goodFeaturesToTrack(prevGray, refinedPts, 1, 0.01, 10, mask, 3, false, 0.04); // maxCorners = 1
+		if (refinedPts.empty()) {
+			prevPts[i] = points[i]; // Fallback to user point if no feature found
+		} else {
+			prevPts[i] = refinedPts[0]; // Use the single refined point
 		}
 	}
 	trackedPoints.push_back(prevPts);
@@ -80,7 +74,7 @@ void FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::ve
 			cv::arrowedLine(finalDisplay, prevPts[i], finalPts[i], cv::Scalar(0, 0, 255, 255), 2);
 		}
 		std::string finalText = "Final Dist: " + std::to_string(finalDist) + " px";
-		cv::putText(finalDisplay, finalText, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255, 255), 2);
+		cv::putText(finalDisplay, finalText, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255, 255), 2);
 		memcpy(images[images.size() - 1], finalDisplay.data, width * height * 4); // Write back
 	}
 }

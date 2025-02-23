@@ -12,7 +12,7 @@
 #include <ui/ImageSet.h>
 #include <utils.h>
 
-int main() {
+int main(int argc, char** argv) {
 #ifdef WIN32
 	_putenv_s("TF_ENABLE_ONEDNN_OPTS", "1");
 #ifndef UI_RELEASE
@@ -25,6 +25,8 @@ int main() {
 	setenv("TF_ENABLE_ONEDNN_OPTS", "1", 1);
 #endif
 
+	// TODO: prepare for command line usage, no GUI
+	
 	bool assets_folder_exists = std::filesystem::exists("assets");
 	if (!assets_folder_exists) {
 		fprintf(stderr, "ERROR: Assets folder not found! The folder is required for this program to function correctly!\n");

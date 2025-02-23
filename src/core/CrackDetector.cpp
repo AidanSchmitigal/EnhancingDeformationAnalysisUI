@@ -2,10 +2,14 @@
 
 #include <opencv2/opencv.hpp>
 
-void CrackDetector::DetectCracks(const std::vector<uint32_t*>& images, int width, int height, int crack_darkness, int fill_threshold, int sharpness, int resolution, int amount) {
+std::vector<std::vector<std::vector<cv::Point>>> CrackDetector::DetectCracks(const std::vector<uint32_t*>& images, int width, int height, int crack_darkness, int fill_threshold, int sharpness, int resolution, int amount) {
 	cv::Mat result;
+	std::vector<std::vector<std::vector<cv::Point>>> polygons;
+
 	for (uint32_t* img_ptr : images) {
 		cv::Mat image(height, width, CV_8UC4, img_ptr);
+
+		// TODO: check for info bar at bottom of image and mask image to avoid detecting it
 
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 
@@ -67,13 +71,13 @@ void CrackDetector::DetectCracks(const std::vector<uint32_t*>& images, int width
 			cv::approxPolyDP(contours[i], approx, epsilon, true);
 			approx_polygons.push_back(approx);
 		}
+		polygons.push_back(approx_polygons);
 
-		cv::Mat color_img;
-		image.copyTo(color_img);
-		cv::cvtColor(image, color_img, cv::COLOR_GRAY2BGRA);
-		cv::polylines(color_img, approx_polygons, true, cv::Scalar(0, 0, 255), 2);
+		cv::cvtColor(image, image, cv::COLOR_GRAY2BGRA);
+		cv::polylines(image, approx_polygons, true, cv::Scalar(0, 0, 255), 2);
 
-		result = color_img.clone();
-		memcpy(img_ptr, result.data, width * height * 4);
+		memcpy(img_ptr, image.data, width * height * 4);
 	}
+
+	return polygons;
 }
