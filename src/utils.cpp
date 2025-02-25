@@ -11,7 +11,7 @@
 #endif
 
 namespace utils {
-	std::string OpenFileDialog(const char* open_path, const bool folders_only, const char* filter) {
+	std::string OpenFileDialog(const char* open_path, const char* title, const bool folders_only, const char* filter) {
 #ifdef _WIN32
 		CoInitialize(nullptr);
 		IFileDialog* pFileDialog = nullptr;
@@ -54,9 +54,9 @@ namespace utils {
 		// Set zenity to open in our current directory
 		char buf[256];
 		if (folders_only)
-			snprintf(buf, 256, "zenity --file-selection --title=\"Choose an Image Folder (.tif)\" --directory --filename=%s/", open_path);
+			snprintf(buf, 256, "zenity --file-selection --title=\"%s\" --directory --filename=%s/", title, open_path);
 		else
-			snprintf(buf, 256, "zenity --file-selection --title=\"Choose an Image (.tif)\" --filename=%s/", open_path);
+			snprintf(buf, 256, "zenity --file-selection --title=\"%s\" --filename=%s/", title, open_path);
 
 		char output[1024];
 
@@ -64,7 +64,7 @@ namespace utils {
 		FILE *f = popen(buf, "r");
 
 		// get filename from zenity
-		fgets(output, 1024, f);
+		auto out = fgets(output, 1024, f);
 
 		// remove any newlines
 		output[strcspn(output, "\n")] = 0;
@@ -84,14 +84,16 @@ namespace utils {
 		}
 		size_t npixels;
 		uint32_t* raster;
+		size_t samplesperpixel;
 
 		TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
 		TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
+		TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesperpixel);
 
 		TIFFRGBAImage img;
 		char emsg[1024];
 		if (!TIFFRGBAImageBegin(&img, tif, 0, emsg)) {
-			TIFFError(path, emsg);
+			TIFFError(path, "%s", emsg);
 			TIFFClose(tif);
 			return NULL;
 		}
@@ -114,5 +116,33 @@ namespace utils {
 		_TIFFfree(raster);
 		TIFFClose(tif);
 		return NULL;
+	}
+
+	bool WriteTiff(const char* path, unsigned int* data, int width, int height) {
+		TIFF* tif = TIFFOpen(path, "w");
+		if (!tif) {
+			printf("Could not open file %s\n", path);
+			return false;
+		}
+
+		TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, width);
+		TIFFSetField(tif, TIFFTAG_IMAGELENGTH, height);
+		TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 4);
+		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+		TIFFSetField(tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+		TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+		
+		for (int i = 0; i < height; i++) {
+			if (TIFFWriteScanline(tif, data + i * width, i, 0) < 0) {
+				printf("Error writing tiff\n");
+				TIFFClose(tif);
+				return false;
+			}
+		}
+
+		TIFFClose(tif);
+		return true;
 	}
 }

@@ -32,6 +32,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "ERROR: Assets folder not found! The folder is required for this program to function correctly!\n");
 	}
 
+	glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
 	if (!glfwInit()) {
 		printf("Failed to initialize GLFW\n");
 		return -1;
@@ -50,21 +51,36 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
+	// set glfw error callback, because we might as well
+	glfwSetErrorCallback([](int error, const char* description) {
+		fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+	});
+
+	// call ImGuiInit to initialize the ImGui context
 	ImGuiInit(window, false, assets_folder_exists);
+	// default to dark theme
 	ImGui::StyleColorsDark();
 
+	// allow docking
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+	// create a vector of ImageSet pointers to store the image sets
 	std::vector<ImageSet*> image_sets;
 	while (!glfwWindowShouldClose(window)) {
+		// set the default background and clear the screen
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
+
+		// check for events
 		glfwPollEvents();
 
+		// begin the ImGui frame
 		ImGuiBeginFrame();
 
+		// draw the dockspace over the viewport
 		ImGui::DockSpaceOverViewport();
 
+		// show the demo window if in debug
 #ifndef UI_RELEASE
 		ImGui::ShowDemoWindow();
 #endif
@@ -73,11 +89,13 @@ int main(int argc, char** argv) {
 		// for each image set tab, have tabs for stabilization and preprocessing etc.
 		ImGui::Begin("Image Folder Selector");
 		if (ImGui::Button("Select Folder")) {
-			std::string folder_path = utils::OpenFileDialog(".", true);
+			std::string folder_path = utils::OpenFileDialog(".", "Choose a Folder to Load", true);
 			if (!folder_path.empty() && std::filesystem::is_directory(folder_path)) {
 				image_sets.emplace_back(new ImageSet(folder_path));
 			}
 		}
+
+		// display a warning if the assets folder is not found
 		if (!assets_folder_exists) {
 			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Assets folder not found! Please place the assets folder in the same directory as the executable.");
 			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "The assets folder is required for the program to function correctly.");
@@ -85,7 +103,9 @@ int main(int argc, char** argv) {
 
 		ImGui::End();
 
+		// display the image sets
 		for (int i = 0; i < image_sets.size(); i++) {
+			// if the image set is closed, delete it and remove it from the vector
 			if (image_sets[i]->Closed()) {
 				delete image_sets[i];
 				image_sets.erase(image_sets.begin() + i);
@@ -95,12 +115,13 @@ int main(int argc, char** argv) {
 			image_sets[i]->Display();
 		}
 
+		// end the ImGui frame
 		ImGuiEndFrame();
 
 		glfwSwapBuffers(window);
 	}
 
 	glfwDestroyWindow(window);
-	glfwTerminate();
+	glfwTerminate(); // this segfaults on wayland? (using glfw from master branch)
 	return 0;
 }

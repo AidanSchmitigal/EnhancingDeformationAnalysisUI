@@ -16,7 +16,7 @@ void FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::ve
 	cv::cvtColor(firstImage, prevGray, cv::COLOR_BGRA2GRAY);
 
 	// Refine each point separately with its own mask
-	int radius = 10; // Adjust radius as needed
+	int radius = 5; // Adjust radius as needed
 	prevPts.resize(2); // Pre-allocate for 2 points
 	for (int i = 0; i < 2; i++) {
 		// Create a mask for this point only

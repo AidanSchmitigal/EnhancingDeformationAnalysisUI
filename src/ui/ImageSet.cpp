@@ -49,6 +49,22 @@ void ImageSet::Display() {
 	DisplayImageAnalysisTab();
 	DisplayFeatureTrackingTab();
 	DisplayDeformationAnalysisTab();
+	if (ImGui::BeginTabItem("Save Images")) {
+		if (ImGui::Button("Save Processed Images")) {
+			std::string folder = utils::OpenFileDialog(".", "Choose Where to Save the Images", true);
+			if (!folder.empty()) {
+				for (int i = 0; i < m_processed_textures.size(); i++) {
+					char path[256];
+					sprintf(path, "%s/frame_%d.tif", folder.c_str(), i);
+					uint32_t* data = new uint32_t[m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight()];
+					m_processed_textures[i]->GetData(data);
+					utils::WriteTiff(path, data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+					free(data);
+				}
+			}
+		}
+		ImGui::EndTabItem();
+	}
 
 	ImGui::EndTabBar();
 	ImGui::End();
