@@ -419,21 +419,20 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 		if (ImGui::Button("Clear Selection")) {
-			// FIXME: reallocate if the size of the image is different
 			if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
 				free(m_point_image);
 				m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			}
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-			m_num_points = 0;
+			m_points.clear();
 		}
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::ImageButton("Image!", m_point_texture.GetID(), ImVec2(m_point_texture.GetWidth(), m_point_texture.GetHeight()));
+		ImGui::ImageButton("Processed Image", m_point_texture.GetID(), ImVec2(m_point_texture.GetWidth(), m_point_texture.GetHeight()));
 		ImGui::PopStyleVar(2);
 		const auto now = std::chrono::system_clock::now();
-		if (ImGui::IsItemActive() && ImGui::IsItemHovered() && m_num_points < 2 && std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count() > 250) {
+		if (ImGui::IsItemActive() && ImGui::IsItemHovered() && std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count() > 250) {
 			last_time = now;
 			uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
 			uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
@@ -450,9 +449,8 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				}
 			}
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-			m_num_points++;
 		}
-		if (m_num_points == 2) {
+		if (m_points.size() % 2 == 0 && m_points.size() > 0) {
 			if (ImGui::Button("Track Features")) {
 				std::vector<uint32_t*> frames;
 				for (int i = 0; i < m_processed_textures.size(); i++) {
@@ -469,7 +467,6 @@ void ImageSet::DisplayFeatureTrackingTab() {
 					free(frames[i]);
 				}
 				m_points.clear();
-				m_num_points = 0;
 			}
 		}
 		ImGui::EndTabItem();

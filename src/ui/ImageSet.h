@@ -26,7 +26,6 @@ private:
 	void DisplayTestTab();
 
 	static int m_id_counter;
-	uint32_t m_num_points = 0;
 	std::vector<cv::Point2f> m_points;
 	uint32_t* m_point_image = nullptr;
 	Texture m_point_texture;
