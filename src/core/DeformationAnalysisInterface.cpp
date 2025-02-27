@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 
 #include <cppflow/cppflow.h>
+#include <tensorflow/c/c_api.h>
 
 // Function to split an image into tiles
 std::vector<DeformationAnalysisInterface::ImageTile> DeformationAnalysisInterface::splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap) {
@@ -100,16 +101,43 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 					image_data.push_back(tile.data.at<float>(y, x));
 				}
 			}
-			cppflow::tensor input = cppflow::tensor(image_data, {1, 1, tile.data.rows, tile.data.cols});
+			for (int y = 0; y < tile.data.rows; y++) {
+				for (int x = 0; x < tile.data.cols; x++) {
+					image_data.push_back(tile.data.at<float>(y, x));
+				}
+			}
+			cppflow::tensor input = cppflow::tensor(image_data, {1, 2, tile.data.rows, tile.data.cols});
 
 			try {
-				std::vector<std::string> strings = {"hello", "world", "world", "world", "world", "world"};
-				cppflow::tensor string_tensor(strings, {6, 6});
+				std::string str = "saver";
+				std::vector<int64_t> dims = {1}; // Shape {1} for one string
+				size_t data_size = sizeof(int64_t) * 2 + str.size(); // 2 offsets + string bytes
+				std::vector<char> buffer(data_size);
+
+				// Offset for one string: [0, length]
+				int64_t offset_start = 0;
+				int64_t offset_end = str.size();
+				memcpy(buffer.data(), &offset_start, sizeof(int64_t));
+				memcpy(buffer.data() + sizeof(int64_t), &offset_end, sizeof(int64_t));
+				memcpy(buffer.data() + 2 * sizeof(int64_t), str.data(), str.size());
+
+				// Create the tensor
+				TF_Tensor* tensor = TF_NewTensor(
+						TF_STRING,           // Data type
+						dims.data(),         // Dimensions
+						dims.size(),         // Number of dimensions (1)
+						buffer.data(),       // Data buffer
+						data_size,           // Buffer size
+						[](void* data, size_t, void*) { }, // Deallocator
+						nullptr              // Deallocator arg
+						);
+				cppflow::tensor filename_data = cppflow::tensor(tensor);
 				auto output2 = model({
 						{ "serving_default_input.1", input },
-						{ "saver_filename", string_tensor }
-					},
-					{"StatefulPartitionedCall"});
+						{ "saver_filename",  filename_data }
+						},
+						{"StatefulPartitionedCall"});
+				printf("Model finished!\n");
 				output.push_back(output2[0]);
 			}
 			catch (const std::runtime_error& e) {

@@ -4,6 +4,8 @@
 #include <vector>
 
 #include <ui/ImageSequenceViewer.h>
+#include <ui/PreprocessingTab.h>
+
 #include <OpenGL/Texture.h>
 
 #include <core/FeatureTracker.hpp>
@@ -19,13 +21,14 @@ public:
 private:
 	void LoadImages();
 	void DisplayImageComparisonTab();
-	void DisplayPreprocessingTab();
 	void DisplayImageAnalysisTab();
 	void DisplayFeatureTrackingTab();
 	void DisplayDeformationAnalysisTab();
 	void DisplayTestTab();
 
 	static int m_id_counter;
+
+	PreprocessingTab m_preprocessing_tab;
 	std::vector<cv::Point2f> m_points;
 	uint32_t* m_point_image = nullptr;
 	Texture m_point_texture;

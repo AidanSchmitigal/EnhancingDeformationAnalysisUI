@@ -3,11 +3,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace cv {
-	template<typename _Tp> class Point_;
-	typedef Point_<int> Point2i;
-	typedef Point2i Point;
-}
+#include <opencv2/opencv.hpp>
 
 class CrackDetector {
 public:

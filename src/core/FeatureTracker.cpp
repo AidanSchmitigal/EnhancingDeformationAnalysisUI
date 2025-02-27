@@ -37,9 +37,9 @@ void FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::ve
 	// Draw initial points and distance on first image
 	unsigned int text_y = 30;
 	for (int i = 0; i < points.size(); i++) {
-		float initialDist = cv::norm(prevPts[i * 2] - prevPts[i * 2 + 1]);
+		float initialDist = cv::norm(prevPts[i] - prevPts[i + 1]);
 		cv::circle(displayImage, prevPts[i], 5, cv::Scalar(0, 255, 0, 255), -1);
-		if (i % 2 == 0) cv::putText(displayImage, "Feature " + std::to_string(initialDist), prevPts[i], cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255, 255), 2);
+		if (i % 2 == 0) cv::putText(displayImage, std::to_string(i / 2) + ": " + std::to_string(initialDist), prevPts[i], cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255, 255), 2);
 		text_y += 30;
 	}
 	memcpy(images[0], displayImage.data, width * height * 4); // Write back to original buffer
@@ -74,7 +74,7 @@ void FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::ve
 			float finalDist = cv::norm(finalPts[i] - finalPts[i + 1]);
 			cv::circle(finalDisplay, finalPts[i], 5, cv::Scalar(0, 255, 0, 255), -1);
 			cv::arrowedLine(finalDisplay, prevPts[i], finalPts[i], cv::Scalar(0, 0, 255, 255), 2);
-			if (i % 2 == 0) cv::putText(finalDisplay, "Feature " + std::to_string(finalDist), finalPts[i], cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255, 255), 2);
+			if (i % 2 == 0) cv::putText(finalDisplay, std::to_string(i / 2) + " " + std::to_string(finalDist), finalPts[i], cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255, 255), 2);
 			text_y += 30;
 		}
 		memcpy(images[images.size() - 1], finalDisplay.data, width * height * 4); // Write back
