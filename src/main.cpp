@@ -32,7 +32,6 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "ERROR: Assets folder not found! The folder is required for this program to function correctly!\n");
 	}
 
-	glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
 	if (!glfwInit()) {
 		printf("Failed to initialize GLFW\n");
 		return -1;
