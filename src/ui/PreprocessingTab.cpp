@@ -194,7 +194,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			ImGui::TextDisabled("(?)");
 			if (ImGui::IsItemHovered()) {
 				ImGui::BeginTooltip();
-				ImGui::Text("This is a very early version of the crack detection algorithm. It works best on images with high contrast between the cracks and the background. \n\n"
+				ImGui::Text("This is an early version of the crack detection algorithm. It works best on images with high contrast between the cracks and the background. \n\n"
 						"To use it, first denoise the images using the \"Denoising\" section. Then, click the \"Detect Cracks\" button. The algorithm will then process the images and display the results.");
 				ImGui::EndTooltip();
 			}

@@ -16,6 +16,7 @@
 #include <string>
 #include <filesystem>
 #include <unordered_map>
+#include <numeric>
 
 int ImageSet::m_id_counter = 0;
 
@@ -48,17 +49,20 @@ void ImageSet::Display() {
 	ImGui::BeginTabBar("PreProcessing");
 
 	bool changed = false;
+	// TODO: refactor all of these into separate files
 	DisplayImageComparisonTab();
 	m_preprocessing_tab.DisplayPreprocessingTab(changed);
 	DisplayImageAnalysisTab();
 	DisplayFeatureTrackingTab();
 	DisplayDeformationAnalysisTab();
 
+	// only necessary when we modify the vector by changing its size (this only happens in the preprocessing tab)
 	if (changed) {
 		m_preprocessing_tab.GetProcessedTextures(m_processed_textures);
 		m_processed_sequence_viewer.SetTextures(m_processed_textures);
 	}
-	
+
+	// TODO: move this somewhere else
 	if (ImGui::BeginTabItem("Save Images")) {
 		if (ImGui::Button("Save Processed Images")) {
 			std::string folder = utils::OpenFileDialog(".", "Choose Where to Save the Images", true);
@@ -85,12 +89,16 @@ void ImageSet::LoadImages() {
 		printf("Path does not exist\n");
 		return;
 	}
+	
+	// find all .tif files in the folder
 	std::vector<std::string> files;
 	for (const auto& entry : std::filesystem::directory_iterator(m_folder_path)) {
 		if (entry.path().string().find(".tif") == std::string::npos)
 			continue;
 		files.push_back(entry.path().string());
 	}
+
+	// sort the files by name
 	std::sort(files.begin(), files.end());
 	for (const auto& file : files) {
 		int width, height;
@@ -230,6 +238,46 @@ void ImageSet::DisplayImageAnalysisTab() {
 	}
 }
 
+// Calculate width for a single polygon
+float calculatePolygonWidth(const std::vector<cv::Point>& polygon) {
+    if (polygon.size() < 3) return 0.0f;
+
+    std::vector<float> widths;
+    int n = polygon.size();
+    for (int i = 0; i < n; i += std::max(1, n / 10)) { // Sample ~10 points
+        cv::Point p1 = polygon[i];
+        std::vector<float> distances;
+
+        for (const auto& p2 : polygon) {
+            float dist = cv::norm(p2 - p1);
+            if (dist > 0) distances.push_back(dist);
+        }
+
+        if (distances.size() > 1) {
+            std::sort(distances.begin(), distances.end());
+            widths.push_back(distances[1]); // Second smallest as width
+        }
+    }
+
+    return widths.empty() ? 0.0f : std::accumulate(widths.begin(), widths.end(), 0.0f) / widths.size();
+}
+
+// Track widths for all cracks in all images
+std::vector<std::vector<float>> trackCrackWidths(const std::vector<std::vector<std::vector<cv::Point>>>& polygons) {
+    std::vector<std::vector<float>> widthsPerImage;
+
+    for (const auto& imagePolygons : polygons) { // For each image
+        std::vector<float> widths;
+        for (const auto& polygon : imagePolygons) { // For each crack polygon
+            float width = calculatePolygonWidth(polygon);
+            if (width > 0) widths.push_back(width);
+        }
+        widthsPerImage.push_back(widths);
+    }
+
+    return widthsPerImage;
+}
+
 void ImageSet::DisplayFeatureTrackingTab() {
 	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
@@ -291,6 +339,31 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		}
 		else {
 			ImGui::Text("Select two points to track features");
+		}
+
+		static std::vector<std::vector<float>> widths;
+		if (ImGui::Button("Automatically Track Widths")) {
+			std::vector<uint32_t*> frames;
+			for (int i = 0; i < m_processed_textures.size(); i++) {
+				uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
+				m_processed_textures[i]->GetData(data);
+				frames.push_back(data);
+			}
+			auto polygons = CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			widths = trackCrackWidths(polygons);
+			for (int i = 0; i < frames.size(); i++) {
+				m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+				free(frames[i]);
+			}
+		}
+		for (int i = 0; i < widths.size(); i++) {
+			char name[100];
+			sprintf(name, "Image %d", i);
+			if (ImGui::CollapsingHeader(name)) {
+			for (int j = 0; j < widths[i].size(); j++) {
+				ImGui::Text("Crack %d: %.2f", j, widths[i][j]);
+			}
+			}
 		}
 		ImGui::EndTabItem();
 	}

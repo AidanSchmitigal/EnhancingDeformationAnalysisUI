@@ -9,6 +9,7 @@ class ImageSequenceViewer {
 public:
 	ImageSequenceViewer() = default;
 	ImageSequenceViewer(std::vector<Texture*>& textures, const std::string& image_sequence_name = "Image Sequence");
+	// don't let this free the textures, they are allocated and freed in ImageSet
 	~ImageSequenceViewer() {}
 
 	void Display();

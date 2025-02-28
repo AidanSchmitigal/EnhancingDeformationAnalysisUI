@@ -9,6 +9,7 @@ class PreprocessingTab {
 public:
     PreprocessingTab() = default;
     PreprocessingTab(std::vector<Texture*>& textures, std::vector<Texture*>& processed_textures);
+    // don't let this free the textures/texture vectors, they are allocated and freed in ImageSet
     ~PreprocessingTab() {}
     void DisplayPreprocessingTab(bool& changed);
     void GetProcessedTextures(std::vector<Texture*>& processed_textures) { processed_textures = m_processed_textures; }
