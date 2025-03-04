@@ -15,7 +15,6 @@
 
 #include <string>
 #include <filesystem>
-#include <unordered_map>
 #include <numeric>
 
 int ImageSet::m_id_counter = 0;
@@ -89,7 +88,7 @@ void ImageSet::LoadImages() {
 		printf("Path does not exist\n");
 		return;
 	}
-	
+
 	// find all .tif files in the folder
 	std::vector<std::string> files;
 	for (const auto& entry : std::filesystem::directory_iterator(m_folder_path)) {
@@ -240,131 +239,148 @@ void ImageSet::DisplayImageAnalysisTab() {
 
 // Calculate width for a single polygon
 float calculatePolygonWidth(const std::vector<cv::Point>& polygon) {
-    if (polygon.size() < 3) return 0.0f;
+	if (polygon.size() < 3) return 0.0f;
 
-    std::vector<float> widths;
-    int n = polygon.size();
-    for (int i = 0; i < n; i += std::max(1, n / 10)) { // Sample ~10 points
-        cv::Point p1 = polygon[i];
-        std::vector<float> distances;
+	std::vector<float> widths;
+	int n = polygon.size();
+	for (int i = 0; i < n; i += std::max(1, n / 10)) { // Sample ~10 points
+		cv::Point p1 = polygon[i];
+		std::vector<float> distances;
 
-        for (const auto& p2 : polygon) {
-            float dist = cv::norm(p2 - p1);
-            if (dist > 0) distances.push_back(dist);
-        }
+		for (const auto& p2 : polygon) {
+			float dist = cv::norm(p2 - p1);
+			if (dist > 0) distances.push_back(dist);
+		}
 
-        if (distances.size() > 1) {
-            std::sort(distances.begin(), distances.end());
-            widths.push_back(distances[1]); // Second smallest as width
-        }
-    }
+		if (distances.size() > 1) {
+			std::sort(distances.begin(), distances.end());
+			widths.push_back(distances[1]); // Second smallest as width
+		}
+	}
 
-    return widths.empty() ? 0.0f : std::accumulate(widths.begin(), widths.end(), 0.0f) / widths.size();
+	return widths.empty() ? 0.0f : std::accumulate(widths.begin(), widths.end(), 0.0f) / widths.size();
 }
 
 // Track widths for all cracks in all images
 std::vector<std::vector<float>> trackCrackWidths(const std::vector<std::vector<std::vector<cv::Point>>>& polygons) {
-    std::vector<std::vector<float>> widthsPerImage;
+	std::vector<std::vector<float>> widthsPerImage;
 
-    for (const auto& imagePolygons : polygons) { // For each image
-        std::vector<float> widths;
-        for (const auto& polygon : imagePolygons) { // For each crack polygon
-            float width = calculatePolygonWidth(polygon);
-            if (width > 0) widths.push_back(width);
-        }
-        widthsPerImage.push_back(widths);
-    }
+	for (const auto& imagePolygons : polygons) { // For each image
+		std::vector<float> widths;
+		for (const auto& polygon : imagePolygons) { // For each crack polygon
+			float width = calculatePolygonWidth(polygon);
+			if (width > 0) widths.push_back(width);
+		}
+		widthsPerImage.push_back(widths);
+	}
 
-    return widthsPerImage;
+	return widthsPerImage;
 }
 
 void ImageSet::DisplayFeatureTrackingTab() {
+	static std::vector<std::vector<float>> m_widths;
 	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
+		// Initialize point image if needed
 		if (m_point_image == nullptr) {
 			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
-		if (ImGui::Button("Clear Selection")) {
-			if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
-				free(m_point_image);
-				m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			}
-			m_processed_textures[0]->GetData(m_point_image);
-			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-			m_points.clear();
-		}
-		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::ImageButton("Processed Image", m_point_texture.GetID(), ImVec2(m_point_texture.GetWidth(), m_point_texture.GetHeight()));
-		ImGui::PopStyleVar(2);
-		const auto now = std::chrono::system_clock::now();
-		if (ImGui::IsItemActive() && ImGui::IsItemHovered() && std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count() > 250) {
-			last_time = now;
-			uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
-			uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
-			m_points.push_back(cv::Point2f(coordX, coordY));
 
-			// size of the point, 3 == 3x3
-			int size = 3;
-			for (int i = coordX - size; i < coordX + size + 1; i++) {
-				for (int j = coordY - size; j < coordY + size + 1; j++) {
-					if (i < 0 || j < 0 || i >= m_processed_textures[0]->GetWidth() || j >= m_processed_textures[0]->GetHeight()) {
-						continue;
-					}
-					m_point_image[j * m_processed_textures[0]->GetWidth() + i] = 0xFFFF0000;
+		ImGui::BeginChild("Controls", ImVec2(200, 0), true);
+		static bool manualMode = false;
+		ImGui::Text("Mode:");
+		ImGui::RadioButton("Manual", (int*)&manualMode, true);
+		ImGui::SameLine();
+		ImGui::RadioButton("Auto", (int*)&manualMode, false);
+
+		if (manualMode) {
+			if (ImGui::Button("Clear Selection")) {
+				if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+					free(m_point_image);
+					m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 				}
+				m_processed_textures[0]->GetData(m_point_image);
+				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+				m_points.clear();
 			}
-			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-		}
-		if (m_points.size() % 2 == 0 && m_points.size() > 0) {
-			if (ImGui::Button("Track Features")) {
+			if (m_points.size() % 2 == 0 && m_points.size() > 0) {
+				if (ImGui::Button("Track Features")) {
+					std::vector<uint32_t*> frames;
+					for (int i = 0; i < m_processed_textures.size(); i++) {
+						uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
+						m_processed_textures[i]->GetData(data);
+						frames.push_back(data);
+					}
+					std::vector<std::vector<cv::Point2f>> tracked_points;
+					FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+					memcpy(m_point_image, frames[0], m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+					m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+					for (int i = 0; i < frames.size(); i++) {
+						m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+						free(frames[i]);
+					}
+					m_points.clear();
+				}
+			} else {
+				ImGui::Text("Select two points");
+			}
+		} else {
+			if (ImGui::Button("Track Widths")) {
 				std::vector<uint32_t*> frames;
 				for (int i = 0; i < m_processed_textures.size(); i++) {
 					uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
 					m_processed_textures[i]->GetData(data);
 					frames.push_back(data);
 				}
-				std::vector<std::vector<cv::Point2f>> tracked_points;
-				FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-				memcpy(m_point_image, frames[0], m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-				m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+				auto polygons = CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+				m_widths = trackCrackWidths(polygons); // Assuming m_widths is a member variable
 				for (int i = 0; i < frames.size(); i++) {
 					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 					free(frames[i]);
 				}
-				m_points.clear();
+			}
+			for (int i = 0; i < m_widths.size(); i++) {
+				char name[100];
+				sprintf(name, "Image %d", i);
+				if (ImGui::CollapsingHeader(name)) {
+					for (int j = 0; j < m_widths[i].size(); j++) {
+						ImGui::Text("Crack %d: %.2f", j, m_widths[i][j]);
+					}
+				}
 			}
 		}
-		else {
-			ImGui::Text("Select two points to track features");
-		}
+		ImGui::EndChild();
 
-		static std::vector<std::vector<float>> widths;
-		if (ImGui::Button("Automatically Track Widths")) {
-			std::vector<uint32_t*> frames;
-			for (int i = 0; i < m_processed_textures.size(); i++) {
-				uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
-				m_processed_textures[i]->GetData(data);
-				frames.push_back(data);
-			}
-			auto polygons = CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-			widths = trackCrackWidths(polygons);
-			for (int i = 0; i < frames.size(); i++) {
-				m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
-				free(frames[i]);
+		// Image View
+		ImGui::SameLine();
+		ImGui::BeginChild("ImageView", ImVec2(0, 0), true);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::ImageButton("Processed Image", m_point_texture.GetID(), ImVec2(m_point_texture.GetWidth(), m_point_texture.GetHeight()));
+		ImGui::PopStyleVar(2);
+
+		if (manualMode && ImGui::IsItemActive() && ImGui::IsItemHovered()) {
+			const auto now = std::chrono::system_clock::now();
+			if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count() > 250) {
+				last_time = now;
+				uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
+				uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
+				m_points.push_back(cv::Point2f(coordX, coordY));
+
+				int size = 3;
+				for (int i = coordX - size; i < coordX + size + 1; i++) {
+					for (int j = coordY - size; j < coordY + size + 1; j++) {
+						if (i < 0 || j < 0 || i >= m_processed_textures[0]->GetWidth() || j >= m_processed_textures[0]->GetHeight()) continue;
+						m_point_image[j * m_processed_textures[0]->GetWidth() + i] = 0xFFFF0000;
+					}
+				}
+				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
 		}
-		for (int i = 0; i < widths.size(); i++) {
-			char name[100];
-			sprintf(name, "Image %d", i);
-			if (ImGui::CollapsingHeader(name)) {
-			for (int j = 0; j < widths[i].size(); j++) {
-				ImGui::Text("Crack %d: %.2f", j, widths[i][j]);
-			}
-			}
-		}
+		ImGui::EndChild();
+
 		ImGui::EndTabItem();
 	}
 }

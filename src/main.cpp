@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
 #endif
 
 	// TODO: prepare for command line usage, no GUI
-	
+
 	bool assets_folder_exists = std::filesystem::exists("assets");
 	if (!assets_folder_exists) {
 		fprintf(stderr, "ERROR: Assets folder not found! The folder is required for this program to function correctly!\n");
@@ -52,13 +52,17 @@ int main(int argc, char** argv) {
 
 	// set glfw error callback, because we might as well
 	glfwSetErrorCallback([](int error, const char* description) {
-		fprintf(stderr, "GLFW Error %d: %s\n", error, description);
-	});
+			fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+			});
 
+	bool set_colors = true;
 	// call ImGuiInit to initialize the ImGui context
-	ImGuiInit(window, false, assets_folder_exists);
-	// default to dark theme
-	ImGui::StyleColorsDark();
+	// this will also install glfw callbacks
+	ImGuiInit(window, set_colors, assets_folder_exists);
+
+	// default to dark theme if no custom theme
+	if (!set_colors)
+		ImGui::StyleColorsDark();
 
 	// allow docking
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
