@@ -23,10 +23,7 @@ endif()
 
 find_package(OpenCV REQUIRED)
 
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-
 add_subdirectory(libs/glfw)
-add_subdirectory(libs/pybind11)
 add_subdirectory(libs/libtiff)
 add_subdirectory(libs/cppflow)
 
@@ -50,17 +47,11 @@ target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE cppflow)
 
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
 
-target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${Python3_LIBRARIES})
-
 # Include directories
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE src/ libs/ libs/glad/include/ libs/imgui/)
 
 # Include OpenCV
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLUDE_DIRS})
-
-target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/pybind11/include)
-
-target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${Python3_INCLUDE_DIRS})
 
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/cppflow/include)
 
