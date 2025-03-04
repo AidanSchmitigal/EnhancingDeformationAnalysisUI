@@ -308,19 +308,12 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			if (m_points.size() % 2 == 0 && m_points.size() > 0) {
 				if (ImGui::Button("Track Features")) {
 					std::vector<uint32_t*> frames;
-					for (int i = 0; i < m_processed_textures.size(); i++) {
-						uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
-						m_processed_textures[i]->GetData(data);
-						frames.push_back(data);
-					}
+					utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
 					std::vector<std::vector<cv::Point2f>> tracked_points;
 					FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					memcpy(m_point_image, frames[0], m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 					m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-					for (int i = 0; i < frames.size(); i++) {
-						m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
-						free(frames[i]);
-					}
+					utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					m_points.clear();
 				}
 			} else {
@@ -329,17 +322,10 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		} else {
 			if (ImGui::Button("Track Widths")) {
 				std::vector<uint32_t*> frames;
-				for (int i = 0; i < m_processed_textures.size(); i++) {
-					uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
-					m_processed_textures[i]->GetData(data);
-					frames.push_back(data);
-				}
+				utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
 				auto polygons = CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 				m_widths = trackCrackWidths(polygons); // Assuming m_widths is a member variable
-				for (int i = 0; i < frames.size(); i++) {
-					m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
-					free(frames[i]);
-				}
+				utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
 			for (int i = 0; i < m_widths.size(); i++) {
 				char name[100];
@@ -390,16 +376,9 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
 		if (ImGui::Button("Calculate Deformation")) {
 			std::vector<uint32_t*> frames;
-			for (int i = 0; i < m_processed_textures.size(); i++) {
-				uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
-				m_processed_textures[i]->GetData(data);
-				frames.push_back(data);
-			}
+			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
 			good = DeformationAnalysisInterface::TestModel(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), 256, 0);
-			for (int i = 0; i < frames.size(); i++) {
-				m_processed_textures[i]->Load(frames[i], m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
-				free(frames[i]);
-			}
+			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 		if (!good)
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model exited with an error!");

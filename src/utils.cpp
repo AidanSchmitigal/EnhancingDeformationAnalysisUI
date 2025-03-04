@@ -145,4 +145,23 @@ namespace utils {
 		TIFFClose(tif);
 		return true;
 	}
+
+	void GetDataFromTexture(unsigned int* data, int width, int height, Texture* texture) {
+		texture->GetData(data);
+	}
+
+	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<Texture*>& textures) {
+		if (data.size() != textures.size()) data.resize(textures.size());
+		for (int i = 0; i < textures.size(); i++) {
+			if (data[i] == nullptr) data[i] = (uint32_t*)malloc(width * height * 4);
+			textures[i]->GetData(data[i]);
+		}
+	}
+
+	void LoadDataIntoTexturesAndFree(std::vector<Texture*>& textures, std::vector<uint32_t*>& data, int width, int height) {
+		for (int i = 0; i < textures.size(); i++) {
+			textures[i]->Load(data[i], width, height);
+			free(data[i]);
+		}
+	}
 }

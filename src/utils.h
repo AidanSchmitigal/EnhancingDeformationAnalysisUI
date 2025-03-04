@@ -1,4 +1,10 @@
+#pragma once
+
 #include <string>
+#include <vector>
+#include <cstdint>
+
+#include <OpenGL/Texture.h>
 
 namespace utils {
 	// TODO: fill in the filter for win32 (although it may not matter?)
@@ -9,4 +15,8 @@ namespace utils {
 	unsigned int* LoadTiff(const char* path, int& width, int& height);
 
 	bool WriteTiff(const char* path, unsigned int* data, int width, int height);
+
+	void GetDataFromTexture(unsigned int* data, int width, int height, Texture* texture);
+	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<Texture*>& textures);
+	void LoadDataIntoTexturesAndFree(std::vector<Texture*>& textures, std::vector<uint32_t*>& data, int width, int height);
 }
