@@ -67,3 +67,45 @@ std::vector<std::vector<float>> FeatureTracker::TrackFeatures(const std::vector<
 	}
 	return widths;
 }
+
+std::vector<float> FeatureTracker::CalculateCrackWidthProfile(const std::vector<cv::Point>& polygon) {
+	std::vector<float> widths;
+	if (polygon.size() < 3) return widths;
+
+	int n = polygon.size();
+	int sampleCount = std::max(5, n); // Sample ~20% of points, min 5
+	for (int i = 0; i < n; i += std::max(1, n / sampleCount)) {
+		cv::Point p1 = polygon[i];
+		std::vector<float> distances;
+
+		// Compute distances to all other points
+		for (const auto& p2 : polygon) {
+			float dist = cv::norm(p2 - p1);
+			if (dist > 0) distances.push_back(dist);
+		}
+
+		// Take second smallest distance as width at this point
+		if (distances.size() > 1) {
+			std::sort(distances.begin(), distances.end());
+			widths.push_back(distances[1]);
+		}
+	}
+
+	return widths;
+}
+
+// Track width profiles for all cracks in all images
+std::vector<std::vector<std::vector<float>>> FeatureTracker::TrackCrackWidthProfiles(
+		const std::vector<std::vector<std::vector<cv::Point>>>& polygons) {
+	std::vector<std::vector<std::vector<float>>> profilesPerImage;
+
+	for (const auto& imagePolygons : polygons) { // For each image
+		std::vector<std::vector<float>> profiles;
+		for (const auto& polygon : imagePolygons) { // For each crack
+			profiles.push_back(CalculateCrackWidthProfile(polygon));
+		}
+		profilesPerImage.push_back(profiles);
+	}
+
+	return profilesPerImage;
+}

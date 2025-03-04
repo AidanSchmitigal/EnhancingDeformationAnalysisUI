@@ -60,10 +60,9 @@ target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
 
 if (UI_RELEASE)
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_RELEASE)
+if (!WIN32)
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3)
 endif()
-if (WIN32)
-	# enabling optimizations leads to issues when using visual studio, it conflicts with /RTC1
-	# to enable optimizations, create a release configuration and build from there
 else()
-	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O2)
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -g -O)
 endif()
