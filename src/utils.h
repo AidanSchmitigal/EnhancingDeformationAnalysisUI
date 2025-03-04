@@ -19,4 +19,5 @@ namespace utils {
 	void GetDataFromTexture(unsigned int* data, int width, int height, Texture* texture);
 	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<Texture*>& textures);
 	void LoadDataIntoTexturesAndFree(std::vector<Texture*>& textures, std::vector<uint32_t*>& data, int width, int height);
+	bool WriteCSV(const char* path, std::vector<std::vector<std::vector<float>>>& data);
 }

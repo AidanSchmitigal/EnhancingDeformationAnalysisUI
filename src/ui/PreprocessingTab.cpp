@@ -104,7 +104,6 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 
 		ImGui::EndChild();
 
-		// Image View (optional, if you want to display an image here)
 		ImGui::SameLine();
 		ImGui::BeginChild("ImageView", ImVec2(0, 0), true);
 		if (!m_processed_textures.empty())

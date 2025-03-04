@@ -15,7 +15,6 @@
 
 #include <string>
 #include <filesystem>
-#include <numeric>
 
 int ImageSet::m_id_counter = 0;
 
@@ -237,48 +236,52 @@ void ImageSet::DisplayImageAnalysisTab() {
 	}
 }
 
-// Calculate width for a single polygon
-float calculatePolygonWidth(const std::vector<cv::Point>& polygon) {
-	if (polygon.size() < 3) return 0.0f;
-
+std::vector<float> calculateCrackWidthProfile(const std::vector<cv::Point>& polygon) {
 	std::vector<float> widths;
+	if (polygon.size() < 3) return widths;
+
 	int n = polygon.size();
-	for (int i = 0; i < n; i += std::max(1, n / 10)) { // Sample ~10 points
+	int sampleCount = std::max(5, n); // Sample ~20% of points, min 5
+	for (int i = 0; i < n; i += std::max(1, n / sampleCount)) {
 		cv::Point p1 = polygon[i];
 		std::vector<float> distances;
 
+		// Compute distances to all other points
 		for (const auto& p2 : polygon) {
 			float dist = cv::norm(p2 - p1);
 			if (dist > 0) distances.push_back(dist);
 		}
 
+		// Take second smallest distance as width at this point
 		if (distances.size() > 1) {
 			std::sort(distances.begin(), distances.end());
-			widths.push_back(distances[1]); // Second smallest as width
+			widths.push_back(distances[1]);
 		}
 	}
 
-	return widths.empty() ? 0.0f : std::accumulate(widths.begin(), widths.end(), 0.0f) / widths.size();
+	return widths;
 }
 
-// Track widths for all cracks in all images
-std::vector<std::vector<float>> trackCrackWidths(const std::vector<std::vector<std::vector<cv::Point>>>& polygons) {
-	std::vector<std::vector<float>> widthsPerImage;
+// Track width profiles for all cracks in all images
+std::vector<std::vector<std::vector<float>>> trackCrackWidthProfiles(
+		const std::vector<std::vector<std::vector<cv::Point>>>& polygons) {
+	std::vector<std::vector<std::vector<float>>> profilesPerImage;
 
 	for (const auto& imagePolygons : polygons) { // For each image
-		std::vector<float> widths;
-		for (const auto& polygon : imagePolygons) { // For each crack polygon
-			float width = calculatePolygonWidth(polygon);
-			if (width > 0) widths.push_back(width);
+		std::vector<std::vector<float>> profiles;
+		for (const auto& polygon : imagePolygons) { // For each crack
+			profiles.push_back(calculateCrackWidthProfile(polygon));
 		}
-		widthsPerImage.push_back(widths);
+		profilesPerImage.push_back(profiles);
 	}
 
-	return widthsPerImage;
+	return profilesPerImage;
 }
 
 void ImageSet::DisplayFeatureTrackingTab() {
-	static std::vector<std::vector<float>> m_widths;
+	static std::vector<std::vector<std::vector<float>>> widths;
+	static bool widths_computed = false;
+	static bool write_success = true;
 	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
 		// Initialize point image if needed
@@ -287,8 +290,12 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
+		if (widths.size() == 0)
+			widths_computed = false;
+		else
+			widths_computed = true;
 
-		ImGui::BeginChild("Controls", ImVec2(200, 0), true);
+		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 		static bool manualMode = false;
 		ImGui::Text("Mode:");
 		ImGui::RadioButton("Manual", (int*)&manualMode, true);
@@ -324,16 +331,26 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				std::vector<uint32_t*> frames;
 				utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
 				auto polygons = CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-				m_widths = trackCrackWidths(polygons); // Assuming m_widths is a member variable
+				widths = trackCrackWidthProfiles(polygons); // Assuming m_widths is a member variable
 				utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
-			for (int i = 0; i < m_widths.size(); i++) {
-				char name[100];
-				sprintf(name, "Image %d", i);
-				if (ImGui::CollapsingHeader(name)) {
-					for (int j = 0; j < m_widths[i].size(); j++) {
-						ImGui::Text("Crack %d: %.2f", j, m_widths[i][j]);
-					}
+		}
+		if (widths_computed) {
+			if (ImGui::Button("Clear Widths")) {
+				widths.clear();
+				widths_computed = false;
+			}
+			static std::string folder_path;
+			if (ImGui::Button("Choose Folder to Save")) {
+				folder_path = utils::OpenFileDialog(".", "Pick a folder to save widths", true);
+			}
+			static char filename[256] = "";
+			ImGui::InputTextWithHint("Filename", "widths.csv", filename, 256);
+			ImGui::TextWrapped("%s/%s", folder_path.c_str(), filename);
+			if (ImGui::Button("Save Widths")) {
+				write_success = utils::WriteCSV(std::string(folder_path + "/" + filename).c_str(), widths);
+				if (!write_success) {
+					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
 			}
 		}
