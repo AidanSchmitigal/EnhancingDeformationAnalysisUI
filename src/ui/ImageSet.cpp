@@ -192,13 +192,6 @@ void ImageSet::DisplayImageAnalysisTab() {
 		}
 		free(data);
 
-		ImGui::SameLine();
-		ImGui::TextDisabled("(?)");
-		if (ImGui::IsItemHovered()) {
-			ImGui::BeginTooltip();
-			ImGui::Text("To reduce memory usage, the image stats are shared between the image sets. If you want to recalculate the stats, click this button.");
-			ImGui::EndTooltip();
-		}
 		if (avg_histogram.size() == 0) {
 			avg_histogram.resize(256);
 		}
@@ -266,12 +259,13 @@ void ImageSet::DisplayFeatureTrackingTab() {
 	static bool write_success = true;
 	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
-		// Initialize point image if needed
+		// Initialize point image
 		if (m_point_image == nullptr) {
 			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
+		// Update point image if it isn't the same size as the ref texture
 		if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
 			free(m_point_image);
 			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
@@ -279,12 +273,14 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 		
+		// Update point image if it isn't the same as the ref texture
 		uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 		m_processed_textures[0]->GetData(data);
-		if (memcmp(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4) != 0) {
+		if (m_points.size() == 0 && memcmp(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4) != 0) {
 			memcpy(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_point_texture.Load(data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
+		free(data);
 
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 		static bool manualMode = false;
