@@ -94,6 +94,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		ImGui::SeparatorText("Denoising");
 		static int m_kernel_size = 3;
 		static float m_sigma = 1.0f;
+		ImGui::SetNextItemWidth(150);
 		ImGui::SliderInt("Kernel Size", &m_kernel_size, 1, 9, "%.0d");
 		if (m_kernel_size % 2 == 0) m_kernel_size++;
 		ImGui::SliderFloat("Sigma", &m_sigma, 0.0f, 10.0f);
@@ -109,7 +110,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		ImGui::SliderInt("Tile Size", &tile_size, 32, 512);
 		ImGui::SliderInt("Overlap", &overlap, 0, 256);
 		static bool result = true;
-		if (ImGui::Button("Denoise")) {
+		if (ImGui::Button("Use AI Model to Denoise")) {
 			std::vector<uint32_t*> frames;
 			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
 			result = DenoiseInterface::DenoiseNew(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), models[selected_model], tile_size, overlap);

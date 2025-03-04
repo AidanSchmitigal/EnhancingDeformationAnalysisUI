@@ -369,6 +369,8 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
+				memset(filename, 0, 256);
+				folder_path = "";
 			}
 		}
 		ImGui::EndChild();
