@@ -67,6 +67,9 @@ int main(int argc, char** argv) {
 	// allow docking
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+	// set glfw to use vsync
+	glfwSwapInterval(1);
+
 	// create a vector of ImageSet pointers to store the image sets
 	std::vector<ImageSet*> image_sets;
 	while (!glfwWindowShouldClose(window)) {

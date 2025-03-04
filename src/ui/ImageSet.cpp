@@ -155,12 +155,23 @@ void ImageSet::DisplayImageAnalysisTab() {
 		std::vector<float> histogram;
 		bool computed = false; // Flag to avoid unnecessary recomputation
 	};
+	static uint32_t* m_ref_image = nullptr;
+	static uint32_t m_ref_image_width = 0, m_ref_image_height = 0;
 	static std::vector<ImageStatsCache> imageStatsCache;
 	static std::vector<float> avg_histogram;
 	static float avg_snr = 0.0f;
 	static bool avg_computed = false;
 	if (ImGui::BeginTabItem("Image Analysis")) {
-		if (ImGui::Button("Recalculate Stats")) {
+		if (m_ref_image == nullptr) {
+			m_ref_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_processed_textures[0]->GetData(m_ref_image);
+		}
+		if (m_ref_image_width * m_ref_image_height != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+			free(m_ref_image);
+			m_ref_image_width = m_processed_textures[0]->GetWidth();
+			m_ref_image_height = m_processed_textures[0]->GetHeight();
+			m_ref_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_processed_textures[0]->GetData(m_ref_image);
 			avg_histogram.clear();
 			avg_snr = 0.0f;
 			avg_computed = false;
@@ -168,6 +179,19 @@ void ImageSet::DisplayImageAnalysisTab() {
 				imageStatsCache[i].computed = false;
 			}
 		}
+		uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+		m_processed_textures[0]->GetData(data);
+		if (memcmp(m_ref_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4) != 0) {
+			memcpy(m_ref_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			avg_histogram.clear();
+			avg_snr = 0.0f;
+			avg_computed = false;
+			for (int i = 0; i < imageStatsCache.size(); i++) {
+				imageStatsCache[i].computed = false;
+			}
+		}
+		free(data);
+
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
 		if (ImGui::IsItemHovered()) {
@@ -248,6 +272,19 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
+		if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+			free(m_point_image);
+			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_processed_textures[0]->GetData(m_point_image);
+			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+		}
+		
+		uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+		m_processed_textures[0]->GetData(data);
+		if (memcmp(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4) != 0) {
+			memcpy(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_point_texture.Load(data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+		}
 
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 		static bool manualMode = false;
@@ -264,15 +301,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		}
 
 		if (manualMode) {
-			if (ImGui::Button("Clear Selection")) {
-				if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
-					free(m_point_image);
-					m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-				}
-				m_processed_textures[0]->GetData(m_point_image);
-				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-				m_points.clear();
-			}
+			if (ImGui::Button("Clear Selection")) m_points.clear();
 			if (m_points.size() % 2 == 0 && m_points.size() > 0) {
 				if (ImGui::Button("Track Features")) {
 					std::vector<uint32_t*> frames;
