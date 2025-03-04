@@ -181,4 +181,21 @@ namespace utils {
 		fclose(f);
 		return true;
 	}
+
+	bool WriteCSV(const char* path, std::vector<std::vector<float>>& data) {
+		FILE* f = fopen(path, "w");
+		if (!f) {
+			printf("Could not open file %s\n", path);
+			return false;
+		}
+		for (int i = 0; i < data.size(); i++) {
+			for (int j = 0; j < data[i].size(); j++) {
+				fprintf(f, "%f", data[i][j]);
+				if (j < data[i].size() - 1) fprintf(f, ",");
+			}
+			fprintf(f, "\n");
+		}
+		fclose(f);
+		return true;
+	}
 }

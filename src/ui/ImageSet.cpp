@@ -280,7 +280,7 @@ std::vector<std::vector<std::vector<float>>> trackCrackWidthProfiles(
 
 void ImageSet::DisplayFeatureTrackingTab() {
 	static std::vector<std::vector<std::vector<float>>> widths;
-	static bool widths_computed = false;
+	static std::vector<std::vector<float>> manual_widths;
 	static bool write_success = true;
 	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
@@ -290,10 +290,6 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
-		if (widths.size() == 0)
-			widths_computed = false;
-		else
-			widths_computed = true;
 
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 		static bool manualMode = false;
@@ -301,6 +297,13 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		ImGui::RadioButton("Manual", (int*)&manualMode, true);
 		ImGui::SameLine();
 		ImGui::RadioButton("Auto", (int*)&manualMode, false);
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::IsItemHovered()) {
+			ImGui::BeginTooltip();
+			ImGui::Text("Manual mode allows you to select points to track features. Auto mode will automatically detect cracks and track their widths.\nWe suggest cropping the infobar for automatic tracking.");
+			ImGui::EndTooltip();
+		}
 
 		if (manualMode) {
 			if (ImGui::Button("Clear Selection")) {
@@ -317,7 +320,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 					std::vector<uint32_t*> frames;
 					utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
 					std::vector<std::vector<cv::Point2f>> tracked_points;
-					FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+					manual_widths = FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					memcpy(m_point_image, frames[0], m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 					m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
@@ -335,10 +338,37 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
 		}
-		if (widths_computed) {
+		if (manual_widths.size() > 0 && manualMode) {
+			if (ImGui::Button("Clear Widths")) {
+				manual_widths.clear();
+			}
+			static std::string folder_path;
+			if (ImGui::Button("Choose Folder to Save")) {
+				folder_path = utils::OpenFileDialog(".", "Pick a folder to save widths", true);
+			}
+			static char manual_filename[256] = "";
+			ImGui::InputTextWithHint("Filename", "widths.csv", manual_filename, 256);
+			ImGui::TextWrapped("%s/%s", folder_path.c_str(), manual_filename);
+			if (ImGui::Button("Save Widths")) {
+				write_success = utils::WriteCSV(std::string(folder_path + "/" + manual_filename).c_str(), manual_widths);
+				if (!write_success) {
+					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
+				}
+				memset(manual_filename, 0, 256);
+				folder_path = "";
+			}
+			ImGui::Text("Manual Widths:");
+			for (int i = 0; i < manual_widths.size(); i++) {
+				ImGui::Text("Frame %d:", i);
+				for (int j = 0; j < manual_widths[i].size(); j++) {
+					if (j % 4 != 3) ImGui::SameLine();
+					ImGui::Text("%.2f", manual_widths[i][j]);
+				}
+			}
+		}
+		if (widths.size() > 0 && !manualMode) {
 			if (ImGui::Button("Clear Widths")) {
 				widths.clear();
-				widths_computed = false;
 			}
 			static std::string folder_path;
 			if (ImGui::Button("Choose Folder to Save")) {
@@ -403,8 +433,3 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 	}
 }
 
-void ImageSet::DisplayTestTab() {
-	if (ImGui::BeginTabItem("Test")) {
-		ImGui::EndTabItem();
-	}
-}

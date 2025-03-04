@@ -61,6 +61,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			}
 			m_selected_textures_map.clear();
 		}
+		// TODO: readd frame selection here
 
 		// Denoising
 		ImGui::Text("Denoising");

@@ -74,7 +74,7 @@ std::vector<std::vector<std::vector<cv::Point>>> CrackDetector::DetectCracks(con
 		polygons.push_back(approx_polygons);
 
 		cv::cvtColor(image, image, cv::COLOR_GRAY2BGRA);
-		cv::polylines(image, approx_polygons, true, cv::Scalar(0, 0, 255), 2);
+		cv::polylines(image, approx_polygons, true, cv::Scalar(255, 0, 0, 255), 2);
 
 		memcpy(img_ptr, image.data, width * height * 4);
 	}

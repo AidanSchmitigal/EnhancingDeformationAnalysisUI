@@ -2,9 +2,8 @@
 
 #include <opencv2/opencv.hpp>
 
-void FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::vector<cv::Point2f>& points, std::vector<std::vector<cv::Point2f>>& trackedPoints, int width, int height) {
-	if (images.empty() || (points.size() % 2 != 0 && points.size() > 0)) return; // Expect exactly 2 points
-
+std::vector<std::vector<float>> FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::vector<cv::Point2f>& points, std::vector<std::vector<cv::Point2f>>& trackedPoints, int width, int height) {
+	std::vector<std::vector<float>> widths;
 	cv::Mat prevGray, currGray;
 	std::vector<cv::Point2f> prevPts, currPts;
 	cv::TermCriteria criteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 50, 0.001);
@@ -34,13 +33,13 @@ void FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::ve
 	}
 	trackedPoints.push_back(prevPts);
 
+
+	widths.resize(images.size());
 	// Draw initial points and distance on first image
-	unsigned int text_y = 30;
 	for (int i = 0; i < points.size(); i++) {
-		float initialDist = cv::norm(prevPts[i] - prevPts[i + 1]);
+		if (i % 2 == 0)
+			widths[0].push_back(cv::norm(prevPts[i] - prevPts[i + 1]));
 		cv::circle(displayImage, prevPts[i], 5, cv::Scalar(0, 255, 0, 255), -1);
-		if (i % 2 == 0) cv::putText(displayImage, std::to_string(i / 2) + ": " + std::to_string(initialDist), prevPts[i], cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255, 255), 2);
-		text_y += 30;
 	}
 	memcpy(images[0], displayImage.data, width * height * 4); // Write back to original buffer
 
@@ -57,26 +56,14 @@ void FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::ve
 		for (int j = 0; j < points.size(); j++) {
 			if (status[j]) framePoints.push_back(currPts[j]);
 			else framePoints.push_back(cv::Point2f(-1, -1));
+			if (j % 2 == 0) widths[i].push_back(cv::norm(currPts[j] - currPts[j + 1]));
+			cv::circle(currentImage, currPts[j], 5, cv::Scalar(0, 255, 0, 255), -1);
 		}
 		trackedPoints.push_back(framePoints);
+		memcpy(images[i], currentImage.data, width * height * 4); // Write back to original buffer
 
 		cv::swap(prevGray, currGray);
 		prevPts = currPts;
 	}
-
-	// Annotate last image with final points, vectors, and distance
-	cv::Mat finalImage(height, width, CV_8UC4, images.back());
-	cv::Mat finalDisplay = finalImage.clone();
-	std::vector<cv::Point2f>& finalPts = trackedPoints.back();
-	if (finalPts[0].x >= 0 && finalPts[1].x >= 0) {
-		text_y = 30;
-		for (int i = 0; i < points.size(); i++) {
-			float finalDist = cv::norm(finalPts[i] - finalPts[i + 1]);
-			cv::circle(finalDisplay, finalPts[i], 5, cv::Scalar(0, 255, 0, 255), -1);
-			cv::arrowedLine(finalDisplay, prevPts[i], finalPts[i], cv::Scalar(0, 0, 255, 255), 2);
-			if (i % 2 == 0) cv::putText(finalDisplay, std::to_string(i / 2) + " " + std::to_string(finalDist), finalPts[i], cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255, 255), 2);
-			text_y += 30;
-		}
-		memcpy(images[images.size() - 1], finalDisplay.data, width * height * 4); // Write back
-	}
+	return widths;
 }

@@ -10,5 +10,5 @@ namespace cv {
 
 class FeatureTracker {
 	public:
-		static void TrackFeatures(const std::vector<uint32_t*>& imageSequence, std::vector<cv::Point2f>& points, std::vector<std::vector<cv::Point2f>>& trackedPoints, int width, int height);
+		static std::vector<std::vector<float>> TrackFeatures(const std::vector<uint32_t*>& imageSequence, std::vector<cv::Point2f>& points, std::vector<std::vector<cv::Point2f>>& trackedPoints, int width, int height);
 };
