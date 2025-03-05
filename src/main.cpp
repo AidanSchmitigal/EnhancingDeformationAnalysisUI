@@ -8,9 +8,13 @@
 #include <imgui.h>
 
 #include <ImGuiImpl.h>
+
 #include <ui/ImageSequenceViewer.h>
 #include <ui/ImageSet.h>
+
 #include <utils.h>
+
+#include <cli.hpp>
 
 int main(int argc, char** argv) {
 #ifdef WIN32
@@ -25,7 +29,9 @@ int main(int argc, char** argv) {
 	setenv("TF_ENABLE_ONEDNN_OPTS", "1", 1);
 #endif
 
-	// TODO: prepare for command line usage, no GUI
+	if (argc > 1) {
+		cli::run(argc, argv);
+	}
 
 	bool assets_folder_exists = std::filesystem::exists("assets");
 	if (!assets_folder_exists) {
