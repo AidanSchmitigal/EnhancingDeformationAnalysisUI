@@ -5,6 +5,8 @@
 #include <core/DenoiseInterface.hpp>
 #include <core/FeatureTracker.hpp>
 #include <core/DeformationAnalysisInterface.hpp>
+#include <core/ImageAnalysis.hpp>
+
 #include <utils.h>
 
 #include <imgui.h>
@@ -150,104 +152,58 @@ void ImageSet::DisplayImageComparisonTab() {
 }
 
 void ImageSet::DisplayImageAnalysisTab() {
-	struct ImageStatsCache {
-		double snr = 0.0;
-		std::vector<float> histogram;
-		bool computed = false; // Flag to avoid unnecessary recomputation
-	};
 	static uint32_t* m_ref_image = nullptr;
 	static uint32_t m_ref_image_width = 0, m_ref_image_height = 0;
-	static std::vector<ImageStatsCache> imageStatsCache;
+	static std::vector<std::vector<float>> histograms;
 	static std::vector<float> avg_histogram;
+	static std::vector<float> snrs;
 	static float avg_snr = 0.0f;
-	static bool avg_computed = false;
 	if (ImGui::BeginTabItem("Image Analysis")) {
-		if (m_ref_image == nullptr) {
-			m_ref_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_processed_textures[0]->GetData(m_ref_image);
-		}
-		if (m_ref_image_width * m_ref_image_height != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
-			free(m_ref_image);
+		if (m_ref_image == nullptr || m_ref_image_width * m_ref_image_height != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+			if (m_ref_image) free(m_ref_image);
 			m_ref_image_width = m_processed_textures[0]->GetWidth();
 			m_ref_image_height = m_processed_textures[0]->GetHeight();
 			m_ref_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_processed_textures[0]->GetData(m_ref_image);
+			histograms.clear();
 			avg_histogram.clear();
+			snrs.clear();
 			avg_snr = 0.0f;
-			avg_computed = false;
-			for (int i = 0; i < imageStatsCache.size(); i++) {
-				imageStatsCache[i].computed = false;
+			std::vector<uint32_t*> frames;
+			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
+			ImageAnalysis::AnalyzeImages(frames, m_ref_image_width, m_ref_image_height, histograms, avg_histogram, snrs, avg_snr);
+			for (auto& frame : frames) {
+				free(frame);
 			}
 		}
 		uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 		m_processed_textures[0]->GetData(data);
 		if (memcmp(m_ref_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4) != 0) {
 			memcpy(m_ref_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			histograms.clear();
 			avg_histogram.clear();
+			snrs.clear();
 			avg_snr = 0.0f;
-			avg_computed = false;
-			for (int i = 0; i < imageStatsCache.size(); i++) {
-				imageStatsCache[i].computed = false;
+			std::vector<uint32_t*> frames;
+			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
+			ImageAnalysis::AnalyzeImages(frames, m_ref_image_width, m_ref_image_height, histograms, avg_histogram, snrs, avg_snr);
+			for (auto& frame : frames) {
+				free(frame);
 			}
 		}
 		free(data);
 
-		if (avg_histogram.size() == 0) {
-			avg_histogram.resize(256);
-		}
-		for (int i = 0; i < m_processed_textures.size(); i++) {	
-			if (i >= imageStatsCache.size()) {
-				imageStatsCache.push_back(ImageStatsCache());
-			}
-			if (imageStatsCache[i].computed) {
-				continue;
-			}
-			imageStatsCache.push_back(ImageStatsCache());
-			uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_processed_textures[i]->GetData(data);
-			cv::Mat img(m_processed_textures[i]->GetHeight(), m_processed_textures[i]->GetWidth(), CV_8UC4, data);
-			cv::cvtColor(img, img, cv::COLOR_BGRA2GRAY);
-			cv::Scalar mean, stddev;
-			cv::meanStdDev(img, mean, stddev);
-			cv::Scalar snr = mean[0] / stddev[0];
-			imageStatsCache[i].snr = snr[0];
-			avg_snr += snr[0];
-
-			int bins = 256;
-			imageStatsCache[i].histogram.resize(bins);
-			cv::Mat hist;
-			float range[] = {0, 256};
-			const float* histRange = {range};
-			bool uniform = true, accumulate = false;
-			cv::calcHist(&img, 1, 0, cv::Mat(), hist, 1, &bins, &histRange, uniform, accumulate);
-			// Normalize for display
-			cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
-
-			for (int j = 0; j < bins; j++) {
-				imageStatsCache[i].histogram[j] = hist.at<float>(j);
-				avg_histogram[j] += hist.at<float>(j);
-			}
-
-			imageStatsCache[i].computed = true;
-			free(data);
-		}
-		if (!avg_computed) {
-			avg_snr /= m_processed_textures.size();
-			for (int i = 0; i < avg_histogram.size(); i++) {
-				avg_histogram[i] /= m_processed_textures.size();
-			}
-			avg_computed = true;
-		}
-
+		ImGui::SeparatorText("Average Analysis");
 		ImGui::Text("Average SNR: %.2f", avg_snr);
-		ImGui::PlotHistogram("Average Histogram", avg_histogram.data(), avg_histogram.size(), 0, NULL, 0, 1.0f, ImVec2(0, 80));
-		for (int i = 0; i < imageStatsCache.size(); i++) {
-			if (!imageStatsCache[i].computed)
-				continue;
-			ImGui::Text("SNR: %.2f", imageStatsCache[i].snr);
-			char hist_text[100];
-			snprintf(hist_text, 100, "Image %d", i);
-			ImGui::PlotHistogram(hist_text, imageStatsCache[i].histogram.data(), imageStatsCache[i].histogram.size(), 0, NULL, 0, 1.0f, ImVec2(0, 80));
+		auto size = ImGui::GetIO().DisplaySize;
+		size.x = size.x / 1.3f;
+		ImGui::PlotHistogram("Average Histogram", &avg_histogram[0], 256, 0, NULL, 0.0f, 1.0f, ImVec2(size.x, 300));
+		ImGui::SeparatorText("Frame Analysis");
+		for (int i = 0; i < histograms.size(); i++) {
+			char label[256];
+			sprintf(label, "Frame %d", i);
+			ImGui::PlotHistogram(label, &histograms[i][0], 256, 0, NULL, 0.0f, 1.0f, ImVec2(size.x, 300));
+			ImGui::Text("SNR: %.2f", snrs[i]);
 		}
 		ImGui::EndTabItem();
 	}

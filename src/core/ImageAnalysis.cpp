@@ -15,6 +15,7 @@ void ImageAnalysis::AnalyzeImages(std::vector<uint32_t*>& frames, int width, int
 
         int bins = 256;
         histograms[i].resize(bins);
+        avg_histogram.resize(bins);
         cv::Mat hist;
         float range[] = {0, 256};
         const float* histRange = {range};
@@ -28,4 +29,8 @@ void ImageAnalysis::AnalyzeImages(std::vector<uint32_t*>& frames, int width, int
             avg_histogram[j] += hist.at<float>(j);
         }
     }
+    for (int j = 0; j < avg_histogram.size(); j++) {
+        avg_histogram[j] /= frames.size();
+    }
+    avg_snr /= frames.size();
 }

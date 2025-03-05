@@ -14,6 +14,9 @@
 #include <filesystem>
 
 bool LoadImages(const char* folder, std::vector<uint32_t*>& data, int& width, int& height) {
+	printf("Loading images from %s\n", folder);
+	printf("Current path: %s\n", std::filesystem::current_path().string().c_str());
+
 	// load the images
 	if (!std::filesystem::exists(folder)) {
 		return false;
@@ -74,22 +77,24 @@ namespace cli {
 	void run(int argc, char** argv) {
 		const char* folder = NULL;
 		const char* filter = "none"; // Default preprocessing filter
-		const char* output = "results"; // Default output dir
+		char* output = NULL; // Default output dir
 		const char* stats_output = "results.csv";
 		const char* widths_output = "widths.csv";
+		int do_crop = 0;
 		int do_denoise = 0;
 		int do_analyze = 0;
 		int do_widths = 0;
+		int crop_pixels = 0;
 
 		// Parse flags
 		for (int i = 1; i < argc; i++) {
 			if (strcmp(argv[i], "--folder") == 0 && i + 1 < argc) {
 				folder = argv[++i];
 			} else if (strcmp(argv[i], "--crop") == 0 && i + 1 < argc) {
-				filter = argv[++i];
-			} else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
-				output = argv[++i];
+				crop_pixels = atoi(argv[++i]);
+				do_crop = 1;
 			} else if (strcmp(argv[i], "--denoise") == 0 && i + 1 < argc) {
+				filter = argv[++i];
 				do_denoise = 1;
 			} else if (strcmp(argv[i], "--analyze") == 0 && i + 1 < argc) {
 				stats_output = argv[++i];
@@ -97,6 +102,8 @@ namespace cli {
 			} else if (strcmp(argv[i], "--calculate-widths") == 0 && i + 1 < argc) {
 				widths_output = argv[++i];
 				do_widths = 1;
+			} else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
+				output = argv[++i];
 			} else if (strcmp(argv[i], "--help") == 0) {
 				printf("Usage: %s --folder <path> [--crop <pixels_from_bottom_to_remove>] [--denoise <blur/sfr_hrsem/sfr_lrsem>] [--analyze <output.csv>] [--calculate-widths <widths.csv>] [--output <path_to_folder>]\n", argv[0]);
 				return;
@@ -137,20 +144,47 @@ namespace cli {
 			}
 		}
 
+		if (do_crop) {
+			height -= crop_pixels;
+		}
+
 		// Execute based on flags
 		if (do_denoise) {
 			DenoiseInterface::DenoiseNew(images, width, height, filter, 256, 10);
 		}
+
 		if (do_analyze) {
 			std::vector<std::vector<float>> histograms;
 			std::vector<float> avg_histogram;
 			std::vector<float> snrs;
 			float avg_snr;
 			ImageAnalysis::AnalyzeImages(images, width, height, histograms, avg_histogram, snrs, avg_snr);
-			
+			WriteAnalysis(stats_output, histograms, avg_histogram, snrs, avg_snr);
 		}
-		if (!do_denoise && !do_analyze && !do_widths) {
-			printf("Nothing to do. Use --preprocess and/or --analyze and/or --do-widths.\n");
+
+		if (do_widths) {
+			auto polygons = CrackDetector::DetectCracks(images, width, height);
+			auto widths = FeatureTracker::TrackCrackWidthProfiles(polygons);
+			utils::WriteCSV(widths_output, widths);
+		}
+
+		if (output != NULL) {
+			printf("Saving images to %s\n", output);
+			if (output[strlen(output) - 1] == '/') {
+				output[strlen(output) - 1] = '\0';
+			}
+			if (!std::filesystem::exists(output)) {
+				std::filesystem::create_directory(output);
+			}
+			for (int i = 0; i < images.size(); i++) {
+				char filename[256];
+				sprintf(filename, "%s/image_%d.tif", output, i);
+				utils::WriteTiff(filename, images[i], width, height);
+			}
+		}
+
+		if (!do_crop && !do_denoise && !do_analyze && !do_widths) {
+			printf("Nothing to do. Use --crop and/or --denoise and/or --analyze and/or --do-widths.\n");
 		}
 	}
 }

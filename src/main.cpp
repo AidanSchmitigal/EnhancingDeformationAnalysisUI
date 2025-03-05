@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
 
 	if (argc > 1) {
 		cli::run(argc, argv);
+		return 0;
 	}
 
 	bool assets_folder_exists = std::filesystem::exists("assets");
