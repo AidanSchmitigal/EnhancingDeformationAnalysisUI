@@ -24,6 +24,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		static int crop = 60;
 		ImGui::SliderInt("Pixels", &crop, 0, 100);
 		if (ImGui::Button("Crop Bottom")) {
+			if (crop == 0 || crop >= m_processed_textures[0]->GetHeight()) return;
 			for (int i = 0; i < m_processed_textures.size(); i++) {
 				uint32_t* data = (uint32_t*)malloc(m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight() * 4);
 				m_processed_textures[i]->GetData(data);
