@@ -8,6 +8,7 @@ def check_if_installed():
     tensorflow = False
     if platform.system() == "Windows":
         user_path = ""
+        user_opencv_dir = ""
         # Get the user PATH environment variable, not system
         result = subprocess.run('reg query "HKCU\\Environment" /v PATH', capture_output=True, text=True, shell=True)
         if result.returncode == 0:
@@ -15,9 +16,15 @@ def check_if_installed():
             for line in lines:
                 if "PATH" in line:
                     user_path = line.split("REG_SZ")[-1].strip()
-        if os.environ.get("OPENCV_DIR") and user_path.find("opencv\\build\\x64\\vc16\\bin") != -1:
+        result = subprocess.run('reg query "HKCU\\Environment" /v OPENCV_DIR', capture_output=True, text=True, shell=True)
+        if result.returncode == 0:
+            lines = result.stdout.splitlines()
+            for line in lines:
+                if "OPENCV_DIR" in line:
+                    user_opencv_dir = line.split("REG_SZ")[-1].strip()
+        if (user_opencv_dir != "" and user_path.find("opencv\\build\\x64\\vc16\\bin") != -1) or (os.environ.get("OPENCV_DIR") and os.environ["PATH"].find("opencv\\build\\x64\\vc16\\bin") != -1):
             opencv = True
-        if user_path.find("tensorflow\\include") != -1:
+        if user_path.find("tensorflow\\include") != -1 or os.environ["PATH"].find("tensorflow\\include") != -1:
             tensorflow = True
     elif platform.system() == "Darwin":
         if subprocess.call(["brew", "list", "opencv"]) == 0:
