@@ -99,7 +99,6 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
 		cv::Size paddedSize;
 		auto tiles = splitImageIntoTiles(image, tile_size, overlap);
-		std::cerr << "Tiles: " << tiles.size() << std::endl;
 
 		std::vector<cppflow::tensor> output;
 		for (auto& tile : tiles) {

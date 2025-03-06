@@ -90,8 +90,7 @@ int main(int argc, char** argv) {
 		// begin the ImGui frame
 		ImGuiBeginFrame();
 
-		// draw the dockspace over the viewport
-		ImGui::DockSpaceOverViewport();
+		ImGuiID dockspaceID = ImGui::DockSpaceOverViewport();
 
 		// show the demo window if in debug
 #ifndef UI_RELEASE
@@ -102,6 +101,8 @@ int main(int argc, char** argv) {
 		{
 			ImGui::LoadIniSettingsFromDisk("assets/DefaultLayout.ini");
 		}
+
+		ImGui::SetNextWindowDockID(dockspaceID, ImGuiCond_FirstUseEver);
 
 		// for each image set, create a window that will be tabbed in the main window
 		// for each image set tab, have tabs for stabilization and preprocessing etc.
@@ -130,6 +131,7 @@ int main(int argc, char** argv) {
 				i--;
 				continue;
 			}
+			ImGui::SetNextWindowDockID(dockspaceID, ImGuiCond_FirstUseEver);
 			image_sets[i]->Display();
 		}
 
