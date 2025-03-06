@@ -1,6 +1,7 @@
 import os
 import platform
 import subprocess
+from pathlib import Path
 
 # Handles windows, mac, and anything based on debian
 def check_if_installed():
@@ -39,13 +40,20 @@ def check_if_installed():
     return (opencv, tensorflow)
 
 def install_packages():
+
+    if platform.system() == "Windows":
+        subprocess.check_call(["curl", "-L", "https://aka.ms/vs/17/release/vc_redist.x64.exe", "-o", "vc_redist.x64.exe"])
+        subprocess.call(["vc_redist.x64.exe", "/install", "/quiet", "/norestart"])
+        os.remove("vc_redist.x64.exe")
+
     (opencv, tensorflow) = check_if_installed()
     if opencv and tensorflow:
         print("OpenCV and TensorFlow are already installed.")
+        input("Press Enter to exit...")
         return
 
     # Define installation directories
-    install_dir = os.path.abspath("third_party")
+    install_dir = Path.home()
     os.makedirs(install_dir, exist_ok=True)
 
     paths = []
@@ -61,7 +69,6 @@ def install_packages():
             opencv_dir = os.path.join(install_dir, "opencv")
             print(f"OpenCV installed to {opencv_dir}")
             paths.append(opencv_path)
-            paths.append(opencv_dir)
         elif platform.system() == "Darwin":
             subprocess.check_call(["brew", "install", "opencv"])
         else:
@@ -80,21 +87,24 @@ def install_packages():
         tf_filename = os.path.join(install_dir, tf_url.split("/")[-1])
         subprocess.check_call(["curl", "-L", tf_url, "-o", tf_filename])
         if tf_filename.endswith(".zip"):
-            command = "Expand-Archive -Force " + tf_filename + " -DestinationPath " + os.path.join(install_dir, "tensorflow")
-            subprocess.check_call(["pwsh", "-Command", command])
+            os.mkdir(os.path.join(install_dir, "tensorflow"))
+            subprocess.check_call(["tar", "-xf", tf_filename, "-C", os.path.join(install_dir, "tensorflow")])
             print(f"TensorFlow installed to {os.path.join(install_dir, 'tensorflow')}")
             paths.append(os.path.join(install_dir, "tensorflow", "lib"))
             paths.append(os.path.join(install_dir, "tensorflow", "include"))
         else:
             subprocess.check_call(["tar", "-xzf", tf_filename, "-C", os.path.join(install_dir, "tensorflow")])
 
-    if tensorflow or opencv:
+    if not tensorflow or not opencv:
         print("Installation complete.")
+        if not opencv:
+            print(f"Add the environment variable OpenCV_DIR with the value {os.path.join(install_dir, 'opencv\build')}")
         print("Please add the following paths to the PATH environment variable:")
     else:
         print("No packages were installed.")
 
     for path in paths:
         print(path)
+    input("Press Enter to exit...")
 
 install_packages()

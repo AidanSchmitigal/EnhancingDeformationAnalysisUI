@@ -13,18 +13,21 @@
 
 #include <filesystem>
 
-bool LoadImages(const char* folder, std::vector<uint32_t*>& data, int& width, int& height) {
+bool LoadImages(const char *folder, std::vector<uint32_t *> &data, int &width, int &height)
+{
 	printf("Loading images from %s\n", folder);
 	printf("Current path: %s\n", std::filesystem::current_path().string().c_str());
 
 	// load the images
-	if (!std::filesystem::exists(folder)) {
+	if (!std::filesystem::exists(folder))
+	{
 		return false;
 	}
 
 	// find all .tif files in the folder
 	std::vector<std::string> files;
-	for (const auto& entry : std::filesystem::directory_iterator(folder)) {
+	for (const auto &entry : std::filesystem::directory_iterator(folder))
+	{
 		if (entry.path().string().find(".tif") == std::string::npos)
 			continue;
 		files.push_back(entry.path().string());
@@ -32,17 +35,22 @@ bool LoadImages(const char* folder, std::vector<uint32_t*>& data, int& width, in
 
 	// sort the files by name
 	std::sort(files.begin(), files.end());
-	for (int i = 0; i < files.size(); i++) {
+	for (int i = 0; i < files.size(); i++)
+	{
 		int w, h;
-		uint32_t* img = utils::LoadTiff(files[i].c_str(), w, h);
-		if (img == nullptr) {
+		uint32_t *img = utils::LoadTiff(files[i].c_str(), w, h);
+		if (img == nullptr)
+		{
 			printf("Failed to load image %s\n", files[i].c_str());
 			return false;
 		}
-		if (i == 0) {
+		if (i == 0)
+		{
 			width = w;
 			height = h;
-		} else if (w != width || h != height) {
+		}
+		else if (w != width || h != height)
+		{
 			printf("Image %s has different dimensions\n", files[i].c_str());
 			return false;
 		}
@@ -51,20 +59,25 @@ bool LoadImages(const char* folder, std::vector<uint32_t*>& data, int& width, in
 	return true;
 }
 
-bool WriteAnalysis(const char* filename, std::vector<std::vector<float>>& histograms, std::vector<float>& avg_histogram, std::vector<float>& snrs, float avg_snr) {
-	FILE* file = fopen(filename, "w");
-	if (!file) {
+bool WriteAnalysis(const char *filename, std::vector<std::vector<float>> &histograms, std::vector<float> &avg_histogram, std::vector<float> &snrs, float avg_snr)
+{
+	FILE *file = fopen(filename, "w");
+	if (!file)
+	{
 		printf("Failed to open file %s (write analysis)\n", filename);
 		return false;
 	}
-	for (int i = 0; i < histograms.size(); i++) {
-		for (int j = 0; j < histograms[i].size(); j++) {
+	for (int i = 0; i < histograms.size(); i++)
+	{
+		for (int j = 0; j < histograms[i].size(); j++)
+		{
 			fprintf(file, "%f,", histograms[i][j]);
 		}
 		fprintf(file, "%f\n", snrs[i]);
 	}
 	fprintf(file, "\n");
-	for (int i = 0; i < avg_histogram.size(); i++) {
+	for (int i = 0; i < avg_histogram.size(); i++)
+	{
 		fprintf(file, "%f,", avg_histogram[i]);
 	}
 	fprintf(file, "\n");
@@ -73,90 +86,266 @@ bool WriteAnalysis(const char* filename, std::vector<std::vector<float>>& histog
 	return true;
 }
 
-namespace cli {
-	void run(int argc, char** argv) {
-		const char* folder = NULL;
-		const char* filter = "none"; // Default preprocessing filter
-		char* output = NULL; // Default output dir
-		const char* stats_output = "results.csv";
-		const char* widths_output = "widths.csv";
+// Settings struct
+struct Settings
+{
+	std::string folder;
+	int crop_pixels = 0;
+	bool do_crop = false;
+	std::string filter;
+	int denoise_tile_size = 0;
+	bool do_denoise = false;
+	std::string stats_output;
+	bool do_analyze = false;
+	std::string widths_output;
+	bool do_widths = false;
+	std::string output;
+};
+
+// Helper to check if a string is a flag
+bool is_flag(const std::string &arg)
+{
+	return arg.size() >= 2 && arg[0] == '-' && arg[1] == '-';
+}
+
+// Helper to throw errors with usage hint
+void throw_usage_error(const char *flag, const char *msg, const char *prog_name)
+{
+	std::cerr <<
+		std::string(msg) + " '" + flag + "'\n" +
+		"Usage: " + prog_name + " --folder <path> [--crop <pixels>] [--denoise <blur/...> <tile_size>] [--analyze <output.csv>] [--calculate-widths <widths.csv>] [--output <path>]";
+	throw std::runtime_error("Invalid usage");
+}
+
+// Parse flags with argument count validation
+Settings parse_flags(int argc, char *argv[])
+{
+	Settings settings;
+
+	// Map of flag to {handler, expected_arg_count}
+	// arg_count: 0 for no args, 1 for one arg, 2 for two args (special case for --denoise)
+	std::map<std::string, std::pair<std::function<void(int &, int, char *[])>, int>> handlers = {
+		{"--folder", {{[&](int &i, int argc, char *argv[])
+					   {
+						   if (i + 1 >= argc)
+							   throw_usage_error("--folder", "Missing folder path", argv[0]);
+						   settings.folder = argv[++i];
+						   if (settings.folder.empty())
+							   throw_usage_error("--folder", "Folder path cannot be empty", argv[0]);
+					   }},
+					  1}},
+		{"--crop", {{[&](int &i, int argc, char *argv[])
+					 {
+						 if (i + 1 >= argc)
+							 throw_usage_error("--crop", "Missing pixel count", argv[0]);
+						 try
+						 {
+							 settings.crop_pixels = std::stoi(argv[++i]);
+							 if (settings.crop_pixels < 0)
+								 throw_usage_error("--crop", "Pixel count must be non-negative", argv[0]);
+							 settings.do_crop = true;
+						 }
+						 catch (const std::exception &e)
+						 {
+							 throw_usage_error("--crop", "Invalid pixel count", argv[0]);
+						 }
+					 }},
+					1}},
+		{"--denoise", {{[&](int &i, int argc, char *argv[])
+						{
+							if (i + 1 >= argc)
+								throw_usage_error("--denoise", "Missing filter type", argv[0]);
+							settings.filter = argv[++i];
+							if (settings.filter.empty())
+								throw_usage_error("--denoise", "Filter type cannot be empty", argv[0]);
+							if (settings.filter != "blur")
+							{
+								if (i + 1 >= argc)
+									throw_usage_error("--denoise", "Missing tile size for non-blur filter", argv[0]);
+								try
+								{
+									settings.denoise_tile_size = std::stoi(argv[++i]);
+									if (settings.denoise_tile_size <= 0)
+										throw_usage_error("--denoise", "Tile size must be positive", argv[0]);
+								}
+								catch (const std::exception &e)
+								{
+									throw_usage_error("--denoise", "Invalid tile size", argv[0]);
+								}
+							}
+							settings.do_denoise = true;
+						}},
+					   2}}, // 2 args for non-blur, 1 for blur (handled dynamically)
+		{"--analyze", {{[&](int &i, int argc, char *argv[])
+						{
+							if (i + 1 >= argc)
+								throw_usage_error("--analyze", "Missing output file", argv[0]);
+							settings.stats_output = argv[++i];
+							if (settings.stats_output.empty())
+								throw_usage_error("--analyze", "Output file cannot be empty", argv[0]);
+							settings.do_analyze = true;
+						}},
+					   1}},
+		{"--calculate-widths", {{[&](int &i, int argc, char *argv[])
+								 {
+									 if (i + 1 >= argc)
+										 throw_usage_error("--calculate-widths", "Missing output file", argv[0]);
+									 settings.widths_output = argv[++i];
+									 if (settings.widths_output.empty())
+										 throw_usage_error("--calculate-widths", "Output file cannot be empty", argv[0]);
+									 settings.do_widths = true;
+								 }},
+								1}},
+		{"--output", {{[&](int &i, int argc, char *argv[])
+					   {
+						   if (i + 1 >= argc)
+							   throw_usage_error("--output", "Missing output path", argv[0]);
+						   settings.output = argv[++i];
+						   if (settings.output.empty())
+							   throw_usage_error("--output", "Output path cannot be empty", argv[0]);
+					   }},
+					  1}},
+		{"--help", {{[&](int &i, int argc, char *argv[])
+					 {
+						 std::cout << "Usage: " << argv[0] << " --folder <path> [--crop <pixels>] [--denoise <blur/...> <tile_size>] [--analyze <output.csv>] [--calculate-widths <widths.csv>] [--output <path>]\n";
+						 exit(0);
+					 }},
+					0}}};
+
+	for (int i = 1; i < argc; ++i)
+	{
+		std::string arg = argv[i];
+		auto it = handlers.find(arg);
+		if (it == handlers.end())
+		{
+			throw_usage_error(arg.c_str(), "Unknown flag", argv[0]);
+		}
+
+		auto &[handler, expected_args] = it->second;
+		int start_i = i;
+
+		// Execute the handler
+		handler(i, argc, argv);
+
+		// Calculate actual args consumed (excluding the flag itself)
+		int args_consumed = i - start_i;
+
+		// Adjust expected args for --denoise (1 if blur, 2 otherwise)
+		int adjusted_expected = expected_args;
+		if (arg == "--denoise" && settings.filter == "blur")
+		{
+			adjusted_expected = 1;
+		}
+
+		// Validate argument count
+		if (args_consumed != adjusted_expected)
+		{
+			throw_usage_error(arg.c_str(), "Incorrect number of arguments", argv[0]);
+		}
+
+		// Check that consumed args aren�t flags (except the initial flag)
+		for (int j = start_i + 1; j <= i; ++j)
+		{
+			if (is_flag(argv[j]))
+			{
+				throw_usage_error(arg.c_str(), "Argument cannot be another flag", argv[0]);
+			}
+		}
+	}
+
+	if (settings.folder.empty())
+	{
+		throw_usage_error("--folder", "Required flag missing", argv[0]);
+	}
+
+	return settings;
+}
+
+namespace cli
+{
+	void run(int argc, char **argv)
+	{
+		const char *folder = NULL;
+		const char *filter = "none"; // Default preprocessing filter
+		char *output = NULL;		 // Default output dir
+		const char *stats_output = "results.csv";
+		const char *widths_output = "widths.csv";
 		int do_crop = 0;
 		int do_denoise = 0;
 		int do_analyze = 0;
 		int do_widths = 0;
 		int crop_pixels = 0;
+		int denoise_tile_size = 256;
 
-		// Parse flags
-		for (int i = 1; i < argc; i++) {
-			if (strcmp(argv[i], "--folder") == 0 && i + 1 < argc) {
-				folder = argv[++i];
-			} else if (strcmp(argv[i], "--crop") == 0 && i + 1 < argc) {
-				crop_pixels = atoi(argv[++i]);
-				do_crop = 1;
-			} else if (strcmp(argv[i], "--denoise") == 0 && i + 1 < argc) {
-				filter = argv[++i];
-				do_denoise = 1;
-			} else if (strcmp(argv[i], "--analyze") == 0 && i + 1 < argc) {
-				stats_output = argv[++i];
-				do_analyze = 1;
-			} else if (strcmp(argv[i], "--calculate-widths") == 0 && i + 1 < argc) {
-				widths_output = argv[++i];
-				do_widths = 1;
-			} else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
-				output = argv[++i];
-			} else if (strcmp(argv[i], "--help") == 0) {
-				printf("Usage: %s --folder <path> [--crop <pixels_from_bottom_to_remove>] [--denoise <blur/sfr_hrsem/sfr_lrsem>] [--analyze <output.csv>] [--calculate-widths <widths.csv>] [--output <path_to_folder>]\n", argv[0]);
-				return;
-			} else {
-				printf("Unknown flag: %s\n", argv[i]);
-			}
-		}
+		Settings settings = parse_flags(argc, argv);
+		folder = settings.folder.c_str();
+		do_crop = settings.do_crop;
+		crop_pixels = settings.crop_pixels;
+		do_denoise = settings.do_denoise;
+		filter = settings.filter.c_str();
+		denoise_tile_size = settings.denoise_tile_size;
+		do_analyze = settings.do_analyze;
+		stats_output = settings.stats_output.c_str();
+		do_widths = settings.do_widths;
+		widths_output = settings.widths_output.c_str();
+		output = settings.output.empty() ? NULL : const_cast<char*>(settings.output.c_str());
 
 		// Validate required input
-		if (!folder) {
+		if (!folder)
+		{
 			printf("Error: --folder is required\n");
 			printf("Usage: %s --folder <path> [--crop <pixels_from_bottom_to_remove>] [--denoise <blur/sfr_hrsem/sfr_lrsem>] [--analyze <output.csv>] [--output <path_to_folder>]\n", argv[0]);
 		}
-		
+
 		// validate filename and load images
-		std::vector<uint32_t*> images;
+		std::vector<uint32_t *> images;
 		int width, height;
 		bool success = LoadImages(folder, images, width, height);
-		if (!success) {
+		if (!success)
+		{
 			printf("Failed to load images from %s\n", folder);
 			return;
 		}
 
 		// validate filter
-		const char* models[] = { "blur", "sfr_hrsem", "sfr_hrstem", "sfr_hrtem", "sfr_lrsem", "sfr_lrstem", "sfr_lrtem"};
-		if (do_denoise) {
+		const char *models[] = {"blur", "sfr_hrsem", "sfr_hrstem", "sfr_hrtem", "sfr_lrsem", "sfr_lrstem", "sfr_lrtem"};
+		if (do_denoise)
+		{
 			bool found = false;
-			for (int i = 0; i < 6; i++) {
-				if (strcmp(filter, models[i]) == 0) {
+			for (int i = 0; i < 6; i++)
+			{
+				if (strcmp(filter, models[i]) == 0)
+				{
 					found = true;
 					break;
 				}
 			}
-			if (!found) {
+			if (!found)
+			{
 				printf("Invalid denoise filter: %s\n", filter);
 				printf("These are the available filters: blur, sfr_hrsem, sfr_hrstem, sfr_hrtem, sfr_lrsem, sfr_lrstem, sfr_lrtem\n");
 				return;
 			}
 		}
 
-		if (do_crop) {
+		if (do_crop)
+		{
 			height -= crop_pixels;
 		}
 
 		// Execute based on flags
-		if (do_denoise) {
-			if (strcmp(filter, "blur") == 0) {
-					DenoiseInterface::Blur(images, width, height, 3, 1.0f);
+		if (do_denoise)
+		{
+			if (strcmp(filter, "blur") == 0)
+			{
+				DenoiseInterface::Blur(images, width, height, 3, 1.0f);
 			}
-			else DenoiseInterface::Denoise(images, width, height, filter, 256, 10);
+			else
+				DenoiseInterface::Denoise(images, width, height, filter, denoise_tile_size, 10);
 		}
 
-		if (do_analyze) {
+		if (do_analyze)
+		{
 			std::vector<std::vector<float>> histograms;
 			std::vector<float> avg_histogram;
 			std::vector<float> snrs;
@@ -165,28 +354,34 @@ namespace cli {
 			WriteAnalysis(stats_output, histograms, avg_histogram, snrs, avg_snr);
 		}
 
-		if (do_widths) {
+		if (do_widths)
+		{
 			auto polygons = CrackDetector::DetectCracks(images, width, height);
 			auto widths = FeatureTracker::TrackCrackWidthProfiles(polygons);
 			utils::WriteCSV(widths_output, widths);
 		}
 
-		if (output != NULL) {
+		if (output != NULL)
+		{
 			printf("Saving images to %s\n", output);
-			if (output[strlen(output) - 1] == '/') {
+			if (output[strlen(output) - 1] == '/')
+			{
 				output[strlen(output) - 1] = '\0';
 			}
-			if (!std::filesystem::exists(output)) {
+			if (!std::filesystem::exists(output))
+			{
 				std::filesystem::create_directory(output);
 			}
-			for (int i = 0; i < images.size(); i++) {
+			for (int i = 0; i < images.size(); i++)
+			{
 				char filename[256];
 				sprintf(filename, "%s/image_%d.tif", output, i);
 				utils::WriteTiff(filename, images[i], width, height);
 			}
 		}
 
-		if (!do_crop && !do_denoise && !do_analyze && !do_widths) {
+		if (!do_crop && !do_denoise && !do_analyze && !do_widths)
+		{
 			printf("Nothing to do. Use --crop and/or --denoise and/or --analyze and/or --do-widths.\n");
 		}
 	}
