@@ -97,6 +97,11 @@ int main(int argc, char** argv) {
 #ifndef UI_RELEASE
 		ImGui::ShowDemoWindow();
 #endif
+		
+		if (!std::filesystem::exists("imgui.ini"))
+		{
+			ImGui::LoadIniSettingsFromDisk("assets/DefaultLayout.ini");
+		}
 
 		// for each image set, create a window that will be tabbed in the main window
 		// for each image set tab, have tabs for stabilization and preprocessing etc.
