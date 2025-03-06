@@ -118,7 +118,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		if (ImGui::Button("Use AI Model to Denoise")) {
 			std::vector<uint32_t*> frames;
 			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
-			result = DenoiseInterface::DenoiseNew(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), models[selected_model], tile_size, overlap);
+			result = DenoiseInterface::Denoise(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), models[selected_model], tile_size, overlap);
 			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 		ImGui::SameLine(); ImGui::TextDisabled("(?)");
@@ -135,7 +135,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		}
 		ImGui::SameLine(); ImGui::TextDisabled("(?)");
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Early version; works best with high-contrast, denoised images.");
-
+		
 		ImGui::EndChild();
 
 		ImGui::SameLine();

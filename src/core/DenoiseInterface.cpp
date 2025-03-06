@@ -13,87 +13,91 @@ struct ImageTile {
 	cv::Size size;      // Size of the tile
 };
 
-// Function to split an image into tiles
 std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap = 0) {
-	std::vector<ImageTile> tiles;
+    std::vector<ImageTile> tiles;
 
-	int step = tileSize - overlap;  // Move by tileSize - overlap
-	for (int y = 0; y <= image.rows - tileSize; y += step) {
-		if (y + tileSize > image.rows) y = image.rows - tileSize;
-		for (int x = 0; x <= image.cols - tileSize; x += step) {
-			if (x + tileSize > image.cols) x = image.cols - tileSize;
-			// Extract tile
-			cv::Rect roi(x, y, tileSize, tileSize);
-			cv::Mat tile = image(roi).clone();  // Copy to avoid reference issues
+    // Calculate padded dimensions
+    int step = tileSize - overlap;
+    int paddedWidth = ceil((float)image.cols / step) * step + overlap;
+    int paddedHeight = ceil((float)image.rows / step) * step + overlap;
 
-			// Store tile info
-			tiles.push_back({tile, cv::Point(x, y), cv::Size(tileSize, tileSize)});
-		}
-	}
+    // Pad image with zeros
+    cv::Mat paddedImage;
+    cv::copyMakeBorder(image, paddedImage, 0, paddedHeight - image.rows, 
+                       0, paddedWidth - image.cols, cv::BORDER_CONSTANT, cv::Scalar(1.0f));
 
-	return tiles;
+    // Split into tiles with overlap
+    for (int y = 0; y <= paddedImage.rows - tileSize; y += step) {
+        for (int x = 0; x <= paddedImage.cols - tileSize; x += step) {
+            cv::Rect roi(x, y, tileSize, tileSize);
+            cv::Mat tile = paddedImage(roi).clone();
+            tiles.push_back({tile, cv::Point(x, y), cv::Size(tileSize, tileSize)});
+        }
+    }
+
+    return tiles;
 }
 
-cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap) {
-	if (tiles.empty()) {
-		std::cerr << "No tiles provided!" << std::endl;
-		return cv::Mat();
-	}
+cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap = 0) {
+    if (tiles.empty()) {
+        std::cerr << "No tiles provided!" << std::endl;
+        return cv::Mat();
+    }
 
-	cv::Mat reconstructed = cv::Mat::zeros(originalSize, tiles[0].data.type()); // Output image
-	cv::Mat weight = cv::Mat::zeros(originalSize, CV_32F); // Accumulate blending weights
+    // Determine padded size from tiles
+    int maxX = 0, maxY = 0;
+    for (const auto& tile : tiles) {
+        maxX = std::max(maxX, tile.position.x + tile.size.width);
+        maxY = std::max(maxY, tile.position.y + tile.size.height);
+    }
+    cv::Size paddedSize(maxX, maxY);
 
-	int tileSize = tiles[0].size.width; // Assuming square tiles
+    // Initialize accumulation and weight matrices
+    cv::Mat reconstructed = cv::Mat::zeros(paddedSize, CV_32F); // Float for accumulation
+    cv::Mat weight = cv::Mat::zeros(paddedSize, CV_32F);
+    int tileSize = tiles[0].size.width;
 
-	// Create a blending mask to smooth tile overlaps (cosine ramp)
-	cv::Mat blendMask = cv::Mat::ones(tileSize, tileSize, CV_32F);
-	for (int y = 0; y < tileSize; ++y) {
-		for (int x = 0; x < tileSize; ++x) {
-			float wx = (x < overlap) ? (x / float(overlap)) : (x > tileSize - overlap ? (tileSize - x) / float(overlap) : 1.0f);
-			float wy = (y < overlap) ? (y / float(overlap)) : (y > tileSize - overlap ? (tileSize - y) / float(overlap) : 1.0f);
-			blendMask.at<float>(y, x) = wx * wy; // Combine horizontal and vertical weights
-		}
-	}
+    // Create linear blend mask for overlap
+    cv::Mat blendMask = cv::Mat::ones(tileSize, tileSize, CV_32F);
+    if (overlap > 0) {
+        for (int y = 0; y < tileSize; ++y) {
+            for (int x = 0; x < tileSize; ++x) {
+                float wx = (x < overlap) ? (x / (float)overlap) : 
+                          (x >= tileSize - overlap ? (tileSize - x - 1) / (float)overlap : 1.0f);
+                float wy = (y < overlap) ? (y / (float)overlap) : 
+                          (y >= tileSize - overlap ? (tileSize - y - 1) / (float)overlap : 1.0f);
+                blendMask.at<float>(y, x) = wx * wy;
+            }
+        }
+    }
 
-	// Iterate over each tile and blend it into the reconstructed image
-	for (const auto& tile : tiles) {
-		cv::Rect roi(tile.position, tile.size);
+    // Blend tiles
+    for (const auto& tile : tiles) {
+        cv::Rect roi(tile.position, tile.size);
 
-		// Convert tile data to float for blending
-		cv::Mat tileFloat;
-		tile.data.copyTo(tileFloat);
+        cv::Mat weightedTile;
+        cv::multiply(tile.data, blendMask, weightedTile);
+        reconstructed(roi) += weightedTile;
+        weight(roi) += blendMask;
+    }
 
-		// Apply blending mask
-		cv::Mat weightedTile;
-		cv::multiply(tileFloat, blendMask, weightedTile);
+    // Normalize and convert back to grayscale
+    cv::Mat normalized;
+    cv::divide(reconstructed, weight, normalized); // Handle division by zero implicitly
 
-		// Accumulate weighted tile values and blending weights
-		reconstructed(roi) += weightedTile;
-		weight(roi) += blendMask;
-	}
-
-	// Normalize by accumulated weights (avoid division by zero)
-	cv::Mat normalized;
-	reconstructed.copyTo(normalized);
-	for (int y = 0; y < reconstructed.rows; y++) {
-		for (int x = 0; x < reconstructed.cols; x++) {
-			if (weight.at<float>(y, x) > 0.0f) {
-				normalized.at<float>(y, x) = reconstructed.at<float>(y, x) / weight.at<float>(y, x);
-			}
-		}
-	}
-
-	return normalized;
+    // Crop to original size
+    return normalized(cv::Rect(0, 0, originalSize.width, originalSize.height));
 }
 
 // unbelievable amount of allocations in this function...
-bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
+bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
 	cppflow::model model = cppflow::model("assets/models/" + model_name);
 
 	for (int i = 0; i < images.size(); i++) {
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
+		cv::Size paddedSize;
 		auto tiles = splitImageIntoTiles(image, tile_size, overlap);
 		std::cerr << "Tiles: " << tiles.size() << std::endl;
 
@@ -120,7 +124,7 @@ bool DenoiseInterface::DenoiseNew(std::vector<uint32_t *> &images, int width, in
 		// convert tensors to cv::Mat and recombine
 		for (int j = 0; j < tiles.size(); j++) {
 			auto output_data = output[j].get_data<float>();
-			cv::Mat output_image(tiles[j].size, CV_32F);
+			cv::Mat output_image(tiles[j].size, CV_32FC1);
 			for (int y = 0; y < tiles[j].size.height; y++) {
 				for (int x = 0; x < tiles[j].size.width; x++) {
 					output_image.at<float>(y, x) = output_data[y * tiles[j].size.width + x];

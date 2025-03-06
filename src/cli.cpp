@@ -150,7 +150,10 @@ namespace cli {
 
 		// Execute based on flags
 		if (do_denoise) {
-			DenoiseInterface::DenoiseNew(images, width, height, filter, 256, 10);
+			if (strcmp(filter, "blur") == 0) {
+					DenoiseInterface::Blur(images, width, height, 3, 1.0f);
+			}
+			else DenoiseInterface::Denoise(images, width, height, filter, 256, 10);
 		}
 
 		if (do_analyze) {
