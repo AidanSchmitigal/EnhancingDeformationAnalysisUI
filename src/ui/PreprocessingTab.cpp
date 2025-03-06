@@ -17,6 +17,11 @@ PreprocessingTab::PreprocessingTab(std::vector<Texture *> & textures, std::vecto
 
 void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 	if (ImGui::BeginTabItem("Preprocessing")) {
+		if (m_processed_textures.size() == 0) {
+				ImGui::Text("No images loaded");
+				ImGui::EndTabItem();
+				return;
+		}
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 
 		// Crop
@@ -46,7 +51,6 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 
 		// Frame Selection
 		ImGui::SeparatorText("Frame Selection");
-		// TODO: readd frame selection here
 		if (ImGui::Button("Choose Frames")) {
 			ImGui::OpenPopup("Choose Frames");
 		}

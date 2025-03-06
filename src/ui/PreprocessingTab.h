@@ -13,6 +13,7 @@ public:
     ~PreprocessingTab() {}
     void DisplayPreprocessingTab(bool& changed);
     void GetProcessedTextures(std::vector<Texture*>& processed_textures) { processed_textures = m_processed_textures; }
+	void SetProcessedTextures(std::vector<Texture*>& processed_textures) { m_processed_textures = processed_textures; }
 
 private:
     std::vector<Texture*> m_textures;

@@ -138,6 +138,7 @@ void ImageSet::DisplayImageComparisonTab() {
 				free(data);
 			}
 			m_processed_sequence_viewer.SetTextures(m_processed_textures);
+			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 		}
 		ImGui::SameLine();
 		ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 2.2);
@@ -159,6 +160,11 @@ void ImageSet::DisplayImageAnalysisTab() {
 	static std::vector<float> snrs;
 	static float avg_snr = 0.0f;
 	if (ImGui::BeginTabItem("Image Analysis")) {
+		if (m_processed_textures.size() == 0) {
+				ImGui::Text("No images loaded");
+				ImGui::EndTabItem();
+				return;
+		}
 		if (m_ref_image == nullptr || m_ref_image_width * m_ref_image_height != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
 			if (m_ref_image) free(m_ref_image);
 			m_ref_image_width = m_processed_textures[0]->GetWidth();
@@ -215,6 +221,11 @@ void ImageSet::DisplayFeatureTrackingTab() {
 	static bool write_success = true;
 	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
+		if (m_processed_textures.size() == 0) {
+				ImGui::Text("No images loaded");
+				ImGui::EndTabItem();
+				return;
+		}
 		// Initialize point image
 		if (m_point_image == nullptr) {
 			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);

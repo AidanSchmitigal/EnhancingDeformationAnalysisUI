@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 
 std::vector<std::vector<float>> FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::vector<cv::Point2f>& points, std::vector<std::vector<cv::Point2f>>& trackedPoints, int width, int height) {
+	if (images.empty() || points.empty()) return {};
 	std::vector<std::vector<float>> widths;
 	cv::Mat prevGray, currGray;
 	std::vector<cv::Point2f> prevPts, currPts;

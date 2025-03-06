@@ -32,5 +32,5 @@ void ImageAnalysis::AnalyzeImages(std::vector<uint32_t*>& frames, int width, int
     for (int j = 0; j < avg_histogram.size(); j++) {
         avg_histogram[j] /= frames.size();
     }
-    avg_snr /= frames.size();
+    avg_snr = frames.size() != 0 ? avg_snr / frames.size() : 0;
 }
