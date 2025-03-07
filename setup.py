@@ -40,7 +40,6 @@ def check_if_installed():
     return (opencv, tensorflow)
 
 def install_packages():
-
     if platform.system() == "Windows":
         subprocess.check_call(["curl", "-L", "https://aka.ms/vs/17/release/vc_redist.x64.exe", "-o", "vc_redist.x64.exe"])
         subprocess.call(["vc_redist.x64.exe", "/install", "/quiet", "/norestart"])
@@ -87,7 +86,7 @@ def install_packages():
         tf_filename = os.path.join(install_dir, tf_url.split("/")[-1])
         subprocess.check_call(["curl", "-L", tf_url, "-o", tf_filename])
         if tf_filename.endswith(".zip"):
-            os.mkdir(os.path.join(install_dir, "tensorflow"))
+            os.makedirs(os.path.join(install_dir, "tensorflow"), exist_ok=True)
             subprocess.check_call(["tar", "-xf", tf_filename, "-C", os.path.join(install_dir, "tensorflow")])
             print(f"TensorFlow installed to {os.path.join(install_dir, 'tensorflow')}")
             paths.append(os.path.join(install_dir, "tensorflow", "lib"))
