@@ -15,9 +15,6 @@
 
 bool LoadImages(const char *folder, std::vector<uint32_t *> &data, int &width, int &height)
 {
-	printf("Loading images from %s\n", folder);
-	printf("Current path: %s\n", std::filesystem::current_path().string().c_str());
-
 	// load the images
 	if (!std::filesystem::exists(folder))
 	{
