@@ -97,7 +97,7 @@ def install_packages():
     if not tensorflow or not opencv:
         print("Installation complete.")
         if not opencv:
-            print(f"Add the environment variable OpenCV_DIR with the value {os.path.join(install_dir, 'opencv\build')}")
+            print(f"Add the environment variable OpenCV_DIR with the value {os.path.join(install_dir, 'opencv\\build')}")
         print("Please add the following paths to the PATH environment variable:")
     else:
         print("No packages were installed.")
