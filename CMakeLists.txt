@@ -60,9 +60,13 @@ target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
 
 if (UI_RELEASE)
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_RELEASE)
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -Wall)
+
+# Windows doesn't like setting the optimization level through CMake
+# TODO: investigate this
 if (!WIN32)
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3)
 endif()
 else()
-	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -g -O)
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -g)
 endif()
