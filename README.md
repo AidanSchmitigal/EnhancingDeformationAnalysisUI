@@ -22,7 +22,6 @@ Don't miss the recursive part of that command!
 - This also seems to be required for Cuda support on Linux: `export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda`
 
 #### Windows
-- Use powershell and `cd EnhancingDeformationAnalysisUI && mkdir build`
-- `cd build && cmake ..`
-- This will generate a Visual Studio solution, which you can open with `./EnhancingDeformationAnalysisUI.sln`
-- From there you can build by pressing F7, however, it doesn't launch properly through Visual Studio and requires to be launched either through the command line or file explorer.
+- Open the folder using Visual Studio (assuming Desktop C++ package installed). This should automatically configure the project using CMake.
+- Select the correct startup item from the dropdown with the green arrow, EnhancingDeformationAnalysisUI.exe
+- Use F5 to build and run.
