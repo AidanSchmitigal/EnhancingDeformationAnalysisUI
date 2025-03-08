@@ -30,6 +30,7 @@ private:
 
 	PreprocessingTab m_preprocessing_tab;
 	std::vector<cv::Point2f> m_points;
+	std::vector<cv::Point2f> m_last_points;
 	uint32_t* m_point_image = nullptr;
 	Texture m_point_texture;
 	bool m_open = true;

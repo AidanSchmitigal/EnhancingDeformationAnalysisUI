@@ -274,6 +274,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 					memcpy(m_point_image, frames[0], m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 					m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+					m_last_points = m_points;
 					m_points.clear();
 				}
 			} else {
@@ -291,6 +292,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		if (manual_widths.size() > 0 && manualMode) {
 			if (ImGui::Button("Clear Widths")) {
 				manual_widths.clear();
+				m_last_points.clear();
 			}
 			static std::string folder_path;
 			if (ImGui::Button("Choose Folder to Save")) {
@@ -300,7 +302,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			ImGui::InputTextWithHint("Filename", "widths.csv", manual_filename, 256);
 			ImGui::TextWrapped("%s/%s", folder_path.c_str(), manual_filename);
 			if (ImGui::Button("Save Widths")) {
-				write_success = utils::WriteCSV(std::string(folder_path + "/" + manual_filename).c_str(), manual_widths);
+				write_success = utils::WriteCSV(std::string(folder_path + "/" + manual_filename).c_str(), m_last_points, manual_widths);
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}

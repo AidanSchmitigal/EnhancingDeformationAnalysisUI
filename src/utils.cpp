@@ -2,8 +2,10 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <fstream>
 
 #include <tiffio.h>
+#include <opencv2/opencv.hpp>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -133,7 +135,7 @@ namespace utils {
 		TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
 		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
 		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
-		
+
 		for (int i = 0; i < height; i++) {
 			if (TIFFWriteScanline(tif, data + i * width, i, 0) < 0) {
 				printf("Error writing tiff\n");
@@ -182,20 +184,109 @@ namespace utils {
 		return true;
 	}
 
-	bool WriteCSV(const char* path, std::vector<std::vector<float>>& data) {
-		FILE* f = fopen(path, "w");
-		if (!f) {
-			printf("Could not open file %s\n", path);
+	bool WriteCSV(const char* path, std::vector<cv::Point2f>& points, std::vector<std::vector<float>>& data) {
+		std::ofstream file = std::ofstream(path);
+
+		if (!file.is_open()) {
 			return false;
 		}
-		for (int i = 0; i < data.size(); i++) {
-			for (int j = 0; j < data[i].size(); j++) {
-				fprintf(f, "%f", data[i][j]);
-				if (j < data[i].size() - 1) fprintf(f, ",");
-			}
-			fprintf(f, "\n");
+
+		// Write header
+		file << "Point_Pair,Point1_X,Point1_Y,Point2_X,Point2_Y";
+		for (size_t i = 0; i < data.size(); ++i) {
+			file << ",Frame_" << i;
 		}
-		fclose(f);
+		file << "\n";
+
+		// Write data - assuming points are pairs and widths are per frame
+		for (size_t i = 0; i < points.size() / 2; ++i) {
+			file << i << "," 
+				<< points[2*i].x << "," << points[2*i].y << "," 
+				<< points[2*i+1].x << "," << points[2*i+1].y;
+			
+			for (size_t j = 0; j < data.size(); ++j) {
+				file << "," << data[j][i];
+			}
+			file << "\n";
+		}
+
+		file.close();
 		return true;
+	}
+
+	std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap) {
+		std::vector<ImageTile> tiles;
+
+		// Calculate padded dimensions
+		int step = tileSize - overlap;
+		int paddedWidth = ceil((float)image.cols / step) * step + overlap;
+		int paddedHeight = ceil((float)image.rows / step) * step + overlap;
+
+		// Pad image with zeros
+		cv::Mat paddedImage;
+		cv::copyMakeBorder(image, paddedImage, 0, paddedHeight - image.rows, 
+				0, paddedWidth - image.cols, cv::BORDER_CONSTANT, cv::Scalar(1.0f));
+
+		// Split into tiles with overlap
+		for (int y = 0; y <= paddedImage.rows - tileSize; y += step) {
+			for (int x = 0; x <= paddedImage.cols - tileSize; x += step) {
+				cv::Rect roi(x, y, tileSize, tileSize);
+				cv::Mat tile = paddedImage(roi).clone();
+				tiles.push_back({tile, cv::Point(x, y), cv::Size(tileSize, tileSize)});
+			}
+		}
+
+		return tiles;
+	}
+
+	cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap) {
+		if (tiles.empty()) {
+			std::cerr << "No tiles provided!" << std::endl;
+			return cv::Mat();
+		}
+
+		// Determine padded size from tiles
+		int maxX = 0, maxY = 0;
+		for (const auto& tile : tiles) {
+			maxX = std::max(maxX, tile.position.x + tile.size.width);
+			maxY = std::max(maxY, tile.position.y + tile.size.height);
+		}
+		cv::Size paddedSize(maxX, maxY);
+
+		// Initialize accumulation and weight matrices
+		cv::Mat reconstructed = cv::Mat::zeros(paddedSize, CV_32F); // Float for accumulation
+		cv::Mat weight = cv::Mat::zeros(paddedSize, CV_32F);
+		int tileSize = tiles[0].size.width;
+
+		// Create linear blend mask for overlap
+		cv::Mat blendMask = cv::Mat::ones(tileSize, tileSize, CV_32F);
+		if (overlap > 0) {
+			for (int y = 0; y < tileSize; ++y) {
+				for (int x = 0; x < tileSize; ++x) {
+					float wx = (x < overlap) ? (x / (float)overlap) : 
+						(x >= tileSize - overlap ? (tileSize - x - 1) / (float)overlap : 1.0f);
+					float wy = (y < overlap) ? (y / (float)overlap) : 
+						(y >= tileSize - overlap ? (tileSize - y - 1) / (float)overlap : 1.0f);
+					blendMask.at<float>(y, x) = wx * wy;
+				}
+			}
+		}
+
+		// Blend tiles
+		for (const auto& tile : tiles) {
+			cv::Rect roi(tile.position, tile.size);
+
+			cv::Mat weightedTile;
+			cv::multiply(tile.data, blendMask, weightedTile);
+			reconstructed(roi) += weightedTile;
+			weight(roi) += blendMask;
+		}
+
+		// Normalize and convert back to grayscale
+		cv::Mat normalized;
+		cv::divide(reconstructed, weight, normalized); // Handle division by zero implicitly
+
+		// Crop to original size
+		return normalized(cv::Rect(0, 0, originalSize.width, originalSize.height));
 	}
 }
