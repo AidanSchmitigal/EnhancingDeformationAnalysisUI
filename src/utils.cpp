@@ -6,6 +6,7 @@
 
 #include <tiffio.h>
 #include <opencv2/opencv.hpp>
+#include <gif-h/gif.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -53,24 +54,68 @@ namespace utils {
 		return str;
 #else
 
-		// Set zenity to open in our current directory
 		char buf[256];
 		if (folders_only)
 			snprintf(buf, 256, "zenity --file-selection --title=\"%s\" --directory --filename=%s/", title, open_path);
 		else
 			snprintf(buf, 256, "zenity --file-selection --title=\"%s\" --filename=%s/", title, open_path);
-
 		char output[1024];
-
 		// open the zenity window
 		FILE *f = popen(buf, "r");
-
 		// get filename from zenity
 		auto out = fgets(output, 1024, f);
-
-		// remove any newlines
+		if (out == nullptr) return std::string();
 		output[strcspn(output, "\n")] = 0;
+		if (output[0] == 0)
+			return std::string();
+		else
+			return std::string(output);
+#endif
+	}
 
+	std::string SaveFileDialog(const char* save_path, const char* title, const char* filter) {
+#ifdef _WIN32
+		CoInitialize(nullptr);
+		IFileDialog* pFileDialog = nullptr;
+		std::wstring folderPath;
+		if (SUCCEEDED(CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_ALL, IID_IFileDialog, reinterpret_cast<void**>(&pFileDialog))))
+		{
+			DWORD dwOptions;
+			if (SUCCEEDED(pFileDialog->GetOptions(&dwOptions)))
+			{
+				pFileDialog->SetOptions(dwOptions | FOS_OVERWRITEPROMPT);
+			}
+			if (SUCCEEDED(pFileDialog->Show(nullptr)))
+			{
+				IShellItem* pItem;
+				if (SUCCEEDED(pFileDialog->GetResult(&pItem)))
+				{
+					PWSTR pszFilePath;
+					if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath)))
+					{
+						folderPath = pszFilePath;
+						CoTaskMemFree(pszFilePath);
+					}
+					pItem->Release();
+				}
+			}
+			pFileDialog->Release();
+		}
+		CoUninitialize();
+		if (folderPath.empty()) return std::string();
+		int size_needed = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, nullptr, 0, nullptr, nullptr);
+		std::string str(size_needed - 1, 0);
+		WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, &str[0], size_needed, nullptr, nullptr);
+		return str;
+#else
+		char buf[256];
+		snprintf(buf, 256, "zenity --file-selection --save --title=\"%s\" --filename=%s", title, save_path);
+		char output[1024];
+		FILE *f = popen(buf, "r");
+		auto out = fgets(output, 1024, f);
+		if (out == nullptr) return std::string();
+		output[strcspn(output, "\n")] = 0;
+		printf("Output: '%s'\n", output);
 		if (output[0] == 0)
 			return std::string();
 		else
@@ -148,6 +193,27 @@ namespace utils {
 		return true;
 	}
 
+	// write gif using gif.h
+	bool WriteGIFOfImageSet(const char* path, std::vector<Texture*> images, int delay, int loop) {
+		if (images.empty()) {
+			printf("No images to write to gif\n");
+			return false;
+		}
+		// Create gif
+		GifWriter writer;
+		if (!GifBegin(&writer, path, images[0]->GetWidth(), images[0]->GetHeight(), delay, loop))
+			return false;
+		uint32_t* data = (uint32_t*)malloc(images[0]->GetWidth() * images[0]->GetHeight() * 4);
+		for (int i = 0; i < images.size(); i++) {
+			images[i]->GetData(data);
+			GifWriteFrame(&writer, (uint8_t*)data, images[i]->GetWidth(), images[i]->GetHeight(), delay);
+		}
+		free(data);
+		// Close gif
+		GifEnd(&writer);
+		return true;
+	}
+
 	void GetDataFromTexture(unsigned int* data, int width, int height, Texture* texture) {
 		texture->GetData(data);
 	}
@@ -203,7 +269,7 @@ namespace utils {
 			file << i << "," 
 				<< points[2*i].x << "," << points[2*i].y << "," 
 				<< points[2*i+1].x << "," << points[2*i+1].y;
-			
+
 			for (size_t j = 0; j < data.size(); ++j) {
 				file << "," << data[j][i];
 			}
