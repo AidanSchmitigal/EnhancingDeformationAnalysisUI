@@ -8,7 +8,6 @@ Don't miss the recursive part of that command!
 ### Prerequisites
 - CMake 3.5 or higher
 - OpenCV ~4.0.0 or higher with the OpenCV_DIR environment variable set to the path of the OpenCVConfig.cmake file
-- Python3.8 or higher (for compatibility with pybind11) with python development installed
 - [Tensorflow C API](https://www.tensorflow.org/install/lang_c) installed on system path (findable by CMake)
 - On windows: CUDA 11 & cuDNN 8.x.x installed to PATH
 - On linux: CUDA 12.x & cuDNN 9.x.x installed to PATH
@@ -22,6 +21,18 @@ Don't miss the recursive part of that command!
 - This also seems to be required for Cuda support on Linux: `export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda`
 
 #### Windows
+- Use the setup script `setup.py` to setup the project and install opencv and tensorflow. Make sure to set the environment variables.
 - Open the folder using Visual Studio (assuming Desktop C++ package installed). This should automatically configure the project using CMake.
 - Select the correct startup item from the dropdown with the green arrow, EnhancingDeformationAnalysisUI.exe
 - Use F5 to build and run.
+
+## Features
+- Loading folders of .tif/tiff images
+- Preprocessing
+    - Cropping images
+    - Stabilization
+    - Frame selection and removal
+    - Denoising with blur or [tk_r_em](https://github.com/Ivanlh20/tk_r_em) AI models
+    - Crack detection
+- Image Analysis with histograms (exportable)
+- Feature tracking either via user selected points or automatic using the crack detection algorithm

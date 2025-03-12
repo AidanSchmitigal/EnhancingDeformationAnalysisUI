@@ -17,17 +17,9 @@
 #include <cli.hpp>
 
 int main(int argc, char** argv) {
-#ifdef WIN32
-	_putenv_s("TF_ENABLE_ONEDNN_OPTS", "1");
 #ifndef UI_RELEASE
 	std::filesystem::current_path("../");
-#endif
-#else
-#ifndef UI_RELEASE
-	std::filesystem::current_path("../");
-#endif
-	setenv("TF_ENABLE_ONEDNN_OPTS", "1", 1);
-#endif
+#endif // UI_RELEASE
 
 	if (argc > 1) {
 		cli::run(argc, argv);
@@ -54,6 +46,8 @@ int main(int argc, char** argv) {
 	int status = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 	if (!status) {
 		printf("Failed to initialize OpenGL context\n");
+		printf("This is likely due to an issue with the graphics driver/card\n");
+		printf("If you do not have a supported display adapter (e.g. if you are using a VM), use the command line interface instead\n");
 		return -1;
 	}
 

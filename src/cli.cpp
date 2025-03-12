@@ -106,12 +106,12 @@ bool is_flag(const std::string &arg)
 }
 
 // Helper to throw errors with usage hint
-void throw_usage_error(const char *flag, const char *msg, const char *prog_name)
+void print_usage_error(const char *flag, const char *msg, const char *prog_name)
 {
 	std::cerr <<
 		std::string(msg) + " '" + flag + "'\n" +
-		"Usage: " + prog_name + " --folder <path> [--crop <pixels>] [--denoise <blur/...> <tile_size>] [--analyze <output.csv>] [--calculate-widths <widths.csv>] [--output <path>]";
-	throw std::runtime_error("Invalid usage");
+		"Usage: " + prog_name + " --folder <path> [--crop <pixels>] [--denoise <blur/sfr_hrsem/sfr_lrsem>] [--analyze <output.csv>] [--calculate-widths <widths.csv>] [--output <folder_path>]\n";
+	exit(1);
 }
 
 // Parse flags with argument count validation
@@ -125,81 +125,66 @@ Settings parse_flags(int argc, char *argv[])
 		{"--folder", {{[&](int &i, int argc, char *argv[])
 					   {
 						   if (i + 1 >= argc)
-							   throw_usage_error("--folder", "Missing folder path", argv[0]);
+							   print_usage_error("--folder", "Missing folder path", argv[0]);
 						   settings.folder = argv[++i];
 						   if (settings.folder.empty())
-							   throw_usage_error("--folder", "Folder path cannot be empty", argv[0]);
+							   print_usage_error("--folder", "Folder path cannot be empty", argv[0]);
 					   }},
 					  1}},
 		{"--crop", {{[&](int &i, int argc, char *argv[])
 					 {
 						 if (i + 1 >= argc)
-							 throw_usage_error("--crop", "Missing pixel count", argv[0]);
+							 print_usage_error("--crop", "Missing pixel count", argv[0]);
 						 try
 						 {
 							 settings.crop_pixels = std::stoi(argv[++i]);
 							 if (settings.crop_pixels < 0)
-								 throw_usage_error("--crop", "Pixel count must be non-negative", argv[0]);
+								 print_usage_error("--crop", "Pixel count must be non-negative", argv[0]);
 							 settings.do_crop = true;
 						 }
 						 catch (const std::exception &e)
 						 {
-							 throw_usage_error("--crop", "Invalid pixel count", argv[0]);
+							 print_usage_error("--crop", "Invalid pixel count", argv[0]);
 						 }
 					 }},
 					1}},
 		{"--denoise", {{[&](int &i, int argc, char *argv[])
 						{
 							if (i + 1 >= argc)
-								throw_usage_error("--denoise", "Missing filter type", argv[0]);
+								print_usage_error("--denoise", "Missing filter type", argv[0]);
 							settings.filter = argv[++i];
 							if (settings.filter.empty())
-								throw_usage_error("--denoise", "Filter type cannot be empty", argv[0]);
-							if (settings.filter != "blur")
-							{
-								if (i + 1 >= argc)
-									throw_usage_error("--denoise", "Missing tile size for non-blur filter", argv[0]);
-								try
-								{
-									settings.denoise_tile_size = std::stoi(argv[++i]);
-									if (settings.denoise_tile_size <= 0)
-										throw_usage_error("--denoise", "Tile size must be positive", argv[0]);
-								}
-								catch (const std::exception &e)
-								{
-									throw_usage_error("--denoise", "Invalid tile size", argv[0]);
-								}
-							}
+								print_usage_error("--denoise", "Filter type cannot be empty", argv[0]);
 							settings.do_denoise = true;
 						}},
-					   2}}, // 2 args for non-blur, 1 for blur (handled dynamically)
+					   1}}, // 2 args for non-blur, 1 for blur (handled dynamically)
 		{"--analyze", {{[&](int &i, int argc, char *argv[])
 						{
 							if (i + 1 >= argc)
-								throw_usage_error("--analyze", "Missing output file", argv[0]);
+								print_usage_error("--analyze", "Missing output file", argv[0]);
 							settings.stats_output = argv[++i];
 							if (settings.stats_output.empty())
-								throw_usage_error("--analyze", "Output file cannot be empty", argv[0]);
+								print_usage_error("--analyze", "Output file cannot be empty", argv[0]);
 							settings.do_analyze = true;
 						}},
 					   1}},
 		{"--calculate-widths", {{[&](int &i, int argc, char *argv[])
 								 {
 									 if (i + 1 >= argc)
-										 throw_usage_error("--calculate-widths", "Missing output file", argv[0]);
+										 print_usage_error("--calculate-widths", "Missing output file", argv[0]);
 									 settings.widths_output = argv[++i];
 									 if (settings.widths_output.empty())
-										 throw_usage_error("--calculate-widths", "Output file cannot be empty", argv[0]);
+										 print_usage_error("--calculate-widths", "Output file cannot be empty", argv[0]);
 									 settings.do_widths = true;
 								 }},
 								1}},
 		{"--output", {{[&](int &i, int argc, char *argv[])
 					   {
 						   if (i + 1 >= argc)
-							   throw_usage_error("--output", "Missing output path", argv[0]);
+							   print_usage_error("--output", "Missing output path", argv[0]);
 						   settings.output = argv[++i];
 						   if (settings.output.empty())
-							   throw_usage_error("--output", "Output path cannot be empty", argv[0]);
+							   print_usage_error("--output", "Output path cannot be empty", argv[0]);
 					   }},
 					  1}},
 		{"--help", {{[&](int &i, int argc, char *argv[])
@@ -215,7 +200,7 @@ Settings parse_flags(int argc, char *argv[])
 		auto it = handlers.find(arg);
 		if (it == handlers.end())
 		{
-			throw_usage_error(arg.c_str(), "Unknown flag", argv[0]);
+			print_usage_error(arg.c_str(), "Unknown flag", argv[0]);
 		}
 
 		auto &[handler, expected_args] = it->second;
@@ -227,17 +212,10 @@ Settings parse_flags(int argc, char *argv[])
 		// Calculate actual args consumed (excluding the flag itself)
 		int args_consumed = i - start_i;
 
-		// Adjust expected args for --denoise (1 if blur, 2 otherwise)
-		int adjusted_expected = expected_args;
-		if (arg == "--denoise" && settings.filter == "blur")
-		{
-			adjusted_expected = 1;
-		}
-
 		// Validate argument count
-		if (args_consumed != adjusted_expected)
+		if (args_consumed != expected_args)
 		{
-			throw_usage_error(arg.c_str(), "Incorrect number of arguments", argv[0]);
+			print_usage_error(arg.c_str(), "Incorrect number of arguments", argv[0]);
 		}
 
 		// Check that consumed args aren�t flags (except the initial flag)
@@ -245,14 +223,14 @@ Settings parse_flags(int argc, char *argv[])
 		{
 			if (is_flag(argv[j]))
 			{
-				throw_usage_error(arg.c_str(), "Argument cannot be another flag", argv[0]);
+				print_usage_error(arg.c_str(), "Argument cannot be another flag", argv[0]);
 			}
 		}
 	}
 
 	if (settings.folder.empty())
 	{
-		throw_usage_error("--folder", "Required flag missing", argv[0]);
+		print_usage_error("--folder", "Required flag missing", argv[0]);
 	}
 
 	return settings;
@@ -274,6 +252,9 @@ namespace cli
 		int crop_pixels = 0;
 		int denoise_tile_size = 256;
 
+		if (!std::filesystem::exists("assets")) {
+			fprintf(stderr, "ERROR: assets folder not found, denoising/deformation analysis will not work properly\n");
+		}
 		Settings settings = parse_flags(argc, argv);
 		folder = settings.folder.c_str();
 		do_crop = settings.do_crop;
