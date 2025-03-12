@@ -8,6 +8,7 @@ project(EnhancingDeformationAnalysisUI VERSION 0.1
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libs/cppflow/cmake/modules)
+
 # Set the source directory
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -20,6 +21,13 @@ if (!WIN32)
 	SET(GLFW_BUILD_X11 ON CACHE BOOL "Build for X11")
 	SET(GLFW_BUILD_WAYLAND ON CACHE BOOL "Build for Wayland")
 endif()
+
+SET(BUILD_EXAMPLES OFF CACHE BOOL "cppflow lib only")
+SET(tiff-tools OFF CACHE BOOL "libtiff lib only")
+SET(tiff-tests OFF CACHE BOOL "libtiff lib only")
+SET(tiff-contrib OFF CACHE BOOL "libtiff lib only")
+SET(tiff-docs OFF CACHE BOOL "libtiff lib only")
+SET(tiff-install OFF CACHE BOOL "libtiff lib only")
 
 find_package(OpenCV REQUIRED)
 
