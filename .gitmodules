@@ -11,3 +11,6 @@
 [submodule "libs/cppflow"]
 	path = libs/cppflow
 	url = https://github.com/serizba/cppflow
+[submodule "libs/gif-h"]
+	path = libs/gif-h
+	url = https://github.com/charlietangora/gif-h

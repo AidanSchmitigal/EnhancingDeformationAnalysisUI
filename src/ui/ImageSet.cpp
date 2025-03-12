@@ -77,6 +77,18 @@ void ImageSet::Display() {
 				}
 			}
 		}
+		if (ImGui::Button("Save a GIF")) {
+			std::string path = utils::SaveFileDialog(".", "Choose Where to Save the GIF", "gif");
+			if (!path.empty()) {
+				utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
+			}
+		}
+		ImGui::TextDisabled("?");
+		if (ImGui::IsItemHovered()) {
+			ImGui::BeginTooltip();
+			ImGui::Text("This will write a GIF of the processed images, and will take around 10 seconds.");
+			ImGui::EndTooltip();
+		}
 		ImGui::EndTabItem();
 	}
 

@@ -3,8 +3,6 @@
 
 #include <glad/glad.h>
 
-#include <stb_image/stb_image.h>
-
 Texture::Texture() {
 	glGenTextures(1, &m_id);
 }

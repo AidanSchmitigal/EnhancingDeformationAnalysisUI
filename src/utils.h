@@ -18,12 +18,15 @@ struct ImageTile {
 namespace utils {
 	// TODO: fill in the filter for win32 (although it may not matter?)
 	std::string OpenFileDialog(const char* open_path = ".", const char* title = "", const bool folders_only = false, const char* filter = "");
+	std::string SaveFileDialog(const char* save_path = ".", const char* title = "", const char* filter = "");
 
 	// Load a tiff image
 	// remember to free this pointer
 	unsigned int* LoadTiff(const char* path, int& width, int& height);
 
 	bool WriteTiff(const char* path, unsigned int* data, int width, int height);
+
+	bool WriteGIFOfImageSet(const char* path, std::vector<Texture*> images, int delay = 100, int loop = 0);
 
 	void GetDataFromTexture(unsigned int* data, int width, int height, Texture* texture);
 	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<Texture*>& textures);
