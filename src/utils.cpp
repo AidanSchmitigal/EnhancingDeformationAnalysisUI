@@ -64,6 +64,8 @@ namespace utils {
 		FILE *f = popen(buf, "r");
 		// get filename from zenity
 		auto out = fgets(output, 1024, f);
+		// if no filename was returned, return an empty string
+		// if we don't do this check we get garbage data into the string when the user cancels the dialog
 		if (out == nullptr) return std::string();
 		output[strcspn(output, "\n")] = 0;
 		if (output[0] == 0)
@@ -113,6 +115,7 @@ namespace utils {
 		char output[1024];
 		FILE *f = popen(buf, "r");
 		auto out = fgets(output, 1024, f);
+		// if we don't do this check we get garbage data into the string when the user cancels the dialog
 		if (out == nullptr) return std::string();
 		output[strcspn(output, "\n")] = 0;
 		printf("Output: '%s'\n", output);
@@ -203,6 +206,8 @@ namespace utils {
 		GifWriter writer;
 		if (!GifBegin(&writer, path, images[0]->GetWidth(), images[0]->GetHeight(), delay, loop))
 			return false;
+
+		// all textures are the same size, so allocate once and then replace each time
 		uint32_t* data = (uint32_t*)malloc(images[0]->GetWidth() * images[0]->GetHeight() * 4);
 		for (int i = 0; i < images.size(); i++) {
 			images[i]->GetData(data);
