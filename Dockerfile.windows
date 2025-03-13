@@ -51,8 +51,6 @@ RUN git clone --depth 1 --branch 4.10.0 https://github.com/opencv/opencv.git; \
 # Set environment variables for CMake to find TensorFlow and OpenCV
 RUN [Environment]::SetEnvironmentVariable('OpenCV_DIR', 'C:\opencv', [EnvironmentVariableTarget]::Machine)
 
-RUN echo 'done'
-
 # Working directory
 WORKDIR C:\
 
