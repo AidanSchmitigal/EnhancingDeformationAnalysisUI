@@ -7,27 +7,44 @@ on:
     branches: [ ci/cd ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    # Use the Docker container
+  build-windows:
+    runs-on: windows-latest
     container:
-      image: ghcr.io/ajh416/enhancing-deformation-ui-ci:slim
-
+      image: ghcr.io/${{ github.repository }}/ci-image-windows:latest
     steps:
-      # Checkout the code
       - uses: actions/checkout@v4
         with:
           submodules: 'true'
 
-      # Configure CMake
+      - name: Configure CMake
+        shell: powershell
+        run: |
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 17 2022" ..
+      - name: Build
+        shell: powershell
+        run: |
+          cd build
+          cmake --build -j$(nproc) .
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/${{ github.repository }}/ci-image-linux:latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
       - name: Configure CMake
         run: |
           mkdir build
           cd build
           cmake ..
 
-      # Build the project
       - name: Build
         run: |
           cd build
