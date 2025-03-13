@@ -12,12 +12,16 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Windows Image
-        run: |
-          docker build -f Dockerfile.windows -t ci-image-windows:latest .
-      - name: Test Build
+
+      - name: Set Lowercase Repository Name
+        id: repo_name
+        run: echo "REPO_NAME_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Pull Container and Test Build
         shell: powershell
         run: |
+          echo "Using container image: ghcr.io/${REPO_NAME_LOWER}/ci-image-windows:latest"
+          docker pull ghcr.io/${REPO_NAME_LOWER}/ci-image-windows:latest
           docker run --rm -v ${PWD}:C:\app ci-image-windows:latest powershell -Command "mkdir build; cd build; cmake -G 'Visual Studio 17 2022' ..; cmake --build . --config Release"
 
   build-linux:

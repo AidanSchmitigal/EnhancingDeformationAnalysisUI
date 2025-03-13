@@ -4,7 +4,7 @@ FROM mcr.microsoft.com/windows/servercore:ltsc2022
 # Set shell to PowerShell
 SHELL ["powershell", "-Command"]
 
-# Install Chocolatey
+# Install Chocolatey (for CMake, Git, Python)
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
@@ -12,12 +12,11 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
 # Ensure Chocolatey is up-to-date
 RUN choco upgrade chocolatey -y
 
-# Install build tools: CMake, Git, Python, Visual Studio Build Tools
+# Install essential tools via Chocolatey (excluding Visual Studio)
 RUN choco install -y cmake git python --version=3.10.11; \
-    choco install -y visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional --quiet --wait"; \
     RefreshEnv.cmd
 
-# Alternative: Manually install VS Build Tools if Chocolatey fails
+# Install Visual Studio Build Tools (without using Chocolatey)
 RUN Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vs_BuildTools.exe -OutFile vs_BuildTools.exe; \
     Start-Process -FilePath vs_BuildTools.exe -ArgumentList "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.Windows10SDK.19041" -NoNewWindow -Wait; \
     Remove-Item vs_BuildTools.exe
