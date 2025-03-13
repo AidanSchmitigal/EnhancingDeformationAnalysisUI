@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ ci/cd ]
+  pull_request:
+    branches: [ ci/cd ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # Use the Docker container
+    container:
+      image: ajh416/enhancing-deformation-ui-ci:slim  # Replace with your image name
+
+    steps:
+      # Checkout the code
+      - uses: actions/checkout@v4
+
+      # Configure CMake
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+
+      # Build the project
+      - name: Build
+        run: |
+          cd build
+          make -j$(nproc)
+
