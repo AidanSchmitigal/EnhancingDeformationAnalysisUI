@@ -1,16 +1,14 @@
-name: Build Docker Images
+name: Build Linux Image
 
 on:
   push:
     branches: [ ci/cd ]
     paths:
       - 'Dockerfile'
-      - 'Dockerfile.windows'
   pull_request:
     branches: [ ci/cd ]
     paths:
       - 'Dockerfile'
-      - 'Dockerfile.windows'
 
 jobs:
   build-linux-image:
@@ -26,16 +24,3 @@ jobs:
           docker build -f Dockerfile -t ghcr.io/${REPO_NAME_LOWER}/ci-image-linux:latest .
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker push ghcr.io/${REPO_NAME_LOWER}/ci-image-linux:latest
-  build-windows-image:
-    permissions: write-all
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set Lowercase Repository Name
-        id: repo_name
-        run: echo "REPO_NAME_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
-      - name: Build Windows Image
-        run: |
-          docker build -f Dockerfile.windows -t ci-image-windows:latest .
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker push ghcr.io/${REPO_NAME_LOWER}/ci-image-windows:latest

@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [ ci/cd ]
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'src/**'
   pull_request:
     branches: [ ci/cd ]
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'src/**'
 
 jobs:
   build-windows:
