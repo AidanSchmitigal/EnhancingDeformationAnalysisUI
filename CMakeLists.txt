@@ -18,7 +18,7 @@ file(GLOB_RECURSE SOURCES "${SRC_DIR}/**.cpp" "${SRC_DIR}/**.h")
 file(GLOB IMGUI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/*.cpp")
 
 if (!WIN32)
-	#SET(GLFW_BUILD_X11 ON CACHE BOOL "Build for X11")
+	SET(GLFW_BUILD_X11 ON CACHE BOOL "Build for X11")
 endif()
 
 SET(BUILD_EXAMPLES OFF CACHE BOOL "cppflow lib only")
