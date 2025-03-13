@@ -22,16 +22,16 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
 
+    env:
+      REPO_NAME_LOWER: ${{ github.repository_owner }}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
     container:
-      image: ghcr.io/${{ REPO_LOWER }}/ci-image-linux:latest
+      image: ghcr.io/${{ env.REPO_NAME_LOWER }}/ci-image-linux:latest
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: 'true'
-
-      - name: Set lowercase repository name
-        run: echo "REPO_LOWER=${REPO_LOWER,,}" >> $GITHUB_ENV
 
       - name: Configure CMake
         run: |
