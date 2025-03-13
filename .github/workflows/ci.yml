@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/${{ github.repository }}/ci-image-linux:latest
+      image: ghcr.io/${{ lowercase(github.repository) }}/ci-image-linux:latest
 
     steps:
       - uses: actions/checkout@v4
