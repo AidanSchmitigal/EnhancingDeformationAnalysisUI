@@ -11,7 +11,7 @@ on:
       - 'Dockerfile.windows'
 
 jobs:
-    build-windows-image:
+  build-windows-image:
     permissions: write-all
     runs-on: windows-latest
     steps:
