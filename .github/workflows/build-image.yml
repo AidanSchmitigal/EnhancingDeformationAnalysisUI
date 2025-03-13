@@ -5,12 +5,10 @@ on:
     branches: [ main ]
     paths:
       - 'Dockerfile'
-      - 'Dockerfile.windows'
   pull_request:
     branches: [ main ]
     paths:
       - 'Dockerfile'
-      - 'Dockerfile.windows'
 
 jobs:
   build-linux-image:
@@ -22,13 +20,3 @@ jobs:
           docker build -f Dockerfile -t ghcr.io/${{ github.repository }}/ci-image-linux:latest .
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker push ghcr.io/${{ github.repository }}/ci-image-linux:latest
-
-  build-windows-image:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build and Push Windows Image
-        run: |
-          docker build -f Dockerfile.windows -t ghcr.io/${{ github.repository }}/ci-image-windows:latest .
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker push ghcr.io/${{ github.repository }}/ci-image-windows:latest
