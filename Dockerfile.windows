@@ -4,7 +4,7 @@ FROM mcr.microsoft.com/windows/servercore:ltsc2022
 # Set shell to PowerShell
 SHELL ["powershell", "-Command"]
 
-# Install Chocolatey (for CMake, Git, Python)
+# Install Chocolatey (for CMake, Git)
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
@@ -13,7 +13,7 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
 RUN choco upgrade chocolatey -y
 
 # Install essential tools via Chocolatey (excluding Visual Studio)
-RUN choco install -y cmake git python --version=3.10.11; \
+RUN choco install -y cmake git \
     RefreshEnv.cmd
 
 # Install Visual Studio Build Tools (without using Chocolatey)
@@ -22,7 +22,7 @@ RUN Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vs_BuildTools.exe -OutFi
     Remove-Item vs_BuildTools.exe
 
 # Update PATH for Python, CMake, MSVC, and TensorFlow (lib and include)
-RUN $env:Path += ';C:\Python310;C:\Python310\Scripts;C:\Program Files\CMake\bin;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.38.33130\bin\Hostx64\x64;C:\tensorflow\lib;C:\tensorflow\include'; \
+RUN $env:Path += ';C:\Program Files\CMake\bin;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.38.33130\bin\Hostx64\x64;C:\tensorflow\lib;C:\tensorflow\include'; \
     [Environment]::SetEnvironmentVariable('Path', $env:Path, [EnvironmentVariableTarget]::Machine)
 
 # Install TensorFlow C API (CPU version)
