@@ -22,24 +22,19 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
 
-    env:
-      REPO_NAME_LOWER: ${{ github.repository_owner }}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-
-    container:
-      image: ghcr.io/${{ env.REPO_NAME_LOWER }}/ci-image-linux:latest
-
     steps:
+      - name: Set Lowercase Repository Name
+        id: repo_name
+        run: echo "REPO_NAME_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v4
         with:
           submodules: 'true'
 
-      - name: Configure CMake
+      - name: Pull and Run Container
         run: |
-          mkdir build
-          cd build
-          cmake ..
-
-      - name: Build
-        run: |
-          cd build
-          make -j$(nproc)
+          echo "Using container image: ghcr.io/${REPO_NAME_LOWER}/ci-image-linux:latest"
+          docker pull ghcr.io/${REPO_NAME_LOWER}/ci-image-linux:latest
+          docker run --rm -v $PWD:/app -w /app ghcr.io/${REPO_NAME_LOWER}/ci-image-linux:latest bash -c "
+            mkdir build && cd build && cmake .. && make -j$(nproc)
+          "
