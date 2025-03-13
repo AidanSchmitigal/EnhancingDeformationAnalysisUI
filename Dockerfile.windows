@@ -13,7 +13,7 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
 RUN choco upgrade chocolatey -y
 
 # Install essential tools via Chocolatey (excluding Visual Studio)
-RUN choco install -y cmake git && RefreshEnv.cmd
+RUN choco install -y cmake git
 
 # Install Visual Studio Build Tools (without using Chocolatey)
 RUN Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vs_BuildTools.exe -OutFile vs_BuildTools.exe; \
