@@ -12,7 +12,7 @@ jobs:
 
     # Use the Docker container
     container:
-      image: ajh416/enhancing-deformation-ui-ci:slim  # Replace with your image name
+      image: ghcr.io/ajh416/enhancing-deformation-ui-ci:slim
 
     steps:
       # Checkout the code
