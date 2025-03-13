@@ -21,6 +21,7 @@ jobs:
         shell: powershell
         run: |
           echo "Using container image: ghcr.io/${REPO_NAME_LOWER}/ci-image-windows:latest"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker pull ghcr.io/${REPO_NAME_LOWER}/ci-image-windows:latest
           docker run --rm -v ${PWD}:C:\app ci-image-windows:latest powershell -Command "mkdir build; cd build; cmake -G 'Visual Studio 17 2022' ..; cmake --build . --config Release"
 
@@ -39,6 +40,7 @@ jobs:
       - name: Pull and Run Container
         run: |
           echo "Using container image: ghcr.io/${REPO_NAME_LOWER}/ci-image-linux:latest"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker pull ghcr.io/${REPO_NAME_LOWER}/ci-image-linux:latest
           docker run --rm -v $PWD:/app -w /app ghcr.io/${REPO_NAME_LOWER}/ci-image-linux:latest bash -c "
             mkdir build && cd build && cmake .. && make -j$(nproc)
