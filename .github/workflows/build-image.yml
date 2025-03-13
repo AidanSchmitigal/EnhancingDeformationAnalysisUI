@@ -5,10 +5,12 @@ on:
     branches: [ ci/cd ]
     paths:
       - 'Dockerfile'
+      - 'Dockerfile.windows'
   pull_request:
     branches: [ ci/cd ]
     paths:
       - 'Dockerfile'
+      - 'Dockerfile.windows'
 
 jobs:
   build-linux-image:
