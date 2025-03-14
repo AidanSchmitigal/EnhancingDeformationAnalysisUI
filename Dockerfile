@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM ubuntu:latest
 RUN apt-get update && apt-get install -y \
     build-essential cmake libjpeg-dev libpng-dev git xorg-dev libwayland-dev libxkbcommon-dev libopencv-dev \
     wayland-protocols extra-cmake-modules wget \
