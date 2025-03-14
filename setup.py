@@ -30,6 +30,7 @@ def check_if_installed():
     elif platform.system() == "Darwin":
         if subprocess.call(["brew", "list", "opencv"]) == 0:
             opencv = True
+        # TODO: fix
         if os.environ["LD_LIBRARY_PATH"].find("tensorflow") != -1:
             tensorflow = True
     else:

@@ -9,6 +9,9 @@
 
 bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, int width, int height, const int tile_size, const int overlap) {
 	cppflow::model model = cppflow::model("assets/models/batch-m4-combo/");
+	for (int i = 0; i < model.get_operations().size(); i++)
+		printf("Operation %d: %s\n", i, model.get_operations()[i].c_str());
+
 	for (int i = 0; i < images.size() - 1; i++) {
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);

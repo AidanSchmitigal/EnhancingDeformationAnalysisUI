@@ -38,6 +38,13 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
+#ifdef __APPLE__
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for macOS
+#endif
+
 #ifdef UI_RELEASE
 	GLFWwindow* window = glfwCreateWindow(1400, 1050, "Enhancing Deformation Analysis UI", NULL, NULL);
 #else
@@ -103,6 +110,16 @@ int main(int argc, char** argv) {
 
 		ImGui::SetNextWindowDockID(dockspaceID, ImGuiCond_FirstUseEver);
 
+#ifdef __APPLE__
+		ImGui::Begin("Image Folder Selector");
+		ImGui::InputTextWithHint("##image_folder", "Enter image folder path", nullptr, 0);
+		if (ImGui::Button("Load Images")) {
+			const char* folder_path = ImGui::GetInputTextState("##image_folder")->Text;
+			if (std::filesystem::is_directory(folder_path)) {
+				image_sets.emplace_back(new ImageSet(folder_path));
+			}
+		}
+#else
 		// for each image set, create a window that will be tabbed in the main window
 		// for each image set tab, have tabs for stabilization and preprocessing etc.
 		ImGui::Begin("Image Folder Selector");
@@ -112,6 +129,8 @@ int main(int argc, char** argv) {
 				image_sets.emplace_back(new ImageSet(folder_path));
 			}
 		}
+
+#endif
 
 		// display a warning if the assets folder is not found
 		if (!assets_folder_exists) {
