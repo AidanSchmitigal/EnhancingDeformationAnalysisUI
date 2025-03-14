@@ -173,9 +173,9 @@ void ImageSet::DisplayImageAnalysisTab() {
 	static float avg_snr = 0.0f;
 	if (ImGui::BeginTabItem("Image Analysis")) {
 		if (m_processed_textures.size() == 0) {
-				ImGui::Text("No images loaded");
-				ImGui::EndTabItem();
-				return;
+			ImGui::Text("No images loaded");
+			ImGui::EndTabItem();
+			return;
 		}
 		if (m_ref_image == nullptr || m_ref_image_width * m_ref_image_height != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
 			if (m_ref_image) free(m_ref_image);
@@ -234,9 +234,9 @@ void ImageSet::DisplayFeatureTrackingTab() {
 	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
 		if (m_processed_textures.size() == 0) {
-				ImGui::Text("No images loaded");
-				ImGui::EndTabItem();
-				return;
+			ImGui::Text("No images loaded");
+			ImGui::EndTabItem();
+			return;
 		}
 		// Initialize point image
 		if (m_point_image == nullptr) {
@@ -251,7 +251,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
-		
+
 		// Update point image if it isn't the same as the ref texture
 		uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 		m_processed_textures[0]->GetData(data);

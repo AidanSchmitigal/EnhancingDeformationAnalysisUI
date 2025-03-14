@@ -10,7 +10,7 @@ Don't miss the recursive part of that command!
 - OpenCV ~4.0.0 or higher with the OpenCV_DIR environment variable set to the path of the OpenCVConfig.cmake file
 - [Tensorflow C API](https://www.tensorflow.org/install/lang_c) installed on system path (findable by CMake)
 - On windows: CUDA 11 & cuDNN 8.x.x installed to PATH
-- On linux: CUDA 12.x & cuDNN 9.x.x installed to PATH
+- On linux: CUDA 12.x & cuDNN 9.x.x installed to PATH, Zenity for file browsing operations
 
 ### Compilation
 #### Linux (maybe MacOS?)

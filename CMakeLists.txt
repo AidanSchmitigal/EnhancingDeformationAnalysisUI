@@ -76,7 +76,10 @@ if (UI_RELEASE)
 # TODO: investigate this
 if (!WIN32)
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3)
-endif()
+endif() # !WIN32
 else()
+if (!WIN32)
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O)
+endif() # !WIN32
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -g)
-endif()
+endif() # UI_RELEASE
