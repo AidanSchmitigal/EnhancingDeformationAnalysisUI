@@ -240,7 +240,8 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				return;
 		}
 		// Initialize point image
-		if (m_point_image == nullptr) {
+		if (m_point_image == NULL) {
+			printf("Refreshing point image\n");
 			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
@@ -277,7 +278,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		}
 
 		if (manualMode) {
-			if (ImGui::Button("Clear Selection")) m_points.clear();
+			if (m_points.size() > 0 && ImGui::Button("Clear Selection")) m_points.clear();
 			if (m_points.size() % 2 == 0 && m_points.size() > 0) {
 				if (ImGui::Button("Track Features")) {
 					std::vector<uint32_t*> frames;
@@ -306,6 +307,15 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			if (ImGui::Button("Clear Widths")) {
 				manual_widths.clear();
 				m_last_points.clear();
+				uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+				for (int i = 0; i < m_processed_textures.size(); i++) {
+					m_textures[i]->GetData(data);
+					m_processed_textures[i]->Load(data, m_textures[i]->GetWidth(), m_textures[i]->GetHeight());
+				}
+				free(m_point_image);
+				m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+				memcpy(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
 			static std::string folder_path;
 			if (ImGui::Button("Choose Folder to Save")) {

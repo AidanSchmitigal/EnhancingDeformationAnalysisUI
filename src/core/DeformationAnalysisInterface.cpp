@@ -35,9 +35,11 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 			}
 
 			// note the inputs are in a different order than the original python model
+			// is that right??
 			cppflow::tensor input = cppflow::tensor(image_data, {1, tiles[k].data.rows, tiles[k].data.cols, 2});
 
 			try {
+				// originally tried stateful partitioned call but it wanted saver_filename string tensor
 				auto output2 = model({{ "serving_default_input.1", input }}, {"PartitionedCall"});
 				output.push_back(output2[0]);
 			}
