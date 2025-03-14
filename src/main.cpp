@@ -21,11 +21,13 @@ int main(int argc, char** argv) {
 	std::filesystem::current_path("../");
 #endif // UI_RELEASE
 
+	// if there's any args, run the cli instead
 	if (argc > 1) {
 		cli::run(argc, argv);
 		return 0;
 	}
 
+	// confirm we have the assets folder (ai models and config)
 	bool assets_folder_exists = std::filesystem::exists("assets");
 	if (!assets_folder_exists) {
 		fprintf(stderr, "ERROR: Assets folder not found! The folder is required for this program to function correctly!\n");
@@ -68,7 +70,7 @@ int main(int argc, char** argv) {
 	// allow docking
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-	// set glfw to use vsync
+	// set glfw to use vsync, results in less cpu usage and no visible difference
 	glfwSwapInterval(1);
 
 	// create a vector of ImageSet pointers to store the image sets
@@ -84,6 +86,7 @@ int main(int argc, char** argv) {
 		// begin the ImGui frame
 		ImGuiBeginFrame();
 
+		// render the dockspace for all the other windows
 		ImGuiID dockspaceID = ImGui::DockSpaceOverViewport();
 
 		// show the demo window if in debug
@@ -91,6 +94,8 @@ int main(int argc, char** argv) {
 		ImGui::ShowDemoWindow();
 #endif
 		
+		// is this necessary when we use the SetNextWindowDockID function?
+		// TODO: test
 		if (!std::filesystem::exists("imgui.ini"))
 		{
 			ImGui::LoadIniSettingsFromDisk("assets/DefaultLayout.ini");

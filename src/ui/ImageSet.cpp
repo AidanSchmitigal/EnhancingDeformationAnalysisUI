@@ -83,6 +83,7 @@ void ImageSet::Display() {
 				utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
 			}
 		}
+		ImGui::SameLine();
 		ImGui::TextDisabled("?");
 		if (ImGui::IsItemHovered()) {
 			ImGui::BeginTooltip();

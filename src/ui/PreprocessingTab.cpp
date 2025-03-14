@@ -18,9 +18,9 @@ PreprocessingTab::PreprocessingTab(std::vector<Texture *> & textures, std::vecto
 void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 	if (ImGui::BeginTabItem("Preprocessing")) {
 		if (m_processed_textures.size() == 0) {
-				ImGui::Text("No images loaded");
-				ImGui::EndTabItem();
-				return;
+			ImGui::Text("No images loaded");
+			ImGui::EndTabItem();
+			return;
 		}
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 
@@ -56,7 +56,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		}
 
 		if (ImGui::BeginPopup("Choose Frames"))
-        {
+		{
 			if (ImGui::Button("Select All")) {
 				for (int i = 0; i < m_processed_textures.size(); i++) m_selected_textures_map[i] = 1;
 			}
@@ -73,8 +73,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 				}
 				m_selected_textures_map.clear();
 			}
-            ImGui::SeparatorText("Frames");
-            for (int i = 0; i < m_processed_textures.size(); i++) {
+			ImGui::SeparatorText("Frames");
+			for (int i = 0; i < m_processed_textures.size(); i++) {
 				char name[100];
 				sprintf(name, "Image %d", i);
 				bool selected = m_selected_textures_map.find(i) != m_selected_textures_map.end();
@@ -92,8 +92,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 					else m_selected_textures_map[i] = 1;
 				}
 			}
-            ImGui::EndPopup();
-        }
+			ImGui::EndPopup();
+		}
 
 		// Denoising
 		ImGui::SeparatorText("Denoising");
@@ -135,7 +135,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		}
 		ImGui::SameLine(); ImGui::TextDisabled("(?)");
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Early version; works best with high-contrast, denoised images.");
-		
+
 		ImGui::EndChild();
 
 		ImGui::SameLine();
