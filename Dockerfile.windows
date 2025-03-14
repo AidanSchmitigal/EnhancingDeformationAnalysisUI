@@ -24,7 +24,7 @@ RUN $env:Path += ';C:\Program Files\CMake\bin;C:\Program Files (x86)\Microsoft V
 RUN Invoke-WebRequest -Uri "https://storage.googleapis.com/tensorflow/versions/2.18.0/libtensorflow-cpu-windows-x86_64.zip" -OutFile "tensorflow.zip"; Expand-Archive -Path "tensorflow.zip" -DestinationPath "C:\tensorflow"; Remove-Item "tensorflow.zip"
 
 # Install OpenCV (build from source for CMake compatibility)
-RUN git clone --depth 1 --branch 4.10.0 https://github.com/opencv/opencv.git; mkdir opencv\build; cd opencv\build; cmake -G 'Visual Studio 17 2022' -D BUILD_opencv_python2=OFF -D BUILD_opencv_python3=OFF -D WITH_QT=OFF -D WITH_FFMPEG=OFF -D BUILD_EXAMPLES=OFF -D INSTALL_C_EXAMPLES=OFF ..; cmake --build . --config Release; cd ..\..; Remove-Item -Recurse -Force opencv
+RUN cmd /c "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"; set; "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"; git clone --depth 1 --branch 4.10.0 https://github.com/opencv/opencv.git; mkdir opencv\build; cd opencv\build; cmake -G 'Visual Studio 17 2022' -D BUILD_opencv_python2=OFF -D BUILD_opencv_python3=OFF -D WITH_QT=OFF -D WITH_FFMPEG=OFF -D BUILD_EXAMPLES=OFF -D INSTALL_C_EXAMPLES=OFF ..; cmake --build . --config Release; cd ..\..; Remove-Item -Recurse -Force opencv
 
 # Set environment variables for CMake to find TensorFlow and OpenCV
 RUN [Environment]::SetEnvironmentVariable('OpenCV_DIR', 'C:\opencv', [EnvironmentVariableTarget]::Machine)
