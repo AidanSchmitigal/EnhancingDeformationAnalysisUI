@@ -69,8 +69,9 @@ target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/gif-h)
 target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
 
 if (UI_RELEASE)
+	message("-- Building in RELEASE mode")
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_RELEASE)
-	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -Wall)
+	#target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -Wall)
 
 # Windows doesn't like setting the optimization level through CMake
 # TODO: investigate this
@@ -78,6 +79,7 @@ if (!WIN32)
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3)
 endif() # !WIN32
 else()
+	message("-- Building in DEBUG mode")
 if (!WIN32)
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O)
 endif() # !WIN32
