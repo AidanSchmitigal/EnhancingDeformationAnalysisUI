@@ -55,3 +55,22 @@ namespace utils {
 	std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap = 0);
 	cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap = 0);
 }
+
+class Profiler {
+	public:
+		Profiler(const char* name = "'empty'");
+		~Profiler();
+		void Stop();
+	private:
+		const char* name;
+		std::chrono::high_resolution_clock::time_point start_time;
+		bool stopped = false;
+};
+
+#ifndef UI_RELEASE
+	#define PROFILE_FUNCTION(name) Profiler profiler_##name(__FUNCTION__);
+	#define PROFILE_SCOPE(name) Profiler profiler_##name(#name);
+#else
+	#define PROFILE_FUNCTION(name)
+	#define PROFILE_SCOPE(name)
+#endif

@@ -2,7 +2,11 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <utils.h>
+
 std::vector<std::vector<std::vector<cv::Point>>> CrackDetector::DetectCracks(const std::vector<uint32_t*>& images, int width, int height, int crack_darkness, int fill_threshold, int sharpness, int resolution, int amount) {
+	PROFILE_FUNCTION();
+
 	cv::Mat result;
 	std::vector<std::vector<std::vector<cv::Point>>> polygons;
 
@@ -23,7 +27,7 @@ std::vector<std::vector<std::vector<cv::Point>>> CrackDetector::DetectCracks(con
 		cv::Mat dilated;
 		cv::dilate(dark_mask, dilated, kernel, cv::Point(-1, -1), fill_threshold);
 
-		cv::Mat inverted;
+		cv::UMat inverted;
 		cv::bitwise_not(dilated, inverted);
 
 		cv::Mat labels, stats, centroids;
@@ -39,10 +43,10 @@ std::vector<std::vector<std::vector<cv::Point>>> CrackDetector::DetectCracks(con
 		}
 
 		kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-		cv::Mat eroded;
+		cv::UMat eroded;
 		cv::erode(filled_img, eroded, kernel);
 
-		cv::Mat clean_img = eroded.clone();
+		cv::UMat clean_img = eroded.clone();
 		int clean_num_labels = cv::connectedComponentsWithStats(eroded, labels, stats, centroids);
 		std::vector<int> areas;
 		for (int i = 1; i < clean_num_labels; ++i) {

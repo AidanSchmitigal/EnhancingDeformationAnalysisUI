@@ -2,7 +2,11 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <utils.h>
+
 std::vector<std::vector<float>> FeatureTracker::TrackFeatures(const std::vector<uint32_t*>& images, std::vector<cv::Point2f>& points, std::vector<std::vector<cv::Point2f>>& trackedPoints, int width, int height) {
+	PROFILE_FUNCTION();
+
 	if (images.empty() || points.empty()) return {};
 	std::vector<std::vector<float>> widths;
 	cv::Mat prevGray, currGray;
@@ -98,6 +102,8 @@ std::vector<float> FeatureTracker::CalculateCrackWidthProfile(const std::vector<
 // Track width profiles for all cracks in all images
 std::vector<std::vector<std::vector<float>>> FeatureTracker::TrackCrackWidthProfiles(
 		const std::vector<std::vector<std::vector<cv::Point>>>& polygons) {
+	PROFILE_FUNCTION();
+
 	std::vector<std::vector<std::vector<float>>> profilesPerImage;
 
 	for (const auto& imagePolygons : polygons) { // For each image

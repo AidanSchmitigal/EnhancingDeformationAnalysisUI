@@ -11,6 +11,8 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 	cppflow::model model = cppflow::model("assets/models/" + model_name);
 
 	for (int i = 0; i < images.size(); i++) {
+		PROFILE_SCOPE(DenoiseOneImage);
+
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
@@ -63,6 +65,7 @@ bool DenoiseInterface::Blur(std::vector<uint32_t *> &images, int width, int heig
 		cv::Mat output_image;
 		cv::GaussianBlur(image, output_image, cv::Size(kernel_size, kernel_size), sigma);
 		output_image.copyTo(image);
+		cv::cvtColor(image, image, cv::COLOR_RGBA2BGRA);
 		memcpy(images[i], image.data, width * height * 4);
 	}
 	return true;

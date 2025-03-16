@@ -127,6 +127,8 @@ namespace utils {
 	}
 
 	unsigned int* LoadTiff(const char* path, int& width, int& height) {
+		PROFILE_FUNCTION()
+
 		TIFF* tif = TIFFOpen(path, "r");
 		if (!tif) {
 			printf("Could not open file %s\n", path);
@@ -169,6 +171,8 @@ namespace utils {
 	}
 
 	bool WriteTiff(const char* path, unsigned int* data, int width, int height) {
+		PROFILE_FUNCTION()
+
 		TIFF* tif = TIFFOpen(path, "w");
 		if (!tif) {
 			printf("Could not open file %s\n", path);
@@ -198,6 +202,8 @@ namespace utils {
 
 	// write gif using gif.h
 	bool WriteGIFOfImageSet(const char* path, std::vector<Texture*> images, int delay, int loop) {
+		PROFILE_FUNCTION()
+
 		if (images.empty()) {
 			printf("No images to write to gif\n");
 			return false;
@@ -224,6 +230,8 @@ namespace utils {
 	}
 
 	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<Texture*>& textures) {
+		PROFILE_FUNCTION()
+
 		if (data.size() != textures.size()) data.resize(textures.size());
 		for (int i = 0; i < textures.size(); i++) {
 			if (data[i] == nullptr) data[i] = (uint32_t*)malloc(width * height * 4);
@@ -232,6 +240,8 @@ namespace utils {
 	}
 
 	void LoadDataIntoTexturesAndFree(std::vector<Texture*>& textures, std::vector<uint32_t*>& data, int width, int height) {
+		PROFILE_FUNCTION()
+
 		for (int i = 0; i < textures.size(); i++) {
 			textures[i]->Load(data[i], width, height);
 			free(data[i]);
@@ -286,6 +296,8 @@ namespace utils {
 	}
 
 	std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap) {
+		PROFILE_FUNCTION()
+
 		std::vector<ImageTile> tiles;
 
 		// Calculate padded dimensions
@@ -311,6 +323,8 @@ namespace utils {
 	}
 
 	cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap) {
+		PROFILE_FUNCTION()
+
 		if (tiles.empty()) {
 			std::cerr << "No tiles provided!" << std::endl;
 			return cv::Mat();
@@ -360,4 +374,21 @@ namespace utils {
 		// Crop to original size
 		return normalized(cv::Rect(0, 0, originalSize.width, originalSize.height));
 	}
+}
+
+Profiler::Profiler(const char* name) {
+	start_time = std::chrono::high_resolution_clock::now();
+	this->name = name;
+}
+
+Profiler::~Profiler() {
+	if (!stopped)
+		Stop();
+}
+
+void Profiler::Stop() {
+	auto end_time = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+	printf("Profiler: %s took %ld ms\n", name, duration);
+	stopped = true;
 }
