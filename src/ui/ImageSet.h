@@ -28,6 +28,7 @@ private:
 
 	static int m_id_counter;
 
+	uint32_t m_current_frame = 0;
 	PreprocessingTab m_preprocessing_tab;
 	std::vector<cv::Point2f> m_points;
 	std::vector<cv::Point2f> m_last_points;

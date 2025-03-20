@@ -8,6 +8,8 @@
 
 // unbelievable amount of allocations in this function...
 bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
+	PROFILE_FUNCTION();
+
 	cppflow::model model = cppflow::model("assets/models/" + model_name);
 
 	for (int i = 0; i < images.size(); i++) {

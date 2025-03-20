@@ -62,42 +62,13 @@ void ImageSet::Display() {
 		m_processed_sequence_viewer.SetTextures(m_processed_textures);
 	}
 
-	// TODO: move this somewhere else
-	if (ImGui::BeginTabItem("Save Images")) {
-		if (ImGui::Button("Save Processed Images")) {
-			std::string folder = utils::OpenFileDialog(".", "Choose Where to Save the Images", true);
-			if (!folder.empty()) {
-				for (int i = 0; i < m_processed_textures.size(); i++) {
-					char path[256];
-					sprintf(path, "%s/frame_%d.tif", folder.c_str(), i);
-					uint32_t* data = new uint32_t[m_processed_textures[i]->GetWidth() * m_processed_textures[i]->GetHeight()];
-					m_processed_textures[i]->GetData(data);
-					utils::WriteTiff(path, data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
-					free(data);
-				}
-			}
-		}
-		if (ImGui::Button("Save a GIF")) {
-			std::string path = utils::SaveFileDialog(".", "Choose Where to Save the GIF", "gif");
-			if (!path.empty()) {
-				utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
-			}
-		}
-		ImGui::SameLine();
-		ImGui::TextDisabled("?");
-		if (ImGui::IsItemHovered()) {
-			ImGui::BeginTooltip();
-			ImGui::Text("This will write a GIF of the processed images, and will take around 10 seconds.");
-			ImGui::EndTooltip();
-		}
-		ImGui::EndTabItem();
-	}
-
 	ImGui::EndTabBar();
 	ImGui::End();
 }
 
 void ImageSet::LoadImages() {
+	PROFILE_FUNCTION();
+
 	if (!std::filesystem::exists(m_folder_path)) {
 		printf("Path does not exist\n");
 		return;
@@ -114,6 +85,8 @@ void ImageSet::LoadImages() {
 	// sort the files by name
 	std::sort(files.begin(), files.end());
 	for (const auto& file : files) {
+		PROFILE_SCOPE(LoadImagesLoop);
+
 		int width, height;
 		uint32_t* temp = utils::LoadTiff(file.c_str(), width, height);
 		Texture* t = new Texture();
@@ -128,39 +101,93 @@ void ImageSet::LoadImages() {
 
 void ImageSet::DisplayImageComparisonTab() {
 	if (ImGui::BeginTabItem("Image Comparison")) {
-		if (ImGui::Button((m_sequence_viewer.GetPlaying() && m_processed_sequence_viewer.GetPlaying()) ? "Stop Both" : "Play Both")) {
-			m_sequence_viewer.StartStopPlay();
-			m_processed_sequence_viewer.StartStopPlay();
-		}
+		static bool isPlaying = false;
+
+		// Control buttons
+		if (ImGui::Button("Play/Pause")) isPlaying = !isPlaying;
 		ImGui::SameLine();
-		if (ImGui::Button("Reset Frame Counters")) {
-			m_sequence_viewer.SetCurrentFrame(0);
-			m_processed_sequence_viewer.SetCurrentFrame(0);
+		if (ImGui::Button("Reset Playback")) {
+			m_current_frame = 0;
+			isPlaying = false;
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Reset Processed Images")) {
-			if (m_textures.size() != m_processed_textures.size()) {
-				for (int i = m_processed_textures.size(); i < m_textures.size(); i++) {
-					m_processed_textures.push_back(new Texture());
-				}
-			}
+			while (m_textures.size() > m_processed_textures.size())
+				m_processed_textures.push_back(new Texture);
+			ImVec2 size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
+			uint32_t* data = (uint32_t*)malloc(size.x * size.y * sizeof(uint32_t));
 			for (int i = 0; i < m_textures.size(); i++) {
-				uint32_t* data = (uint32_t*)malloc(m_textures[i]->GetWidth() * m_textures[i]->GetHeight() * 4);
 				m_textures[i]->GetData(data);
-				m_processed_textures[i]->Load(data, m_textures[i]->GetWidth(), m_textures[i]->GetHeight());
-				free(data);
+				m_processed_textures[i]->Load(data, size.x, size.y);
 			}
-			m_processed_sequence_viewer.SetTextures(m_processed_textures);
-			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
+			free(data);
 		}
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(ImGui::GetIO().DisplaySize.x / 2.2);
-		ImGui::SliderInt("Images / Second", &playspeed, 1, 10);
-		m_sequence_viewer.SetPlaySpeed(playspeed);
-		m_processed_sequence_viewer.SetPlaySpeed(playspeed);
-		m_sequence_viewer.Display();
+		ImGui::TextDisabled("?");
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("This will reset the processed images back to their original unprocessed state.");
+
+		if (ImGui::Button("Save Processed Images")) {
+			std::string folder = utils::OpenFileDialog(".", "Choose a Folder to Save the Images", true);
+			if (!folder.empty() && m_processed_textures.size() > 0) {
+				uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()];
+				for (int i = 0; i < m_processed_textures.size(); i++) {
+					char path[256];
+					sprintf(path, "%s/frame_%d.tif", folder.c_str(), i);
+					m_processed_textures[i]->GetData(data);
+					utils::WriteTiff(path, data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+				}
+				free(data);
+			}
+		}
 		ImGui::SameLine();
-		m_processed_sequence_viewer.Display();
+		ImGui::TextDisabled("?");
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("This will write the processed images into a folder of your choosing.");
+		ImGui::SameLine();
+		if (ImGui::Button("Save a GIF")) {
+			std::string path = utils::SaveFileDialog(".", "Choose Where to Save the GIF", "gif");
+			if (!path.empty()) {
+				utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
+			}
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("?");
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("This will write a GIF of the processed images, and will take around 10 seconds.");
+
+		// Frame slider
+		ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, std::max(m_textures.size(), m_processed_textures.size()) - 1);
+
+		// Side-by-side image display
+		ImGui::BeginChild("Images", ImVec2(0, 0), true);
+		{
+			ImGui::Columns(2, "image_columns");
+
+			ImVec2 size = ImVec2(m_textures[0]->GetWidth() / 1.5, m_textures[0]->GetHeight() / 1.5);
+			// Left sequence
+			ImGui::Text("Sequence 1");
+			if (!m_textures.empty() && m_current_frame < m_textures.size()) {
+				ImGui::Image(m_textures[m_current_frame]->GetID(), size);
+			}
+			ImGui::NextColumn();
+
+			// Right sequence
+			ImGui::Text("Sequence 2");
+			if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
+				ImGui::Image(m_processed_textures[m_current_frame]->GetID(), size);
+			}
+			ImGui::Columns(1);
+		}
+		ImGui::EndChild();
+
+		// Playback logic
+		if (isPlaying) {
+			m_current_frame++;
+			if (m_current_frame >= std::max(m_textures.size(), m_processed_textures.size())) {
+				m_current_frame = 0;  // Loop back to start
+			}
+		}
 		ImGui::EndTabItem();
 	}
 }
@@ -174,9 +201,9 @@ void ImageSet::DisplayImageAnalysisTab() {
 	static float avg_snr = 0.0f;
 	if (ImGui::BeginTabItem("Image Analysis")) {
 		if (m_processed_textures.size() == 0) {
-				ImGui::Text("No images loaded");
-				ImGui::EndTabItem();
-				return;
+			ImGui::Text("No images loaded");
+			ImGui::EndTabItem();
+			return;
 		}
 		if (m_ref_image == nullptr || m_ref_image_width * m_ref_image_height != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
 			if (m_ref_image) free(m_ref_image);
@@ -235,9 +262,9 @@ void ImageSet::DisplayFeatureTrackingTab() {
 	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
 	if (ImGui::BeginTabItem("Feature Tracking")) {
 		if (m_processed_textures.size() == 0) {
-				ImGui::Text("No images loaded");
-				ImGui::EndTabItem();
-				return;
+			ImGui::Text("No images loaded");
+			ImGui::EndTabItem();
+			return;
 		}
 		// Initialize point image
 		if (m_point_image == NULL) {
@@ -253,7 +280,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
-		
+
 		// Update point image if it isn't the same as the ref texture
 		uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 		m_processed_textures[0]->GetData(data);

@@ -134,7 +134,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 		ImGui::SameLine(); ImGui::TextDisabled("(?)");
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Early version; works best with high-contrast, denoised images.");
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("This will highlight in the image what it thinks is the border of the cracks.\nIt is recommended to crop the infobar before using this, as it is detected as a crack.");
 
 		ImGui::EndChild();
 
