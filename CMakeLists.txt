@@ -5,6 +5,7 @@ project(EnhancingDeformationAnalysisUI VERSION 0.1
 	LANGUAGES CXX C)
 
 set(UI_INCLUDE_TENSORFLOW ON CACHE BOOL "Include TensorFlow in the project (denoising)")
+set(UI_PROFILE OFF CACHE BOOL "Build the project in profile mode")
 
 # Enable compile_commands.json for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -76,9 +77,13 @@ if (UI_INCLUDE_TENSORFLOW)
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_TENSORFLOW)
 endif()
 
+if (UI_PROFILE)
+	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_PROFILE)
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3 -DNDEBUG)
+endif()
+
 if (UI_RELEASE)
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_RELEASE)
-	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -Wall)
 
 # Windows doesn't like setting the optimization level through CMake
 # TODO: investigate this
@@ -86,9 +91,6 @@ if (!WIN32)
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3)
 endif()
 else()
-if (!WIN32)
-	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O2)
-endif()
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -g)
 endif()
 
