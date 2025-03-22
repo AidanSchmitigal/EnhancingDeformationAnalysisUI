@@ -4,10 +4,12 @@
 
 #include <opencv2/opencv.hpp>
 
+#ifdef UI_INCLUDE_TENSORFLOW
 #include <cppflow/cppflow.h>
-#include <tensorflow/c/c_api.h>
+#endif
 
 bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, int width, int height, const int tile_size, const int overlap) {
+#ifdef UI_INCLUDE_TENSORFLOW
 	cppflow::model model = cppflow::model("assets/models/batch-m4-combo/");
 	for (int i = 0; i < model.get_operations().size(); i++)
 		printf("Operation %d: %s\n", i, model.get_operations()[i].c_str());
@@ -70,4 +72,7 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 		memcpy(images[i], reconstructed.data, width * height * 4);
 	}
 	return true;
+#else
+	return false;
+#endif
 }

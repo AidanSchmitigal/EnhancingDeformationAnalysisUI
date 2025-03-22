@@ -12,8 +12,6 @@
 
 #include <opencv2/opencv.hpp>
 
-#include <cppflow/cppflow.h>
-
 #include <string>
 #include <filesystem>
 

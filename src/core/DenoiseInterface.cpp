@@ -2,7 +2,9 @@
 
 #include <utils.h>
 
+#ifdef UI_INCLUDE_TENSORFLOW
 #include <cppflow/cppflow.h>
+#endif
 
 #include <opencv2/opencv.hpp>
 
@@ -10,6 +12,7 @@
 bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
 	PROFILE_FUNCTION();
 
+#ifdef UI_INCLUDE_TENSORFLOW
 	cppflow::model model = cppflow::model("assets/models/" + model_name);
 
 	for (int i = 0; i < images.size(); i++) {
@@ -59,6 +62,10 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 		memcpy(images[i], reconstructed.data, width * height * 4);
 	}
 	return true;
+#else
+	printf("Denoising not available, recompile/use other executable with TensorFlow support\n");
+	return false;
+#endif
 }
 
 bool DenoiseInterface::Blur(std::vector<uint32_t *> &images, int width, int height, int kernel_size, float sigma) {
