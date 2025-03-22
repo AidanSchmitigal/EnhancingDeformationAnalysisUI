@@ -1,4 +1,4 @@
-#include <core/stabilizer.hpp>
+#include <core/Stabilizer.hpp>
 
 #include <utils.h>
 

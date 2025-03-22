@@ -1,6 +1,5 @@
 #include <ui/ImageSet.h>
 
-#include <core/stabilizer.hpp>
 #include <core/CrackDetector.hpp>
 #include <core/DenoiseInterface.hpp>
 #include <core/FeatureTracker.hpp>
@@ -112,6 +111,8 @@ void ImageSet::DisplayImageComparisonTab() {
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Reset Processed Images")) {
+			PROFILE_SCOPE(ResetProcessedImages);
+
 			while (m_textures.size() > m_processed_textures.size())
 				m_processed_textures.push_back(new Texture);
 			ImVec2 size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());

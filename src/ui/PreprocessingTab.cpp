@@ -2,7 +2,7 @@
 
 #include <utils.h>
 
-#include <core/stabilizer.hpp>
+#include <core/Stabilizer.hpp>
 #include <core/CrackDetector.hpp>
 #include <core/DenoiseInterface.hpp>
 
