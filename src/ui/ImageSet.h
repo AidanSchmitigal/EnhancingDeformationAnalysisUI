@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-#include <ui/ImageSequenceViewer.h>
 #include <ui/PreprocessingTab.h>
 
 #include <OpenGL/Texture.h>
@@ -39,6 +38,4 @@ private:
 	std::string m_folder_path;
 	std::vector<Texture *> m_textures;
 	std::vector<Texture *> m_processed_textures;
-	ImageSequenceViewer m_sequence_viewer;
-	ImageSequenceViewer m_processed_sequence_viewer;
 };

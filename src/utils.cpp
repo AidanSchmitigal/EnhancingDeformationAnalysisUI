@@ -296,8 +296,6 @@ namespace utils {
 	}
 
 	std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap) {
-		PROFILE_FUNCTION()
-
 		std::vector<ImageTile> tiles;
 
 		// Calculate padded dimensions
@@ -323,8 +321,6 @@ namespace utils {
 	}
 
 	cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap) {
-		PROFILE_FUNCTION()
-
 		if (tiles.empty()) {
 			std::cerr << "No tiles provided!" << std::endl;
 			return cv::Mat();

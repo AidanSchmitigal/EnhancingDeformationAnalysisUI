@@ -25,8 +25,6 @@ ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_p
 	LoadImages();
 
 	m_point_texture = Texture();
-	m_sequence_viewer = ImageSequenceViewer(m_textures, "Original Images");
-	m_processed_sequence_viewer = ImageSequenceViewer(m_processed_textures, "Processed Images");
 
 	m_preprocessing_tab = PreprocessingTab(m_textures, m_processed_textures);
 }
@@ -43,20 +41,58 @@ ImageSet::~ImageSet() {
 
 void ImageSet::Display() {
 	ImGui::Begin(m_window_name.c_str(), &m_open);
+	
+	// Check if processing is happening in the preprocessing tab
+	bool isProcessing = m_preprocessing_tab.IsProcessing();
+	
+	// Start tab bar
 	ImGui::BeginTabBar("PreProcessing");
 
 	bool changed = false;
-	// TODO: refactor all of these into separate files
-	DisplayImageComparisonTab();
+	// TODO: refactor all of these into separate files (maybe?)
+	
+	// Only allow selecting other tabs if not processing
+	if (isProcessing) {
+		// Create a warning notification at the top
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+		ImGui::TextWrapped("Processing in progress - please wait before switching tabs");
+		
+		// Progress bar
+		float progress = m_preprocessing_tab.GetProgress();
+		ImGui::ProgressBar(progress, ImVec2(-1, 0), "");
+		ImGui::PopStyleColor();
+	}
+	
+	// If processing, only allow the Preprocessing tab
+	if (!isProcessing) {
+		DisplayImageComparisonTab();
+	}
+	
+	// Force the Preprocessing tab to be visible if processing
+	bool preprocessingTabOpen = true;
+	if (isProcessing) {
+		ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0.8f, 0.5f, 0.0f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(0.9f, 0.6f, 0.0f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_TabActive, ImVec4(1.0f, 0.7f, 0.0f, 1.0f));
+	}
+	
+	// Always display the preprocessing tab
 	m_preprocessing_tab.DisplayPreprocessingTab(changed);
-	DisplayImageAnalysisTab();
-	DisplayFeatureTrackingTab();
-	DisplayDeformationAnalysisTab();
+	
+	if (isProcessing) {
+		ImGui::PopStyleColor(3);
+	}
+	
+	// Display the other tabs only if not processing
+	if (!isProcessing) {
+		DisplayImageAnalysisTab();
+		DisplayFeatureTrackingTab();
+		DisplayDeformationAnalysisTab();
+	}
 
 	// only necessary when we modify the vector by changing its size (this only happens in the preprocessing tab)
 	if (changed) {
 		m_preprocessing_tab.GetProcessedTextures(m_processed_textures);
-		m_processed_sequence_viewer.SetTextures(m_processed_textures);
 	}
 
 	ImGui::EndTabBar();
@@ -119,6 +155,7 @@ void ImageSet::DisplayImageComparisonTab() {
 				m_textures[i]->GetData(data);
 				m_processed_textures[i]->Load(data, size.x, size.y);
 			}
+			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 			free(data);
 		}
 		ImGui::SameLine();
@@ -153,7 +190,7 @@ void ImageSet::DisplayImageComparisonTab() {
 		ImGui::SameLine();
 		ImGui::TextDisabled("?");
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("This will write a GIF of the processed images, and will take around 10 seconds.");
+			ImGui::SetTooltip("This will write a GIF of the processed images, and can take some time with larger image sets.");
 
 		// Frame slider
 		ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, std::max(m_textures.size(), m_processed_textures.size()) - 1);
@@ -423,6 +460,8 @@ void ImageSet::DisplayFeatureTrackingTab() {
 
 void ImageSet::DisplayDeformationAnalysisTab() {
 	static bool good = true;
+	static std::vector<ImageTile> tiles;
+	static std::vector<Texture> tiles_textures;
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
 		if (ImGui::Button("Calculate Deformation")) {
 			std::vector<uint32_t*> frames;
@@ -432,6 +471,23 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		}
 		if (!good)
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model exited with an error!");
+
+		if (tiles.size() == 0) {
+			uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_processed_textures[0]->GetData(data);
+			cv::Mat image = cv::Mat(m_processed_textures[0]->GetHeight(), m_processed_textures[0]->GetWidth(), CV_8UC4, data);
+			tiles = utils::splitImageIntoTiles(image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			free(data);
+			for (int i = 0; i < tiles.size(); i++) {
+				Texture t;
+				t.Load((uint32_t*)tiles[i].data.data, tiles[i].size.width, tiles[i].size.height);
+				tiles_textures.push_back(t);
+			}
+		}
+		for (int i = 0; i < tiles_textures.size(); i++) {
+			if (i % 4 == 0) ImGui::NewLine();
+			ImGui::Image(tiles_textures[i].GetID(), ImVec2(tiles[i].size.width, tiles[i].size.height));
+		}
 		ImGui::EndTabItem();
 	}
 }

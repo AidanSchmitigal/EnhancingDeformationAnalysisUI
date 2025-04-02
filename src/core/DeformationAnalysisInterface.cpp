@@ -12,15 +12,15 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 #ifdef UI_INCLUDE_TENSORFLOW
 	cppflow::model model = cppflow::model("assets/models/batch-m4-combo/");
 	for (int i = 0; i < model.get_operations().size(); i++)
-		printf("Operation %d: %s\n", i, model.get_operations()[i].c_str());
+		fprintf(stderr, "Operation %d: %s\n", i, model.get_operations()[i].c_str());
 
 	for (int i = 0; i < images.size() - 1; i++) {
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
-		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
-		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
+		//cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
+		image.convertTo(image, CV_32F, 1.0 / 255.0);
 		cv::Mat image2 = cv::Mat(height, width, CV_8UC4, images[i + 1]);
-		cv::cvtColor(image2, image2, cv::COLOR_BGRA2GRAY);
-		image2.convertTo(image2, CV_32FC1, 1.0 / 255.0);
+		//cv::cvtColor(image2, image2, cv::COLOR_BGRA2GRAY);
+		image2.convertTo(image2, CV_32F, 1.0 / 255.0);
 		auto tiles = utils::splitImageIntoTiles(image, tile_size, overlap);
 		auto tiles2 = utils::splitImageIntoTiles(image2, tile_size, overlap);
 
@@ -67,8 +67,8 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 			tiles[j].data = output_image;
 		}
 		cv::Mat reconstructed = utils::reconstructImageFromTiles(tiles, image.size(), overlap);
-		reconstructed.convertTo(reconstructed, CV_8UC1, 255.0);
-		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
+		reconstructed.convertTo(reconstructed, CV_8U, 255.0);
+		//cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
 		memcpy(images[i], reconstructed.data, width * height * 4);
 	}
 	return true;

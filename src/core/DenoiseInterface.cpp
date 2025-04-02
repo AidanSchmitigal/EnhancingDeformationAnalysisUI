@@ -1,6 +1,10 @@
 #include <core/DenoiseInterface.hpp>
+#include <core/ThreadPool.hpp>
 
 #include <utils.h>
+
+#include <filesystem>
+#include <atomic>
 
 #ifdef UI_INCLUDE_TENSORFLOW
 #include <cppflow/cppflow.h>
@@ -8,15 +12,28 @@
 
 #include <opencv2/opencv.hpp>
 
-// unbelievable amount of allocations in this function...
+// Static member initialization
+float DenoiseInterface::m_progress = 0.0f;
+bool DenoiseInterface::m_is_processing = false;
+
+// Global thread pool for image processing
+// This is implemented as a singleton pattern
+ThreadPool& GetThreadPool() {
+	static ThreadPool thread_pool;
+	return thread_pool;
+}
+
+// Original synchronous implementation
 bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
 	PROFILE_FUNCTION();
 
 #ifdef UI_INCLUDE_TENSORFLOW
-	cppflow::model model = cppflow::model("assets/models/" + model_name);
+	cppflow::model model("assets/models/" + model_name);
 
 	for (int i = 0; i < images.size(); i++) {
 		PROFILE_SCOPE(DenoiseOneImage);
+		
+		m_progress = (float)i / images.size();
 
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
@@ -53,7 +70,6 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 					output_image.at<float>(y, x) = output_data[y * tiles[j].size.width + x];
 				}
 			}
-			//output_image.convertTo(output_image, CV_8UC1, 255.0);
 			tiles[j].data = output_image;
 		}
 		cv::Mat reconstructed = utils::reconstructImageFromTiles(tiles, image.size(), overlap);
@@ -61,6 +77,8 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
 		memcpy(images[i], reconstructed.data, width * height * 4);
 	}
+	
+	m_progress = 1.0f;
 	return true;
 #else
 	printf("Denoising not available, recompile/use other executable with TensorFlow support\n");
@@ -68,8 +86,39 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 #endif
 }
 
+// Asynchronous version of Denoise
+std::future<bool> DenoiseInterface::DenoiseAsync(std::vector<uint32_t*>& images, int width, int height, 
+                                             const std::string& model_name, const int tile_size, 
+                                             const int overlap, std::function<void(bool)> callback) {
+	// Set processing flag
+	m_is_processing = true;
+	m_progress = 0.0f;
+	
+	// Get the thread pool
+	auto& pool = GetThreadPool();
+	
+	// Submit task to thread pool
+	auto future = pool.enqueue([&images, width, height, model_name, tile_size, overlap, callback]() {
+		bool result = Denoise(images, width, height, model_name, tile_size, overlap);
+		
+		// When complete, update processing flag and call callback if provided
+		m_is_processing = false;
+		if (callback) {
+			callback(result);
+		}
+		
+		return result;
+	});
+	
+	return future;
+}
+
 bool DenoiseInterface::Blur(std::vector<uint32_t *> &images, int width, int height, int kernel_size, float sigma) {
+	PROFILE_FUNCTION();
+	
 	for (int i = 0; i < images.size(); i++) {
+		m_progress = (float)i / images.size();
+		
 		cv::Mat image(height, width, CV_8UC4, images[i]);
 		cv::Mat output_image;
 		cv::GaussianBlur(image, output_image, cv::Size(kernel_size, kernel_size), sigma);
@@ -77,5 +126,42 @@ bool DenoiseInterface::Blur(std::vector<uint32_t *> &images, int width, int heig
 		cv::cvtColor(image, image, cv::COLOR_RGBA2BGRA);
 		memcpy(images[i], image.data, width * height * 4);
 	}
+	
+	m_progress = 1.0f;
 	return true;
+}
+
+// Asynchronous version of Blur
+std::future<bool> DenoiseInterface::BlurAsync(std::vector<uint32_t*>& images, int width, int height, 
+                                          int kernel_size, float sigma, 
+                                          std::function<void(bool)> callback) {
+	// Set processing flag
+	m_is_processing = true;
+	m_progress = 0.0f;
+	
+	// Get the thread pool
+	auto& pool = GetThreadPool();
+	
+	// Submit task to thread pool
+	auto future = pool.enqueue([&images, width, height, kernel_size, sigma, callback]() {
+		bool result = Blur(images, width, height, kernel_size, sigma);
+		
+		// When complete, update processing flag and call callback if provided
+		m_is_processing = false;
+		if (callback) {
+			callback(result);
+		}
+		
+		return result;
+	});
+	
+	return future;
+}
+
+bool DenoiseInterface::IsProcessing() {
+	return m_is_processing;
+}
+
+float DenoiseInterface::GetProgress() {
+	return m_progress;
 }

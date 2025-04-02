@@ -9,7 +9,6 @@
 
 #include <ImGuiImpl.h>
 
-#include <ui/ImageSequenceViewer.h>
 #include <ui/ImageSet.h>
 
 #include <utils.h>
