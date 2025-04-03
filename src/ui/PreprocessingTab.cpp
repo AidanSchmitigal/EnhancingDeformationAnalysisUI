@@ -71,6 +71,9 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			} else if (Stabilizer::IsProcessing()) {
 				progress = Stabilizer::GetProgress();
 			}
+			else if (CrackDetector::IsProcessing()) {
+				progress = CrackDetector::GetProgress();
+			}
 			ImGui::ProgressBar(progress, ImVec2(-1, 0), "");
 			// Disable other buttons during processing
 		}
@@ -171,9 +174,10 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		// Denoising
 		ImGui::SeparatorText("Denoising");
 		ImGui::BeginDisabled(m_is_processing);
-		ImGui::SetNextItemWidth(150);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Kernel Size").x);
 		ImGui::SliderInt("Kernel Size", &m_kernel_size, 1, 9, "%.0d");
 		if (m_kernel_size % 2 == 0) m_kernel_size++;
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Sigma").x);
 		ImGui::SliderFloat("Sigma", &m_sigma, 0.0f, 10.0f);
 		if (ImGui::Button("Blur")) {
 			m_is_processing = true;
@@ -204,9 +208,12 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}
 		
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Model").x);
 		ImGui::Combo("Model", &m_selected_model, m_models, IM_ARRAYSIZE(m_models));
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tile Size").x);
 		ImGui::SliderInt("Tile Size", &m_tile_size, 150, 512);
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tile size. Generally leave around 256, but can be varied for different results.");
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Overlap").x);
 		ImGui::SliderInt("Overlap", &m_overlap, 0, 128);
 		
 		if (ImGui::Button("Use AI Model to Denoise")) {
@@ -248,6 +255,16 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		// Crack Detection
 		ImGui::SeparatorText("Crack Detection");
 		ImGui::BeginDisabled(m_is_processing);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Crack Darkness").x);
+		ImGui::SliderInt("Crack Darkness", &m_crack_darkness, 0, 127);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Fill Threshold").x);
+		ImGui::SliderInt("Fill Threshold", &m_fill_threshold, 0, 127);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Sharpness").x);
+		ImGui::SliderInt("Sharpness", &m_sharpness, 0, 127);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Resolution").x);
+		ImGui::SliderInt("Resolution", &m_resolution, 0, 50);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Amount").x);
+		ImGui::SliderInt("Amount", &m_amount, 0, 20);
 		if (ImGui::Button("Detect Cracks")) {
 			m_is_processing = true;
 			
@@ -259,12 +276,20 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			auto width = m_processed_textures[0]->GetWidth();
 			auto height = m_processed_textures[0]->GetHeight();
 			
-			// Create a thread to handle crack detection
-			// Note: ThreadPool would be better but CrackDetector doesn't have an async interface yet
-			auto future = std::async(std::launch::async, [this, width, height]() {
-				CrackDetector::DetectCracks(m_processing_frames, width, height);
-				return true;
-			});
+			auto future = CrackDetector::DetectCracksAsync(
+				m_processing_frames, 
+				width, 
+				height,
+				m_crack_darkness, // crack_darkness
+				m_fill_threshold,  // fill_threshold
+				m_sharpness,  // sharpness
+				m_resolution,   // resolution
+				m_amount,   // amount
+				[this](bool result) {
+					// This callback will run in the worker thread
+					// We don't need to do anything here as we check the future in the main loop
+				}
+			);
 			
 			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}

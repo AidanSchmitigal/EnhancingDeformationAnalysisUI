@@ -28,21 +28,30 @@ class PreprocessingTab {
 		// Helper methods to update UI after async processing completes
 		void OnProcessingComplete(bool success);
 
+		// Our textures
 		std::vector<Texture*> m_textures;
 		std::vector<Texture*> m_processed_textures;
 		std::unordered_map<int, int> m_selected_textures_map;
 
-		// Processing state
+		// State for async processing
 		std::vector<uint32_t*> m_processing_frames;
 		std::shared_ptr<std::future<bool>> m_processing_future;
 		bool m_is_processing = false;
 		bool m_last_result = true;
 
 		// Processing parameters (preserved between frames)
+		// Denoising parameters
 		int m_kernel_size = 3;
 		float m_sigma = 1.0f;
 		int m_tile_size = 256; 
 		int m_overlap = 0;
 		int m_selected_model = 0;
 		static const char* m_models[];
+
+		// Crack detection parameters
+		int m_crack_darkness = 40;
+		int m_fill_threshold = 2;
+		int m_sharpness = 50;
+		int m_resolution = 3;
+		int m_amount = 1;
 };

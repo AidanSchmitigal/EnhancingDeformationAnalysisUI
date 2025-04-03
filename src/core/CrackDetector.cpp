@@ -1,11 +1,19 @@
 #include <core/CrackDetector.hpp>
 
+#include <core/ThreadPool.hpp>
+
 #include <opencv2/opencv.hpp>
 
 #include <utils.h>
 
+bool CrackDetector::m_is_processing = false;
+float CrackDetector::m_progress = 0.0f;
+
 std::vector<std::vector<std::vector<cv::Point>>> CrackDetector::DetectCracks(const std::vector<uint32_t*>& images, int width, int height, int crack_darkness, int fill_threshold, int sharpness, int resolution, int amount) {
 	PROFILE_FUNCTION();
+
+	m_is_processing = true;
+	m_progress = 0.0f;
 
 	cv::Mat result;
 	std::vector<std::vector<std::vector<cv::Point>>> polygons;
@@ -81,7 +89,21 @@ std::vector<std::vector<std::vector<cv::Point>>> CrackDetector::DetectCracks(con
 		cv::polylines(image, approx_polygons, true, cv::Scalar(0, 0, 255, 255), 2);
 
 		memcpy(img_ptr, image.data, width * height * 4);
+		m_progress += 1.0f / images.size();
 	}
+	m_progress = 1.0f;
 
 	return polygons;
+}
+
+std::future<bool> CrackDetector::DetectCracksAsync(const std::vector<uint32_t*>& images, int width, int height, int crack_darkness, int fill_threshold, int sharpness, int resolution, int amount, std::function<void(bool)> callback) {
+	PROFILE_FUNCTION();
+	auto task = ThreadPool::GetThreadPool().enqueue([=]() {
+		DetectCracks(images, width, height, crack_darkness, fill_threshold, sharpness, resolution, amount);
+		return true;
+	});
+	if (callback) {
+		callback(true);
+	}
+	return task;
 }
