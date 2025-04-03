@@ -3,9 +3,6 @@
 
 #include <utils.h>
 
-#include <filesystem>
-#include <atomic>
-
 #ifdef UI_INCLUDE_TENSORFLOW
 #include <cppflow/cppflow.h>
 #endif
@@ -15,13 +12,6 @@
 // Static member initialization
 float DenoiseInterface::m_progress = 0.0f;
 bool DenoiseInterface::m_is_processing = false;
-
-// Global thread pool for image processing
-// This is implemented as a singleton pattern
-ThreadPool& GetThreadPool() {
-	static ThreadPool thread_pool;
-	return thread_pool;
-}
 
 // Original synchronous implementation
 bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
@@ -95,7 +85,7 @@ std::future<bool> DenoiseInterface::DenoiseAsync(std::vector<uint32_t*>& images,
 	m_progress = 0.0f;
 	
 	// Get the thread pool
-	auto& pool = GetThreadPool();
+	auto& pool = ThreadPool::GetThreadPool();
 	
 	// Submit task to thread pool
 	auto future = pool.enqueue([&images, width, height, model_name, tile_size, overlap, callback]() {
@@ -140,7 +130,7 @@ std::future<bool> DenoiseInterface::BlurAsync(std::vector<uint32_t*>& images, in
 	m_progress = 0.0f;
 	
 	// Get the thread pool
-	auto& pool = GetThreadPool();
+	auto& pool = ThreadPool::GetThreadPool();
 	
 	// Submit task to thread pool
 	auto future = pool.enqueue([&images, width, height, kernel_size, sigma, callback]() {
@@ -158,10 +148,3 @@ std::future<bool> DenoiseInterface::BlurAsync(std::vector<uint32_t*>& images, in
 	return future;
 }
 
-bool DenoiseInterface::IsProcessing() {
-	return m_is_processing;
-}
-
-float DenoiseInterface::GetProgress() {
-	return m_progress;
-}

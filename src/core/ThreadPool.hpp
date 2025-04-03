@@ -10,67 +10,73 @@
 #include <atomic>
 
 class ThreadPool {
-public:
-    ThreadPool(size_t num_threads = 0);
-    ~ThreadPool();
+	public:
+		ThreadPool(size_t num_threads = 0);
+		~ThreadPool();
 
-    // Add a task to the thread pool
-    template<class F, class... Args>
-    auto enqueue(F&& f, Args&&... args) 
-        -> std::future<typename std::invoke_result<F, Args...>::type>;
+		// Add a task to the thread pool
+		template<class F, class... Args>
+			auto enqueue(F&& f, Args&&... args) 
+			-> std::future<typename std::invoke_result<F, Args...>::type>;
 
-    // Get the number of tasks in the queue
-    size_t get_queue_size();
+		static ThreadPool& GetThreadPool() {
+			static ThreadPool instance;
+			return instance;
+		}
 
-    // Set a callback to be called when a task completes
-    void set_on_task_complete(std::function<void()> callback);
+		// Get the number of tasks in the queue
+		size_t get_queue_size();
 
-    // Get the number of active tasks
-    size_t get_active_tasks() const;
+		// Set a callback to be called when a task completes
+		void set_on_task_complete(std::function<void()> callback);
 
-private:
-    std::vector<std::thread> m_workers;
-    std::queue<std::function<void()>> m_tasks;
+		// Get the number of active tasks
+		size_t get_active_tasks() const;
 
-    std::mutex m_queue_mutex;
-    std::condition_variable m_condition;
-    std::atomic<bool> m_stop;
-    std::atomic<size_t> m_active_tasks;
-    std::function<void()> m_on_task_complete;
+	private:
+		std::vector<std::thread> m_workers;
+		std::queue<std::function<void()>> m_tasks;
+
+		std::mutex m_queue_mutex;
+		std::condition_variable m_condition;
+		std::atomic<bool> m_stop;
+		std::atomic<size_t> m_active_tasks;
+		std::function<void()> m_on_task_complete;
 };
 
 // Implementation of the enqueue function
-template<class F, class... Args>
+	template<class F, class... Args>
 auto ThreadPool::enqueue(F&& f, Args&&... args) 
-    -> std::future<typename std::invoke_result<F, Args...>::type> {
-    
-    using return_type = typename std::invoke_result<F, Args...>::type;
+	-> std::future<typename std::invoke_result<F, Args...>::type> {
 
-    auto task = std::make_shared<std::packaged_task<return_type()>>(
-        std::bind(std::forward<F>(f), std::forward<Args>(args)...)
-    );
-    
-    std::future<return_type> res = task->get_future();
-    
-    {
-        std::unique_lock<std::mutex> lock(m_queue_mutex);
+		using return_type = typename std::invoke_result<F, Args...>::type;
 
-        // Don't allow enqueueing after stopping the pool
-        if (m_stop) {
-            throw std::runtime_error("Enqueue on stopped ThreadPool");
-        }
+		auto task = std::make_shared<std::packaged_task<return_type()>>(
+				std::bind(std::forward<F>(f), std::forward<Args>(args)...)
+				);
 
-        m_tasks.emplace([this, task]() {
-            m_active_tasks++;
-            (*task)();
-            m_active_tasks--;
-            
-            if (m_on_task_complete) {
-                m_on_task_complete();
-            }
-        });
-    }
-    
-    m_condition.notify_one();
-    return res;
-}
+		std::future<return_type> res = task->get_future();
+
+		{
+			std::unique_lock<std::mutex> lock(m_queue_mutex);
+
+			// Don't allow enqueueing after stopping the pool
+			if (m_stop) {
+				throw std::runtime_error("Enqueue on stopped ThreadPool");
+			}
+
+			m_tasks.emplace([this, task]() {
+					m_active_tasks++;
+					(*task)();
+					m_active_tasks--;
+
+					if (m_on_task_complete) {
+					m_on_task_complete();
+					}
+					});
+		}
+
+		m_condition.notify_one();
+		return res;
+	}
+

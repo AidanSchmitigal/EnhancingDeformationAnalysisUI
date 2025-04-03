@@ -1,13 +1,18 @@
 #include <core/Stabilizer.hpp>
 
 #include <utils.h>
+#include <core/ThreadPool.hpp>
 
 #include <opencv2/opencv.hpp>
 
-void Stabilizer::Stabilize(std::vector<uint32_t*>& frames, int width, int height) {
+// Static member initialization
+float Stabilizer::m_progress = 0.0f;
+bool Stabilizer::m_is_processing = false;
+
+bool Stabilizer::Stabilize(std::vector<uint32_t*>& frames, int width, int height) {
 	PROFILE_FUNCTION();
 
-	if (frames.empty()) return;
+	if (frames.empty()) return false;
 
 	std::vector<cv::Mat> mats;
 	for (auto& ptr : frames) {
@@ -55,9 +60,31 @@ void Stabilizer::Stabilize(std::vector<uint32_t*>& frames, int width, int height
 		cv::Mat stabilized;
 		cv::warpAffine(mats[i], stabilized, transformMatrix, mats[i].size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
 		stabilizedFrames.push_back(stabilized);
+		m_progress = static_cast<float>(i) / mats.size(); // Update progress
 	}
 
 	for (size_t i = 0; i < frames.size(); i++) {
 		std::memcpy(frames[i], stabilizedFrames[i].data, width * height * 4);
 	}
+	return true;
+}
+
+std::future<bool> Stabilizer::StabilizeAsync(std::vector<uint32_t*>& frames, int width, int height, std::function<void(bool)> callback) {
+	// Set processing flag
+	m_is_processing = true;
+	m_progress = 0.0f;
+	// Get the thread pool
+	auto& pool = ThreadPool::GetThreadPool();
+	// Submit task to thread pool
+	auto future = pool.enqueue([&frames, width, height, callback]() {
+		bool result = Stabilize(frames, width, height);
+		// When complete, update processing flag and call callback if provided
+		m_is_processing = false;
+		if (callback) {
+			callback(result);
+		}
+		return result;
+	});
+	m_progress = 1.0f; // Set progress to 100% immediately for async
+	return future;
 }

@@ -19,8 +19,8 @@ public:
 		float sigma, std::function<void(bool)> callback = nullptr);
 	
 	// Status checking
-	static bool IsProcessing();
-	static float GetProgress();
+	static bool IsProcessing() { return m_is_processing; }
+	static float GetProgress() { return m_progress; }
 
 private:
 	static float m_progress;

@@ -65,7 +65,12 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		// Processing status display
 		if (m_is_processing) {
 			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Processing...");
-			float progress = DenoiseInterface::GetProgress();
+			float progress = 0.0f;
+			if (DenoiseInterface::IsProcessing()) {
+				progress = DenoiseInterface::GetProgress();
+			} else if (Stabilizer::IsProcessing()) {
+				progress = Stabilizer::GetProgress();
+			}
 			ImGui::ProgressBar(progress, ImVec2(-1, 0), "");
 			// Disable other buttons during processing
 		}
@@ -101,14 +106,16 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
 			auto height = m_processed_textures[0]->GetHeight();
-			
-			// Create a thread to handle stabilization
-			// Note: ThreadPool would be better but Stabilizer doesn't have an async interface yet
-			auto future = std::async(std::launch::async, [this, width, height]() {
-				Stabilizer::Stabilize(m_processing_frames, width, height);
-				return true;
-			});
-			
+
+			auto future = Stabilizer::StabilizeAsync(
+				m_processing_frames, 
+				width, 
+				height,
+				[this](bool result) {
+					// This callback will run in the worker thread
+					// We don't need to do anything here as we check the future in the main loop
+				}
+			);
 			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}
 		ImGui::EndDisabled();

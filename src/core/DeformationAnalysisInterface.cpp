@@ -16,10 +16,10 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 
 	for (int i = 0; i < images.size() - 1; i++) {
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
-		//cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
+		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		image.convertTo(image, CV_32F, 1.0 / 255.0);
 		cv::Mat image2 = cv::Mat(height, width, CV_8UC4, images[i + 1]);
-		//cv::cvtColor(image2, image2, cv::COLOR_BGRA2GRAY);
+		cv::cvtColor(image2, image2, cv::COLOR_BGRA2GRAY);
 		image2.convertTo(image2, CV_32F, 1.0 / 255.0);
 		auto tiles = utils::splitImageIntoTiles(image, tile_size, overlap);
 		auto tiles2 = utils::splitImageIntoTiles(image2, tile_size, overlap);
@@ -45,7 +45,7 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 
 			try {
 				// originally tried stateful partitioned call but it wanted saver_filename string tensor
-				auto output2 = model({{ "serving_default_input.1", input }}, {"PartitionedCall"});
+				auto output2 = model({{ "serving_default_input", input }}, {"PartitionedCall"});
 				output.push_back(output2[0]);
 			}
 			catch (const std::runtime_error& e) {
@@ -57,18 +57,19 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 		// convert tensors to cv::Mat and recombine
 		for (int j = 0; j < tiles.size(); j++) {
 			auto output_data = output[j].get_data<float>();
+			printf("Output size: %zu\n", output_data.size());
+			printf("Tile size: %d x %d = %d\n", tiles[j].size.width, tiles[j].size.height, tiles[j].size.width * tiles[j].size.height);
 			cv::Mat output_image(tiles[j].size, CV_32F);
 			for (int y = 0; y < tiles[j].size.height; y++) {
 				for (int x = 0; x < tiles[j].size.width; x++) {
 					output_image.at<float>(y, x) = output_data[y * tiles[j].size.width + x];
 				}
 			}
-			//output_image.convertTo(output_image, CV_8UC1, 255.0);
 			tiles[j].data = output_image;
 		}
 		cv::Mat reconstructed = utils::reconstructImageFromTiles(tiles, image.size(), overlap);
-		reconstructed.convertTo(reconstructed, CV_8U, 255.0);
-		//cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
+		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
+		reconstructed.convertTo(reconstructed, CV_8UC4, 255.0);
 		memcpy(images[i], reconstructed.data, width * height * 4);
 	}
 	return true;
