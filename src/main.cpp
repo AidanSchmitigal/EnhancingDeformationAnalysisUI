@@ -77,6 +77,7 @@ int main(int argc, char** argv) {
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 	// set glfw to use vsync, results in less cpu usage and no visible difference
+	// this limits the frame rate to the refresh rate of the monitor
 	glfwSwapInterval(1);
 
 	// create a vector of ImageSet pointers to store the image sets
@@ -100,13 +101,6 @@ int main(int argc, char** argv) {
 		ImGui::ShowDemoWindow();
 #endif
 		
-		// is this necessary when we use the SetNextWindowDockID function?
-		// TODO: test
-		if (!std::filesystem::exists("imgui.ini"))
-		{
-			ImGui::LoadIniSettingsFromDisk("assets/DefaultLayout.ini");
-		}
-
 		ImGui::SetNextWindowDockID(dockspaceID, ImGuiCond_FirstUseEver);
 
 #ifdef __APPLE__
@@ -159,6 +153,6 @@ int main(int argc, char** argv) {
 	}
 
 	glfwDestroyWindow(window);
-	glfwTerminate(); // this segfaults on wayland? (using glfw from master branch)
+	glfwTerminate(); // this segfaults on Kubuntu 24.10 w/ wayland, weird.
 	return 0;
 }

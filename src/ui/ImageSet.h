@@ -35,6 +35,7 @@ private:
 	Texture m_point_texture;
 	bool m_open = true;
 	std::string m_window_name;
+	int m_window_id = 0;
 	std::string m_folder_path;
 	std::vector<Texture *> m_textures;
 	std::vector<Texture *> m_processed_textures;

@@ -193,6 +193,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			auto sigma = m_sigma;
 			
 			// Use the async version with callback
+			// Honestly it runs quick enough this shouldn't matter but for the sake of consistency
+			// we can use the async version
 			auto future = DenoiseInterface::BlurAsync(
 				m_processing_frames, 
 				width, 
@@ -212,7 +214,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		ImGui::Combo("Model", &m_selected_model, m_models, IM_ARRAYSIZE(m_models));
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tile Size").x);
 		ImGui::SliderInt("Tile Size", &m_tile_size, 150, 512);
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tile size. Generally leave around 256, but can be varied for different results.");
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tile size. MUST BE AN EVEN NUMBER!\nGenerally leave around 256, but can be varied for different results.");
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Overlap").x);
 		ImGui::SliderInt("Overlap", &m_overlap, 0, 128);
 		

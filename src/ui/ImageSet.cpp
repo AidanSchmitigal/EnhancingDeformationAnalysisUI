@@ -20,7 +20,8 @@ int ImageSet::m_id_counter = 0;
 int playspeed = 1;
 
 ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_path) {
-	m_window_name = "ImageSet " + std::to_string(m_id_counter++);
+	m_window_name = folder_path.find_last_of('/') == std::string::npos ? folder_path : folder_path.substr(folder_path.find_last_of('/') + 1);
+	m_window_id = m_id_counter++;
 
 	LoadImages();
 
@@ -40,7 +41,7 @@ ImageSet::~ImageSet() {
 }
 
 void ImageSet::Display() {
-	ImGui::Begin(m_window_name.c_str(), &m_open);
+	ImGui::Begin((m_window_name + " " + std::to_string(m_window_id)).c_str(), &m_open);
 
 	// Check if processing is happening in the preprocessing tab
 	bool isProcessing = m_preprocessing_tab.IsProcessing();
@@ -190,14 +191,14 @@ void ImageSet::DisplayImageComparisonTab() {
 			ImGui::Columns(2, "image_columns");
 
 			// Left sequence
-			ImGui::Text("Sequence 1");
+			ImGui::Text("Original Sequence");
 			if (!m_textures.empty() && m_current_frame < m_textures.size()) {
 				ImGui::Image(m_textures[m_current_frame]->GetID(), ImVec2(m_textures[0]->GetWidth() / 1.5, m_textures[0]->GetHeight() / 1.5));
 			}
 			ImGui::NextColumn();
 
 			// Right sequence
-			ImGui::Text("Sequence 2");
+			ImGui::Text("Processed Sequence");
 			if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
 				ImGui::Image(m_processed_textures[m_current_frame]->GetID(), ImVec2(m_processed_textures[0]->GetWidth() / 1.5, m_processed_textures[0]->GetHeight() / 1.5));
 			}
