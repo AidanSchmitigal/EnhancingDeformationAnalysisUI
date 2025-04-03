@@ -78,8 +78,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		// Crop
 		ImGui::SeparatorText("Crop");
 		static int crop = 60;
-		ImGui::SliderInt("Pixels", &crop, 0, 100);
 		ImGui::BeginDisabled(m_is_processing);
+		ImGui::SliderInt("Pixels", &crop, 0, 100);
 		if (ImGui::Button("Crop Bottom") && !m_is_processing) {
 			if (crop == 0 || crop >= m_processed_textures[0]->GetHeight()) return;
 			for (int i = 0; i < m_processed_textures.size(); i++) {
