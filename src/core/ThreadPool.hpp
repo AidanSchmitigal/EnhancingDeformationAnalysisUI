@@ -11,12 +11,9 @@
 
 class ThreadPool {
 	public:
-		ThreadPool(size_t num_threads = 0);
-		~ThreadPool();
-
 		// Add a task to the thread pool
 		template<class F, class... Args>
-			auto enqueue(F&& f, Args&&... args) 
+		auto enqueue(F&& f, Args&&... args) 
 			-> std::future<typename std::invoke_result<F, Args...>::type>;
 
 		static ThreadPool& GetThreadPool() {
@@ -34,6 +31,10 @@ class ThreadPool {
 		size_t get_active_tasks() const;
 
 	private:
+		// private because we want to use the singleton pattern
+		ThreadPool(size_t num_threads = 0);
+		~ThreadPool();
+
 		std::vector<std::thread> m_workers;
 		std::queue<std::function<void()>> m_tasks;
 
@@ -45,7 +46,7 @@ class ThreadPool {
 };
 
 // Implementation of the enqueue function
-	template<class F, class... Args>
+template<class F, class... Args>
 auto ThreadPool::enqueue(F&& f, Args&&... args) 
 	-> std::future<typename std::invoke_result<F, Args...>::type> {
 
