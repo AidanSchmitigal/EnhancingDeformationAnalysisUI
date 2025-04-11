@@ -210,6 +210,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}
 		
+#ifdef UI_INCLUDE_TENSORFLOW
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Model").x);
 		ImGui::Combo("Model", &m_selected_model, m_models, IM_ARRAYSIZE(m_models));
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tile Size").x);
@@ -248,6 +249,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			
 			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}
+#endif
 		ImGui::EndDisabled();
 		
 		ImGui::SameLine(); ImGui::TextDisabled("(?)");
