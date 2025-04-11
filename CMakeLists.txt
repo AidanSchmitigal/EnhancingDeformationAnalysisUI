@@ -83,14 +83,18 @@ if (UI_PROFILE)
 endif()
 
 if (UI_RELEASE)
+	message("-- Building in RELEASE mode")
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_RELEASE)
 
 # Windows doesn't like setting the optimization level through CMake
 # TODO: investigate this
 if (!WIN32)
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3)
-endif()
+endif() # !WIN32
 else()
+	message("-- Building in DEBUG mode")
+if (!WIN32)
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O)
+endif() # !WIN32
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -g)
-endif()
-
+endif() # UI_RELEASE
