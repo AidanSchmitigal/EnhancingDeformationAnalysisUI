@@ -9,6 +9,8 @@
 #include <gif-h/gif.h>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #include <shobjidl.h>
 #endif
