@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <core/stabilizer.hpp>
+#include <core/Stabilizer.hpp>
 #include <core/CrackDetector.hpp>
 #include <core/DenoiseInterface.hpp>
 #include <core/FeatureTracker.hpp>

@@ -1,4 +1,5 @@
 #include <OpenGL/Texture.h>
+
 #include <utils.h>
 
 #include <glad/glad.h>
@@ -12,6 +13,8 @@ Texture::~Texture() {
 }
 
 void Texture::Load(const uint32_t* data, int width, int height) {
+	PROFILE_FUNCTION();
+
 	if (m_loaded && m_width == width && m_height == height) {
 		Bind();
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, data);
@@ -37,6 +40,8 @@ void Texture::Load(const uint32_t* data, int width, int height) {
 
 // assumes we want to use bytes and not floats
 void Texture::Load(const char* filename) {
+	PROFILE_FUNCTION();
+
 	int width, height;
 	unsigned int* temp = utils::LoadTiff(filename, width, height);
 	Bind();
@@ -55,8 +60,13 @@ void Texture::Load(const char* filename) {
 }
 
 void Texture::GetData(uint32_t* data) {
+	PROFILE_FUNCTION();
+
 	Bind();
-	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	{
+		PROFILE_SCOPE(OpenGLGetData);
+		glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	}
 	Unbind();
 }
 

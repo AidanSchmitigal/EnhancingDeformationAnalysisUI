@@ -4,6 +4,9 @@ project(EnhancingDeformationAnalysisUI VERSION 0.1
 	DESCRIPTION "UI for the Enhancing Deformation Analysis capstone"
 	LANGUAGES CXX C)
 
+set(UI_INCLUDE_TENSORFLOW ON CACHE BOOL "Include TensorFlow in the project (denoising)")
+set(UI_PROFILE OFF CACHE BOOL "Build the project in profile mode")
+
 # Enable compile_commands.json for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -19,7 +22,6 @@ file(GLOB IMGUI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/*.h" "${CMAKE_CU
 
 if (!WIN32)
 	SET(GLFW_BUILD_X11 ON CACHE BOOL "Build for X11")
-	SET(GLFW_BUILD_WAYLAND ON CACHE BOOL "Build for Wayland")
 endif()
 
 SET(BUILD_EXAMPLES OFF CACHE BOOL "cppflow lib only")
@@ -33,7 +35,10 @@ find_package(OpenCV REQUIRED)
 
 add_subdirectory(libs/glfw)
 add_subdirectory(libs/libtiff)
-add_subdirectory(libs/cppflow)
+
+if(UI_INCLUDE_TENSORFLOW)
+	add_subdirectory(libs/cppflow)
+endif()
 
 # Don't let glfw build examples/tests/docs or install
 SET(GLFW_BUILD_DOCS OFF CACHE BOOL "GLFW lib only")
@@ -51,27 +56,35 @@ target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE glfw)
 
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE tiff)
 
-target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE cppflow)
+# must link cppflow before opencv or you'll get a segfault apparently (???)
+if (UI_INCLUDE_TENSORFLOW)
+	target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE cppflow)
+	target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/cppflow/include)
+endif()
 
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
 
 # Include directories
-target_include_directories(EnhancingDeformationAnalysisUI PRIVATE src/ libs/ libs/glad/include/ libs/imgui/)
+target_include_directories(EnhancingDeformationAnalysisUI PRIVATE src/ libs/ libs/glad/include/ libs/imgui/ libs/gif-h/)
 
 # Include OpenCV
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLUDE_DIRS})
 
-target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/cppflow/include)
-
-target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/gif-h)
-
 # Set C++ standard to 20
 target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
+
+if (UI_INCLUDE_TENSORFLOW)
+	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_TENSORFLOW)
+endif()
+
+if (UI_PROFILE)
+	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_PROFILE)
+	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3 -DNDEBUG)
+endif()
 
 if (UI_RELEASE)
 	message("-- Building in RELEASE mode")
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_RELEASE)
-	#target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -Wall)
 
 # Windows doesn't like setting the optimization level through CMake
 # TODO: investigate this

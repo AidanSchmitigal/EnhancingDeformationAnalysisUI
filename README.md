@@ -36,3 +36,5 @@ Don't miss the recursive part of that command!
     - Crack detection
 - Image Analysis with histograms (exportable)
 - Feature tracking either via user selected points or automatic using the crack detection algorithm
+## Credits
+- [tk_r_em](https://github.com/Ivanlh20/tk_r_em) for the denoising models used

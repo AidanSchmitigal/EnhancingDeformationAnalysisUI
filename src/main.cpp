@@ -9,7 +9,6 @@
 
 #include <ImGuiImpl.h>
 
-#include <ui/ImageSequenceViewer.h>
 #include <ui/ImageSet.h>
 
 #include <utils.h>
@@ -37,6 +36,13 @@ int main(int argc, char** argv) {
 		printf("Failed to initialize GLFW\n");
 		return -1;
 	}
+
+#ifdef __APPLE__
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for macOS
+#endif
 
 #ifdef UI_RELEASE
 	GLFWwindow* window = glfwCreateWindow(1400, 1050, "Enhancing Deformation Analysis UI", NULL, NULL);
@@ -71,6 +77,7 @@ int main(int argc, char** argv) {
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 	// set glfw to use vsync, results in less cpu usage and no visible difference
+	// this limits the frame rate to the refresh rate of the monitor
 	glfwSwapInterval(1);
 
 	// create a vector of ImageSet pointers to store the image sets
@@ -94,15 +101,18 @@ int main(int argc, char** argv) {
 		ImGui::ShowDemoWindow();
 #endif
 		
-		// is this necessary when we use the SetNextWindowDockID function?
-		// TODO: test
-		if (!std::filesystem::exists("imgui.ini"))
-		{
-			ImGui::LoadIniSettingsFromDisk("assets/DefaultLayout.ini");
-		}
-
 		ImGui::SetNextWindowDockID(dockspaceID, ImGuiCond_FirstUseEver);
 
+#ifdef __APPLE__
+		ImGui::Begin("Image Folder Selector");
+		ImGui::InputTextWithHint("##image_folder", "Enter image folder path", nullptr, 0);
+		if (ImGui::Button("Load Images")) {
+			const char* folder_path = ImGui::GetInputTextState("##image_folder")->Text;
+			if (std::filesystem::is_directory(folder_path)) {
+				image_sets.emplace_back(new ImageSet(folder_path));
+			}
+		}
+#else
 		// for each image set, create a window that will be tabbed in the main window
 		// for each image set tab, have tabs for stabilization and preprocessing etc.
 		ImGui::Begin("Image Folder Selector");
@@ -112,6 +122,8 @@ int main(int argc, char** argv) {
 				image_sets.emplace_back(new ImageSet(folder_path));
 			}
 		}
+
+#endif
 
 		// display a warning if the assets folder is not found
 		if (!assets_folder_exists) {
@@ -141,6 +153,6 @@ int main(int argc, char** argv) {
 	}
 
 	glfwDestroyWindow(window);
-	glfwTerminate(); // this segfaults on wayland? (using glfw from master branch)
+	glfwTerminate(); // this segfaults on Kubuntu 24.10 w/ wayland, weird.
 	return 0;
 }

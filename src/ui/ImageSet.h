@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-#include <ui/ImageSequenceViewer.h>
 #include <ui/PreprocessingTab.h>
 
 #include <OpenGL/Texture.h>
@@ -28,6 +27,7 @@ private:
 
 	static int m_id_counter;
 
+	uint32_t m_current_frame = 0;
 	PreprocessingTab m_preprocessing_tab;
 	std::vector<cv::Point2f> m_points;
 	std::vector<cv::Point2f> m_last_points;
@@ -35,9 +35,8 @@ private:
 	Texture m_point_texture;
 	bool m_open = true;
 	std::string m_window_name;
+	int m_window_id = 0;
 	std::string m_folder_path;
 	std::vector<Texture *> m_textures;
 	std::vector<Texture *> m_processed_textures;
-	ImageSequenceViewer m_sequence_viewer;
-	ImageSequenceViewer m_processed_sequence_viewer;
 };

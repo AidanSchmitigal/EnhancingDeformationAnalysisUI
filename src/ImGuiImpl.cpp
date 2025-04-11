@@ -10,7 +10,12 @@ void ImGuiInit(GLFWwindow* window, bool set_colors, bool set_fonts) {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
+
+#ifdef __APPLE__
+	ImGui_ImplOpenGL3_Init("#version 150");
+#else
 	ImGui_ImplOpenGL3_Init();
+#endif
 
 	if (set_fonts)
 		ImGui::GetIO().Fonts->AddFontFromFileTTF("assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
