@@ -1,10 +1,11 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 project(EnhancingDeformationAnalysisUI VERSION 0.1
 	DESCRIPTION "UI for the Enhancing Deformation Analysis capstone"
 	LANGUAGES CXX C)
 
 set(UI_INCLUDE_TENSORFLOW ON CACHE BOOL "Include TensorFlow in the project (denoising)")
+set(UI_INCLUDE_PYTORCH ON CACHE BOOL "Include PyTorch in the project")
 set(UI_PROFILE OFF CACHE BOOL "Build the project in profile mode")
 
 # Enable compile_commands.json for clangd
@@ -36,6 +37,9 @@ find_package(OpenCV REQUIRED)
 add_subdirectory(libs/glfw)
 add_subdirectory(libs/libtiff)
 
+if (UI_INCLUDE_PYTORCH)
+	find_package(Torch REQUIRED)
+endif()
 if(UI_INCLUDE_TENSORFLOW)
 	add_subdirectory(libs/cppflow)
 endif()
@@ -60,6 +64,11 @@ target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE tiff)
 if (UI_INCLUDE_TENSORFLOW)
 	target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE cppflow)
 	target_include_directories(EnhancingDeformationAnalysisUI PRIVATE libs/cppflow/include)
+endif()
+
+if (UI_INCLUDE_PYTORCH)
+	target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TORCH_LIBRARIES})
+	target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${TORCH_INCLUDE_DIRS})
 endif()
 
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})

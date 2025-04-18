@@ -8,6 +8,9 @@
 #include <cppflow/cppflow.h>
 #endif
 
+#include <torch/script.h>
+
+/*
 bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, int width, int height, const int tile_size, const int overlap) {
 #ifdef UI_INCLUDE_TENSORFLOW
 	cppflow::model model = cppflow::model("assets/models/batch-m4-combo/");
@@ -72,6 +75,96 @@ bool DeformationAnalysisInterface::TestModel(std::vector<uint32_t *> &images, in
 		reconstructed.convertTo(reconstructed, CV_8UC4, 255.0);
 		memcpy(images[i], reconstructed.data, width * height * 4);
 	}
+	return true;
+#else
+	return false;
+#endif
+}
+*/
+
+bool DeformationAnalysisInterface::TestModel(
+		std::vector<uint32_t*>& images,
+		int width, int height,
+		int tile_size, int overlap
+		) {
+#ifdef UI_INCLUDE_PYTORCH
+	// load jit module
+	torch::jit::script::Module module;
+	try {
+		module = torch::jit::load("assets/models/batch-m4-combo.pt");
+	}
+	catch (const c10::Error& e) {
+		std::cerr << "error loading model: " << e.what() << "\n";
+		return false;
+	}
+	module.eval();
+
+	std::vector<cv::Mat> reconstructed_images;
+	for (size_t i = 0; i + 1 < images.size(); ++i) {
+		// prep cv mats
+		cv::Mat img1(height, width, CV_8UC4, images[i]);
+		cv::cvtColor(img1, img1, cv::COLOR_BGRA2GRAY);
+		img1.convertTo(img1, CV_32FC1, 1.f/255.f);
+		cv::Mat img2(height, width, CV_8UC4, images[i+1]);
+		cv::cvtColor(img2, img2, cv::COLOR_BGRA2GRAY);
+		img2.convertTo(img2, CV_32FC1, 1.f/255.f);
+
+		auto tiles1 = utils::splitImageIntoTiles(img1, tile_size, overlap);
+		auto tiles2 = utils::splitImageIntoTiles(img2, tile_size, overlap);
+
+		std::vector<torch::Tensor> outputs;
+		outputs.reserve(tiles1.size());
+
+		for (size_t k = 0; k < tiles1.size(); ++k) {
+			const auto& t1 = tiles1[k].data;
+			const auto& t2 = tiles2[k].data;
+			int h = t1.rows, w = t1.cols;
+			std::vector<float> buf;
+			buf.reserve(h*w*2);
+			// flatten both tiles
+			buf.insert(buf.end(), (float*)t1.datastart, (float*)t1.dataend);
+			buf.insert(buf.end(), (float*)t2.datastart, (float*)t2.dataend);
+
+			// create tensor: [1,2,h,w]
+			auto input = torch::from_blob(
+					buf.data(),
+					{1, 2, h, w},
+					torch::kFloat
+					).clone(); // clone so it owns memory
+
+			// forward
+			try {
+				auto out = module.forward({input}).toTensor();
+				outputs.push_back(out);
+			}
+			catch (const c10::Error& e) {
+				std::cerr<<"inference error: "<<e.what()<<"\n";
+				return false;
+			}
+		}
+
+		// rebuild mats
+		for (size_t j = 0; j < outputs.size(); ++j) {
+			auto& t      = outputs[j];
+			int h        = tiles1[j].size.height;
+			int w        = tiles1[j].size.width;
+			float* datap = t.data_ptr<float>();
+			cv::Mat outm(h, w, CV_32F, datap);
+			tiles1[j].data = outm.clone(); // clone to own
+		}
+
+		auto recon = utils::reconstructImageFromTiles(
+				tiles1, img1.size(), overlap
+				);
+		cv::cvtColor(recon, recon, cv::COLOR_GRAY2BGRA);
+		recon.convertTo(recon, CV_8UC4, 255.f);
+		reconstructed_images.push_back(recon);
+	}
+
+	for (size_t i = 0; i < reconstructed_images.size(); ++i) {
+		memcpy(images[i], reconstructed_images[i].data, width * height * 4);
+	}
+
 	return true;
 #else
 	return false;
