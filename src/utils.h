@@ -50,6 +50,8 @@ namespace utils {
 	// writes our manual width tracking data to a csv
 	bool WriteCSV(const char* path, std::vector<std::vector<cv::Point2f>>& points, std::vector<std::vector<float>>& data);
 
+	bool saveAnalysisCsv(const char* path, const std::vector<std::vector<float>>& histograms, const std::vector<float>& avg_histogram, const std::vector<float>& snrs, float avg_snr);
+
 	// functions to split an image into tiles and then reconstruct it
 	// used for denoising
 	std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap = 0);

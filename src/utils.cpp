@@ -292,6 +292,37 @@ namespace utils {
 		return true;
 	}
 
+	bool saveAnalysisCsv(const char* path, const std::vector<std::vector<float>>& histograms, const std::vector<float>& avg_histogram, const std::vector<float>& snrs, float avg_snr) {
+		std::ofstream f(path);
+		if (!f.is_open()) {
+			std::cerr << "Could not open file " << path << std::endl;
+			return false;
+		}
+		int bins = avg_histogram.size();
+
+		// header
+		f << "frame,snr";
+		for (int b = 0; b < bins; ++b)
+			f << ",bin" << b;
+		f << "\n";
+
+		// per-frame rows
+		size_t n = std::min(histograms.size(), snrs.size());
+		for (size_t i = 0; i < n; ++i) {
+			f << i << "," << snrs[i];
+			for (int b = 0; b < bins; ++b)
+				f << "," << histograms[i][b];
+			f << "\n";
+		}
+
+		// average row
+		f << "avg," << avg_snr;
+		for (int b = 0; b < bins; ++b)
+			f << "," << avg_histogram[b];
+		f << "\n";
+		return true;
+	}
+
 	std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap) {
 		std::vector<ImageTile> tiles;
 

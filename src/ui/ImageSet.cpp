@@ -224,6 +224,7 @@ void ImageSet::DisplayImageAnalysisTab() {
 	static std::vector<float> avg_histogram;
 	static std::vector<float> snrs;
 	static float avg_snr = 0.0f;
+	static bool write_success = true;
 	if (ImGui::BeginTabItem("Image Analysis")) {
 		if (m_processed_textures.size() == 0) {
 			ImGui::Text("No images loaded");
@@ -263,6 +264,23 @@ void ImageSet::DisplayImageAnalysisTab() {
 			}
 		}
 		free(data);
+
+		ImGui::SeparatorText("Write Analysis to CSV");
+		static std::string folder_path;
+		if (ImGui::Button("Choose Folder to Save")) {
+			folder_path = utils::OpenFileDialog(".", "Pick a folder to save widths", true);
+		}
+		static char manual_filename[256] = "";
+		ImGui::InputTextWithHint("Filename", "analysis.csv", manual_filename, 256);
+		ImGui::TextWrapped("%s/%s", folder_path.c_str(), manual_filename);
+		if (ImGui::Button("Save Analysis")) {
+			write_success = utils::saveAnalysisCsv(manual_filename, histograms, avg_histogram, snrs, avg_snr);
+			memset(manual_filename, 0, 256);
+			folder_path = "";
+		}
+		if (!write_success) {
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
+		}
 
 		ImGui::SeparatorText("Average Analysis");
 		ImGui::Text("Average SNR: %.2f", avg_snr);
