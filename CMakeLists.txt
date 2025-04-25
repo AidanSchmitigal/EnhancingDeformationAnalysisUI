@@ -23,6 +23,7 @@ file(GLOB IMGUI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/*.h" "${CMAKE_CU
 
 if (!WIN32)
 	SET(GLFW_BUILD_X11 ON CACHE BOOL "Build for X11")
+	SET(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build for Wayland")
 endif()
 
 SET(BUILD_EXAMPLES OFF CACHE BOOL "cppflow lib only")
@@ -37,6 +38,7 @@ find_package(OpenCV REQUIRED)
 add_subdirectory(libs/glfw)
 add_subdirectory(libs/libtiff)
 
+set(USE_CUDNN 1 CACHE BOOL "Use cuDNN for TensorFlow")
 if (UI_INCLUDE_PYTORCH)
 	find_package(Torch REQUIRED)
 endif()

@@ -131,7 +131,7 @@ namespace utils {
 	unsigned int* LoadTiff(const char* path, int& width, int& height) {
 		PROFILE_FUNCTION()
 
-		TIFF* tif = TIFFOpen(path, "r");
+			TIFF* tif = TIFFOpen(path, "r");
 		if (!tif) {
 			printf("Could not open file %s\n", path);
 			return NULL;
@@ -175,7 +175,7 @@ namespace utils {
 	bool WriteTiff(const char* path, unsigned int* data, int width, int height) {
 		PROFILE_FUNCTION()
 
-		TIFF* tif = TIFFOpen(path, "w");
+			TIFF* tif = TIFFOpen(path, "w");
 		if (!tif) {
 			printf("Could not open file %s\n", path);
 			return false;
@@ -206,10 +206,10 @@ namespace utils {
 	bool WriteGIFOfImageSet(const char* path, std::vector<Texture*> images, int delay, int loop) {
 		PROFILE_FUNCTION()
 
-		if (images.empty()) {
-			printf("No images to write to gif\n");
-			return false;
-		}
+			if (images.empty()) {
+				printf("No images to write to gif\n");
+				return false;
+			}
 		// Create gif
 		GifWriter writer;
 		if (!GifBegin(&writer, path, images[0]->GetWidth(), images[0]->GetHeight(), delay, loop))
@@ -234,7 +234,7 @@ namespace utils {
 	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<Texture*>& textures) {
 		PROFILE_FUNCTION()
 
-		if (data.size() != textures.size()) data.resize(textures.size());
+			if (data.size() != textures.size()) data.resize(textures.size());
 		for (int i = 0; i < textures.size(); i++) {
 			if (data[i] == nullptr) data[i] = (uint32_t*)malloc(width * height * 4);
 			textures[i]->GetData(data[i]);
@@ -244,10 +244,10 @@ namespace utils {
 	void LoadDataIntoTexturesAndFree(std::vector<Texture*>& textures, std::vector<uint32_t*>& data, int width, int height) {
 		PROFILE_FUNCTION()
 
-		for (int i = 0; i < textures.size(); i++) {
-			textures[i]->Load(data[i], width, height);
-			free(data[i]);
-		}
+			for (int i = 0; i < textures.size(); i++) {
+				textures[i]->Load(data[i], width, height);
+				free(data[i]);
+			}
 	}
 
 	bool WriteCSV(const char* path, std::vector<std::vector<std::vector<float>>>& data) {
@@ -267,33 +267,28 @@ namespace utils {
 		return true;
 	}
 
-	bool WriteCSV(const char* path, std::vector<cv::Point2f>& points, std::vector<std::vector<float>>& data) {
-		std::ofstream file = std::ofstream(path);
-
-		if (!file.is_open()) {
+	bool WriteCSV(const char* path, std::vector<std::vector<cv::Point2f>>& trackedPts, std::vector<std::vector<float>>& widths) {
+		std::ofstream f(path);
+		if (!f.is_open()) {
+			std::cerr << "Could not open file " << path << std::endl;
 			return false;
 		}
+		// header
+		f << "frame";
+		auto nPairs = widths.empty() ? 0 : widths[0].size();
+		for (size_t p = 0; p < nPairs; ++p) f << ",width" << p;
+		auto nPts = trackedPts.empty() ? 0 : trackedPts[0].size();
+		for (size_t j = 0; j < nPts; ++j)
+			f << ",pt" << j << "_x,pt" << j << "_y";
+		f << "\n";
 
-		// Write header
-		file << "Point_Pair,Point1_X,Point1_Y,Point2_X,Point2_Y";
-		for (size_t i = 0; i < data.size(); ++i) {
-			file << ",Frame_" << i;
+		auto nFrames = std::min(widths.size(), trackedPts.size());
+		for (size_t i = 0; i < nFrames; ++i) {
+			f << i;
+			for (auto w : widths[i]) f << "," << w;
+			for (auto& pt : trackedPts[i]) f << "," << pt.x << "," << pt.y;
+			f << "\n";
 		}
-		file << "\n";
-
-		// Write data - assuming points are pairs and widths are per frame
-		for (size_t i = 0; i < points.size() / 2; ++i) {
-			file << i << "," 
-				<< points[2*i].x << "," << points[2*i].y << "," 
-				<< points[2*i+1].x << "," << points[2*i+1].y;
-
-			for (size_t j = 0; j < data.size(); ++j) {
-				file << "," << data[j][i];
-			}
-			file << "\n";
-		}
-
-		file.close();
 		return true;
 	}
 
@@ -308,7 +303,7 @@ namespace utils {
 		// Pad image with zeros
 		cv::Mat paddedImage;
 		cv::copyMakeBorder(image, paddedImage, 0, paddedHeight - image.rows, 
-				0, paddedWidth - image.cols, cv::BORDER_CONSTANT, cv::Scalar(1.0f));
+				0, paddedWidth - image.cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
 
 		// Split into tiles with overlap
 		for (int y = 0; y <= paddedImage.rows - tileSize; y += step) {
@@ -337,12 +332,12 @@ namespace utils {
 		cv::Size paddedSize(maxX, maxY);
 
 		// Initialize accumulation and weight matrices
-		cv::Mat reconstructed = cv::Mat::zeros(paddedSize, CV_32F); // Float for accumulation
-		cv::Mat weight = cv::Mat::zeros(paddedSize, CV_32F);
+		cv::Mat reconstructed = cv::Mat::zeros(paddedSize, CV_32FC4); // Float for accumulation
+		cv::Mat weight = cv::Mat::zeros(paddedSize, CV_32FC4);
 		int tileSize = tiles[0].size.width;
 
 		// Create linear blend mask for overlap
-		cv::Mat blendMask = cv::Mat::ones(tileSize, tileSize, CV_32F);
+		cv::Mat blendMask = cv::Mat::ones(tileSize, tileSize, CV_32FC4);
 		if (overlap > 0) {
 			for (int y = 0; y < tileSize; ++y) {
 				for (int x = 0; x < tileSize; ++x) {
@@ -350,7 +345,7 @@ namespace utils {
 						(x >= tileSize - overlap ? (tileSize - x - 1) / (float)overlap : 1.0f);
 					float wy = (y < overlap) ? (y / (float)overlap) : 
 						(y >= tileSize - overlap ? (tileSize - y - 1) / (float)overlap : 1.0f);
-					blendMask.at<float>(y, x) = wx * wy;
+					blendMask.at<cv::Vec4f>(y, x) = wx * wy;
 				}
 			}
 		}
@@ -359,7 +354,7 @@ namespace utils {
 		for (const auto& tile : tiles) {
 			cv::Rect roi(tile.position, tile.size);
 
-			cv::Mat weightedTile;
+			cv::Mat weightedTile = cv::Mat::zeros(tile.size, CV_32FC4);
 			cv::multiply(tile.data, blendMask, weightedTile);
 			reconstructed(roi) += weightedTile;
 			weight(roi) += blendMask;
@@ -369,7 +364,8 @@ namespace utils {
 		cv::Mat normalized;
 		cv::divide(reconstructed, weight, normalized); // Handle division by zero implicitly
 
-		// Crop to original size
+		normalized.convertTo(normalized, CV_8UC4, 1.0f); // Convert to 8-bit
+								 // Crop to original size
 		return normalized(cv::Rect(0, 0, originalSize.width, originalSize.height));
 	}
 }

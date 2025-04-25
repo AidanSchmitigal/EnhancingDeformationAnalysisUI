@@ -48,7 +48,7 @@ namespace utils {
 	bool WriteCSV(const char* path, std::vector<std::vector<std::vector<float>>>& data);
 
 	// writes our manual width tracking data to a csv
-	bool WriteCSV(const char* path, std::vector<cv::Point2f>& points, std::vector<std::vector<float>>& data);
+	bool WriteCSV(const char* path, std::vector<std::vector<cv::Point2f>>& points, std::vector<std::vector<float>>& data);
 
 	// functions to split an image into tiles and then reconstruct it
 	// used for denoising

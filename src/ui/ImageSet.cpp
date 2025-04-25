@@ -341,10 +341,11 @@ void ImageSet::DisplayFeatureTrackingTab() {
 					m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					m_last_points = m_points;
+					m_last_tracked_points = tracked_points;
 					m_points.clear();
 				}
 			} else {
-				ImGui::Text("Select two points");
+				ImGui::Text("Select an even number of points");
 			}
 		} else {
 			if (ImGui::Button("Track Widths")) {
@@ -377,7 +378,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			ImGui::InputTextWithHint("Filename", "widths.csv", manual_filename, 256);
 			ImGui::TextWrapped("%s/%s", folder_path.c_str(), manual_filename);
 			if (ImGui::Button("Save Widths")) {
-				write_success = utils::WriteCSV(std::string(folder_path + "/" + manual_filename).c_str(), m_last_points, manual_widths);
+				write_success = utils::WriteCSV(std::string(folder_path + "/" + manual_filename).c_str(), m_last_tracked_points, manual_widths);
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
