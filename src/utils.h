@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <filesystem>
 
 #include <OpenGL/Texture.h>
 
@@ -56,6 +57,8 @@ namespace utils {
 	// used for denoising
 	std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap = 0);
 	cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap = 0);
+
+	bool DirectoryContainsTiff(const std::filesystem::path& path);
 }
 
 class Profiler {

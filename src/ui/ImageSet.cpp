@@ -143,7 +143,7 @@ void ImageSet::DisplayImageComparisonTab() {
 			uint32_t* data = (uint32_t*)malloc(size.x * size.y * sizeof(uint32_t));
 			for (int i = 0; i < m_textures.size(); i++) {
 				m_textures[i]->GetData(data);
-				m_processed_textures[i]->Load(data, size.x, size.y);
+				m_processed_textures[i]->Load(data, (int)size.x, (int)size.y);
 			}
 			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 			free(data);
@@ -183,7 +183,7 @@ void ImageSet::DisplayImageComparisonTab() {
 			ImGui::SetTooltip("This will write a GIF of the processed images, and can take some time with larger image sets.");
 
 		// Frame slider
-		ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, std::max(m_textures.size(), m_processed_textures.size()) - 1);
+		ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, (int)std::max(m_textures.size(), m_processed_textures.size()) - 1);
 
 		// Side-by-side image display
 		ImGui::BeginChild("Images", ImVec2(0, 0), true);
@@ -200,7 +200,7 @@ void ImageSet::DisplayImageComparisonTab() {
 			// Right sequence
 			ImGui::Text("Processed Sequence");
 			if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
-				ImGui::Image(m_processed_textures[m_current_frame]->GetID(), ImVec2(m_processed_textures[0]->GetWidth() / 1.5, m_processed_textures[0]->GetHeight() / 1.5));
+				ImGui::Image(m_processed_textures[m_current_frame]->GetID(), ImVec2((float)m_processed_textures[0]->GetWidth() / 1.5, (float)m_processed_textures[0]->GetHeight() / 1.5));
 			}
 			ImGui::Columns(1);
 		}
@@ -439,15 +439,15 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		ImGui::BeginChild("ImageView", ImVec2(0, 0), true);
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::ImageButton("Processed Image", m_point_texture.GetID(), ImVec2(m_point_texture.GetWidth(), m_point_texture.GetHeight()));
+		ImGui::ImageButton("Processed Image", m_point_texture.GetID(), ImVec2((float)m_point_texture.GetWidth(), (float)m_point_texture.GetHeight()));
 		ImGui::PopStyleVar(2);
 
 		if (manualMode && ImGui::IsItemActive() && ImGui::IsItemHovered()) {
 			const auto now = std::chrono::system_clock::now();
 			if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count() > 250) {
 				last_time = now;
-				uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
-				uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
+				int coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
+				int coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
 				m_points.push_back(cv::Point2f(coordX, coordY));
 
 				int size = 3;
