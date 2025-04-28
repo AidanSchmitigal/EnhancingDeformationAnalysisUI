@@ -120,7 +120,6 @@ namespace utils {
 		// if we don't do this check we get garbage data into the string when the user cancels the dialog
 		if (out == nullptr) return std::string();
 		output[strcspn(output, "\n")] = 0;
-		printf("Output: '%s'\n", output);
 		if (output[0] == 0)
 			return std::string();
 		else

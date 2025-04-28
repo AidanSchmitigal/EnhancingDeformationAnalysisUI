@@ -5,9 +5,14 @@
 
 #include <opencv2/opencv.hpp>
 
+struct tile {
+	cv::Mat data; // tile data
+	cv::Point tl; // top-left corner of tile in original image
+};
+
 class DeformationAnalysisInterface {
 	public:
-		static bool TestModel(std::vector<uint32_t *> &images, int width, int height, const int tile_size, const int overlap);
+		static bool TestModel(std::vector<uint32_t *> &images, int width, int height, const int tile_size, const int overlap, std::vector<tile>& tiles);
 	private:
 		// Structure to hold tile information
 		struct ImageTile {

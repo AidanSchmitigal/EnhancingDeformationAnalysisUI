@@ -266,17 +266,9 @@ void ImageSet::DisplayImageAnalysisTab() {
 		free(data);
 
 		ImGui::SeparatorText("Write Analysis to CSV");
-		static std::string folder_path;
-		if (ImGui::Button("Choose Folder to Save")) {
-			folder_path = utils::OpenFileDialog(".", "Pick a folder to save widths", true);
-		}
-		static char manual_filename[256] = "";
-		ImGui::InputTextWithHint("Filename", "analysis.csv", manual_filename, 256);
-		ImGui::TextWrapped("%s/%s", folder_path.c_str(), manual_filename);
-		if (ImGui::Button("Save Analysis")) {
-			write_success = utils::saveAnalysisCsv(manual_filename, histograms, avg_histogram, snrs, avg_snr);
-			memset(manual_filename, 0, 256);
-			folder_path = "";
+		if (ImGui::Button("Save To")) {
+			auto path = utils::SaveFileDialog(".", "Save Analysis CSV", "csv");
+			write_success = utils::saveAnalysisCsv(path.c_str(), histograms, avg_histogram, snrs, avg_snr);
 		}
 		if (!write_success) {
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
@@ -311,7 +303,6 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		}
 		// Initialize point image
 		if (m_point_image == NULL) {
-			printf("Refreshing point image\n");
 			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
@@ -388,20 +379,12 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				memcpy(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
-			static std::string folder_path;
-			if (ImGui::Button("Choose Folder to Save")) {
-				folder_path = utils::OpenFileDialog(".", "Pick a folder to save widths", true);
-			}
-			static char manual_filename[256] = "";
-			ImGui::InputTextWithHint("Filename", "widths.csv", manual_filename, 256);
-			ImGui::TextWrapped("%s/%s", folder_path.c_str(), manual_filename);
-			if (ImGui::Button("Save Widths")) {
-				write_success = utils::WriteCSV(std::string(folder_path + "/" + manual_filename).c_str(), m_last_tracked_points, manual_widths);
+			if (ImGui::Button("Save To")) {
+				auto path = utils::SaveFileDialog(".", "Save Widths CSV", "csv");
+				write_success = utils::WriteCSV(path.c_str(), widths);
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
-				memset(manual_filename, 0, 256);
-				folder_path = "";
 			}
 			ImGui::Text("Manual Widths:");
 			for (int i = 0; i < manual_widths.size(); i++) {
@@ -416,20 +399,12 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			if (ImGui::Button("Clear Widths")) {
 				widths.clear();
 			}
-			static std::string folder_path;
-			if (ImGui::Button("Choose Folder to Save")) {
-				folder_path = utils::OpenFileDialog(".", "Pick a folder to save widths", true);
-			}
-			static char filename[256] = "";
-			ImGui::InputTextWithHint("Filename", "widths.csv", filename, 256);
-			ImGui::TextWrapped("%s/%s", folder_path.c_str(), filename);
-			if (ImGui::Button("Save Widths")) {
-				write_success = utils::WriteCSV(std::string(folder_path + "/" + filename).c_str(), widths);
+			if (ImGui::Button("Save To")) {
+				auto path = utils::SaveFileDialog(".", "Save Widths CSV", "csv");
+				write_success = utils::WriteCSV(path.c_str(), widths);
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
-				memset(filename, 0, 256);
-				folder_path = "";
 			}
 		}
 		ImGui::EndChild();
@@ -469,12 +444,14 @@ void ImageSet::DisplayFeatureTrackingTab() {
 void ImageSet::DisplayDeformationAnalysisTab() {
 	static bool good = true;
 	static std::vector<ImageTile> tiles;
+	static std::vector<tile> output_tiles;
 	static std::vector<Texture*> tiles_textures;
+	static std::vector<Texture*> output_tile_textures;
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
 		if (ImGui::Button("Calculate Deformation")) {
 			std::vector<uint32_t*> frames;
 			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
-			good = DeformationAnalysisInterface::TestModel(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), 256, 0);
+			good = DeformationAnalysisInterface::TestModel(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), 256, 0, output_tiles);
 			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 		if (!good)
@@ -492,10 +469,25 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			}
 			free(data);
 		}
+		if (output_tile_textures.size() == 0) {
+		for (int i = 0; i < output_tiles.size(); i++) {
+				Texture* t = new Texture;
+				cv::Mat image = cv::Mat(output_tiles[i].data.size(), CV_8UC4, output_tiles[i].data.data);
+				cv::cvtColor(image, image, cv::COLOR_BGR2BGRA);
+				t->Load((uint32_t*)image.data, tiles[i].size.width, tiles[i].size.height);
+				output_tile_textures.push_back(t);
+		}
+		}
 		ImGui::NewLine();
 		for (int i = 0; i < tiles_textures.size(); i++) {
 			if (i % 4 != 3) ImGui::SameLine();
 			ImGui::Image(tiles_textures[i]->GetID(), ImVec2(tiles[i].size.width, tiles[i].size.height));
+		}
+		ImGui::SeparatorText("output tiles");
+		ImGui::NewLine();
+		for (int i = 0; i < output_tile_textures.size(); i++) {
+			if (i % 4 != 3) ImGui::SameLine();
+			ImGui::Image(output_tile_textures[i]->GetID(), ImVec2(tiles[i].size.width, tiles[i].size.height));
 		}
 		ImGui::EndTabItem();
 	}
