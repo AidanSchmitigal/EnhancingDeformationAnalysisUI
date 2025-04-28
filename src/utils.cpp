@@ -398,6 +398,14 @@ namespace utils {
 								 // Crop to original size
 		return normalized(cv::Rect(0, 0, originalSize.width, originalSize.height));
 	}
+
+	bool DirectoryContainsTiff(const std::filesystem::path& path)
+	{
+		for (auto& it : path)
+			if (it.string().find(".tif") != std::string::npos)
+				return true;
+		return false;
+	}
 }
 
 Profiler::Profiler(const char* name) {
@@ -413,6 +421,6 @@ Profiler::~Profiler() {
 void Profiler::Stop() {
 	auto end_time = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-	printf("Profiler: %s took %ld ms\n", name, duration);
+	printf("Profiler: %s took %lld ms\n", name, duration);
 	stopped = true;
 }

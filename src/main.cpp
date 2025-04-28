@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
 		ImGui::Begin("Image Folder Selector");
 		if (ImGui::Button("Select Folder")) {
 			std::string folder_path = utils::OpenFileDialog(".", "Choose a Folder to Load", true);
-			if (!folder_path.empty() && std::filesystem::is_directory(folder_path)) {
+			if (!folder_path.empty() && std::filesystem::is_directory(folder_path) && utils::DirectoryContainsTiff(folder_path)) {
 				image_sets.emplace_back(new ImageSet(folder_path));
 			}
 		}
