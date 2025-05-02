@@ -454,6 +454,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			good = DeformationAnalysisInterface::TestModel(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), 256, 0, output_tiles);
 			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
+
 		if (!good)
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model exited with an error!");
 
