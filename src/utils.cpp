@@ -401,8 +401,8 @@ namespace utils {
 
 	bool DirectoryContainsTiff(const std::filesystem::path& path)
 	{
-		for (auto& it : path)
-			if (it.string().find(".tif") != std::string::npos)
+		for (auto& it : std::filesystem::directory_iterator(path))
+			if (it.path().string().find(".tif") != std::string::npos)
 				return true;
 		return false;
 	}

@@ -1,5 +1,6 @@
 #include "DeformationAnalysisInterface.hpp"
 
+#include <torch/types.h>
 #include <utils.h>
 
 #include <opencv2/opencv.hpp>
@@ -52,7 +53,7 @@ bool DeformationAnalysisInterface::TestModel(
 		int tile_size, int overlap, std::vector<tile>& output_tiles) {
 
 	auto to_tensor = [](const cv::Mat& m) {
-		return torch::from_blob(m.data, {1,1,256,256}).clone();
+		return torch::from_blob(m.data, {1,1,256,256}, torch::kUInt8).to(torch::kFloat32).clone();
 	};
 
 	auto dev = torch::cuda::is_available() ? torch::kCUDA : torch::kCPU;
@@ -60,44 +61,41 @@ bool DeformationAnalysisInterface::TestModel(
 	model.to(dev);
 	model.eval();
 
-	for (int i = 0; i + 1 < images.size(); ++i) {
+	for (int i = 0; i + 1 <= images.size() - 1; ++i) {
+		printf("processing image %d and %d of %zu\n", i, i + 1, images.size() - 1);
 		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		auto tiles = split_tiles(image, tile_size);
 		cv::Mat image2 = cv::Mat(height, width, CV_8UC4, images[i + 1]);
 		cv::cvtColor(image2, image2, cv::COLOR_BGRA2GRAY);
 		auto tiles2 = split_tiles(image2, tile_size);
+		printf("split image %d of (%zu) into %d tiles\n", i, images.size(), (int)tiles.size());
 		std::vector<tile> outTiles;
+		printf("tiles size %d, tiles2 size %d\n", (int)tiles.size(), (int)tiles2.size());
 		for (int k = 0; k < tiles.size(); ++k) {
 			auto input = torch::cat({to_tensor(tiles[k].data),
-				to_tensor(tiles2[k].data)}, 1).to(dev);
+					to_tensor(tiles2[k].data)}, 1).to(dev);
 			auto out   = model.forward({input}).toTensor().to(torch::kCPU);         // (1,2,256,256)
-			printf("output size: %zu %zu %zu %zu, size %zu\n", out.size(0), out.size(1),
-				out.size(2), out.size(3), out.element_size());
-			std::vector<float> outFloats;
-			std::vector<unsigned char> outData;
-			float* dat = out.data_ptr<float>();
-			for (int j = 0; j < out.size(2); j++) {
-				std::cout << (double)dat[j] << " ";
-				outFloats.push_back(std::clamp(((dat[j] + 2) / 4) * 255.0, 0.0, 255.0));
-			}
-			for (int j = 0; j < outFloats.size(); j++) {
-				outData.push_back((unsigned char)dat[j]);
-			}
-			
-			std::vector<cv::Mat> chans(3);
-			for (int j = 0; j < 2; ++j) {
-				chans[j] = cv::Mat(256, 256, CV_8U, outData.data() + j * 256 * 256);
-			}
-			chans[2] = cv::Mat(256,256,CV_8U);
-			cv::Mat rgb; cv::merge(chans, rgb);
-			cv::Mat bgr; cv::cvtColor(rgb, bgr, cv::COLOR_RGB2BGR);
-			outTiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
-			output_tiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
+			auto t2 = out.squeeze(0);              // {2, H, W}
+							       // 2. make a zero‐channel
+		auto zeros = torch::zeros({1, t2.size(1), t2.size(2)}, t2.options()); // {1, H, W}
+
+		// 3. vstack them (i.e. concat along dim 0)
+		auto stacked = torch::cat({t2, zeros}, 0); // {3, H, W}
+
+		// 4. transpose to H×W×3
+		auto hwc = stacked.permute({1, 2, 0});     // {H, W, 3}
+
+		// 5. clamp/scale to [0,255] & convert to uint8
+		auto hwc_u8 = (hwc.add(2).div(4).mul(255).clamp(0, 255)).to(torch::kUInt8);
+		cv::Mat bgr(hwc_u8.size(0), hwc_u8.size(1), CV_8UC3, hwc_u8.data_ptr<uint8_t>());
+
+		outTiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
+		output_tiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
 		}
 		auto stitched = stitch_tiles(outTiles, image.size(), tile_size);
+		printf("stitched image %d of (%zu) into %d tiles\n", i, images.size(), (int)outTiles.size());
 		cv::cvtColor(stitched, stitched, cv::COLOR_BGR2BGRA);
-		stitched.convertTo(stitched, CV_8UC4, 255.0);
 		cv::imwrite("stitched" + std::to_string(i) + ".png", stitched);
 		memcpy(images[i], stitched.data,
 				width * height * sizeof(uint32_t));

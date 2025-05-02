@@ -487,7 +487,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		ImGui::NewLine();
 		for (int i = 0; i < output_tile_textures.size(); i++) {
 			if (i % 4 != 3) ImGui::SameLine();
-			ImGui::Image(output_tile_textures[i]->GetID(), ImVec2(tiles[i].size.width, tiles[i].size.height));
+			ImGui::Image(output_tile_textures[i]->GetID(), ImVec2(output_tiles[i].data.rows, output_tiles[i].data.rows));
 		}
 		ImGui::EndTabItem();
 	}
