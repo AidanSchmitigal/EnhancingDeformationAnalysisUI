@@ -77,25 +77,22 @@ bool DeformationAnalysisInterface::TestModel(
 					to_tensor(tiles2[k].data)}, 1).to(dev);
 			auto out   = model.forward({input}).toTensor().to(torch::kCPU);         // (1,2,256,256)
 			auto t2 = out.squeeze(0);              // {2, H, W}
-							       // 2. make a zero‐channel
-		auto zeros = torch::zeros({1, t2.size(1), t2.size(2)}, t2.options()); // {1, H, W}
+			// 2. make a zero‐channel
+			auto zeros = torch::zeros({1, t2.size(1), t2.size(2)}, t2.options()); // {1, H, W}
+			// 3. vstack them (i.e. concat along dim 0)
+			auto stacked = torch::cat({t2, zeros}, 0); // {3, H, W}
+			// 4. transpose to H×W×3
+			auto hwc = stacked.permute({1, 2, 0});     // {H, W, 3}
+			// 5. clamp/scale to [0,255] & convert to uint8
+			auto hwc_u8 = (hwc.add(2).div(4).mul(255).clamp(0, 255)).to(torch::kUInt8);
+			cv::Mat bgr(hwc_u8.size(0), hwc_u8.size(1), CV_8UC3, hwc_u8.data_ptr<uint8_t>());
+			cv::cvtColor(bgr, bgr, cv::COLOR_BGR2BGRA);
 
-		// 3. vstack them (i.e. concat along dim 0)
-		auto stacked = torch::cat({t2, zeros}, 0); // {3, H, W}
-
-		// 4. transpose to H×W×3
-		auto hwc = stacked.permute({1, 2, 0});     // {H, W, 3}
-
-		// 5. clamp/scale to [0,255] & convert to uint8
-		auto hwc_u8 = (hwc.add(2).div(4).mul(255).clamp(0, 255)).to(torch::kUInt8);
-		cv::Mat bgr(hwc_u8.size(0), hwc_u8.size(1), CV_8UC3, hwc_u8.data_ptr<uint8_t>());
-
-		outTiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
-		output_tiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
+			outTiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
+			output_tiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
 		}
 		auto stitched = stitch_tiles(outTiles, image.size(), tile_size);
 		printf("stitched image %d of (%zu) into %d tiles\n", i, images.size(), (int)outTiles.size());
-		cv::cvtColor(stitched, stitched, cv::COLOR_BGR2BGRA);
 		cv::imwrite("stitched" + std::to_string(i) + ".png", stitched);
 		memcpy(images[i], stitched.data,
 				width * height * sizeof(uint32_t));
