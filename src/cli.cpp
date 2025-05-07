@@ -13,76 +13,6 @@
 
 #include <filesystem>
 
-bool LoadImages(const char *folder, std::vector<uint32_t *> &data, int &width, int &height)
-{
-	// load the images
-	if (!std::filesystem::exists(folder))
-	{
-		return false;
-	}
-
-	// find all .tif files in the folder
-	std::vector<std::string> files;
-	for (const auto &entry : std::filesystem::directory_iterator(folder))
-	{
-		if (entry.path().string().find(".tif") == std::string::npos)
-			continue;
-		files.push_back(entry.path().string());
-	}
-
-	// sort the files by name
-	std::sort(files.begin(), files.end());
-	for (int i = 0; i < files.size(); i++)
-	{
-		int w, h;
-		uint32_t *img = utils::LoadTiff(files[i].c_str(), w, h);
-		if (img == nullptr)
-		{
-			printf("Failed to load image %s\n", files[i].c_str());
-			return false;
-		}
-		if (i == 0)
-		{
-			width = w;
-			height = h;
-		}
-		else if (w != width || h != height)
-		{
-			printf("Image %s has different dimensions\n", files[i].c_str());
-			return false;
-		}
-		data.push_back(img);
-	}
-	return true;
-}
-
-bool WriteAnalysis(const char *filename, std::vector<std::vector<float>> &histograms, std::vector<float> &avg_histogram, std::vector<float> &snrs, float avg_snr)
-{
-	FILE *file = fopen(filename, "w");
-	if (!file)
-	{
-		printf("Failed to open file %s (write analysis)\n", filename);
-		return false;
-	}
-	for (int i = 0; i < histograms.size(); i++)
-	{
-		for (int j = 0; j < histograms[i].size(); j++)
-		{
-			fprintf(file, "%f,", histograms[i][j]);
-		}
-		fprintf(file, "%f\n", snrs[i]);
-	}
-	fprintf(file, "\n");
-	for (int i = 0; i < avg_histogram.size(); i++)
-	{
-		fprintf(file, "%f,", avg_histogram[i]);
-	}
-	fprintf(file, "\n");
-	fprintf(file, "%f\n", avg_snr);
-	fclose(file);
-	return true;
-}
-
 // Settings struct
 struct Settings
 {
@@ -261,7 +191,6 @@ namespace cli
 		crop_pixels = settings.crop_pixels;
 		do_denoise = settings.do_denoise;
 		filter = settings.filter.c_str();
-		denoise_tile_size = settings.denoise_tile_size;
 		do_analyze = settings.do_analyze;
 		stats_output = settings.stats_output.c_str();
 		do_widths = settings.do_widths;
@@ -278,7 +207,7 @@ namespace cli
 		// validate filename and load images
 		std::vector<uint32_t *> images;
 		int width, height;
-		bool success = LoadImages(folder, images, width, height);
+		bool success = utils::LoadTiffFolder(folder, images, width, height);
 		if (!success)
 		{
 			printf("Failed to load images from %s\n", folder);
@@ -308,6 +237,12 @@ namespace cli
 
 		if (do_crop)
 		{
+			if (crop_pixels < 0 || crop_pixels > height)
+			{
+				printf("Invalid crop pixels: %d\n", crop_pixels);
+				printf("Crop pixels must be between 0 and %d\n", height);
+				return;
+			}
 			height -= crop_pixels;
 		}
 
@@ -329,7 +264,7 @@ namespace cli
 			std::vector<float> snrs;
 			float avg_snr;
 			ImageAnalysis::AnalyzeImages(images, width, height, histograms, avg_histogram, snrs, avg_snr);
-			WriteAnalysis(stats_output, histograms, avg_histogram, snrs, avg_snr);
+			utils::saveAnalysisCsv(stats_output, histograms, avg_histogram, snrs, avg_snr);
 		}
 
 		if (do_widths)

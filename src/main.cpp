@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
 	if (!status) {
 		printf("Failed to initialize OpenGL context\n");
 		printf("This is likely due to an issue with the graphics driver/card\n");
-		printf("If you do not have a supported display adapter (e.g. if you are using a VM), use the command line interface instead\n");
+		printf("If you do not have a supported display adapter (e.g., if you are using a VM), use the command line interface instead\n");
 		return -1;
 	}
 
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
 			fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 			});
 
-	bool set_colors = true;
+	constexpr bool set_colors = true;
 	// call ImGuiInit to initialize the ImGui context
 	// this will also install glfw callbacks
 	ImGuiInit(window, set_colors, assets_folder_exists);
@@ -103,6 +103,7 @@ int main(int argc, char** argv) {
 		
 		ImGui::SetNextWindowDockID(dockspaceID, ImGuiCond_FirstUseEver);
 
+// apple doesn't have zenity (by default), so use this for now
 #ifdef __APPLE__
 		ImGui::Begin("Image Folder Selector");
 		ImGui::InputTextWithHint("##image_folder", "Enter image folder path", nullptr, 0);
@@ -153,6 +154,6 @@ int main(int argc, char** argv) {
 	}
 
 	glfwDestroyWindow(window);
-	glfwTerminate(); // this segfaults on Kubuntu 24.10 w/ wayland, weird.
+	glfwTerminate();
 	return 0;
 }

@@ -13,7 +13,6 @@
 #include <opencv2/opencv.hpp>
 
 #include <string>
-#include <filesystem>
 
 int ImageSet::m_id_counter = 0;
 
@@ -40,6 +39,7 @@ ImageSet::~ImageSet() {
 	free(m_point_image);
 }
 
+// display the image set window and the tabs
 void ImageSet::Display() {
 	ImGui::Begin((m_window_name + " " + std::to_string(m_window_id)).c_str(), &m_open);
 
@@ -47,7 +47,7 @@ void ImageSet::Display() {
 	bool isProcessing = m_preprocessing_tab.IsProcessing();
 
 	// Start tab bar
-	ImGui::BeginTabBar("PreProcessing");
+	ImGui::BeginTabBar("Image Set Tabs");
 
 	bool changed = false;
 
@@ -73,11 +73,11 @@ void ImageSet::Display() {
 
 	// Display the other tabs only if not processing
 	if (!isProcessing) {
-		DisplayImageAnalysisTab();
-		DisplayFeatureTrackingTab();
 #ifndef UI_RELEASE // only display in debug mode while developing
 		DisplayDeformationAnalysisTab();
 #endif
+		DisplayFeatureTrackingTab();
+		DisplayImageAnalysisTab();
 	}
 
 	// only necessary when we modify the vector by changing its size (this only happens in the preprocessing tab)
@@ -92,33 +92,18 @@ void ImageSet::Display() {
 void ImageSet::LoadImages() {
 	PROFILE_FUNCTION();
 
-	if (!std::filesystem::exists(m_folder_path)) {
-		printf("Path does not exist\n");
-		return;
-	}
+	std::vector<uint32_t*> images;
+	int width, height;
+	utils::LoadTiffFolder(m_folder_path.c_str(), images, width, height);
 
-	// find all .tif files in the folder
-	std::vector<std::string> files;
-	for (const auto& entry : std::filesystem::directory_iterator(m_folder_path)) {
-		if (entry.path().string().find(".tif") == std::string::npos)
-			continue;
-		files.push_back(entry.path().string());
-	}
-
-	// sort the files by name
-	std::sort(files.begin(), files.end());
-	for (const auto& file : files) {
-		PROFILE_SCOPE(LoadImagesLoop);
-
-		int width, height;
-		uint32_t* temp = utils::LoadTiff(file.c_str(), width, height);
-		Texture* t = new Texture();
-		t->Load(temp, width, height);
+	for (auto& image : images) {
+		Texture* t = new Texture;
+		t->Load(image, width, height);
 		m_textures.push_back(t);
-		Texture* t2 = new Texture();
-		t2->Load(temp, width, height);
+		Texture* t2 = new Texture;
+		t2->Load(image, width, height);
 		m_processed_textures.push_back(t2);
-		free(temp);
+		free(image);
 	}
 }
 
@@ -443,46 +428,31 @@ void ImageSet::DisplayFeatureTrackingTab() {
 
 void ImageSet::DisplayDeformationAnalysisTab() {
 	static bool good = true;
-	static std::vector<ImageTile> tiles;
 	static std::vector<tile> output_tiles;
-	static std::vector<Texture*> tiles_textures;
 	static std::vector<Texture*> output_tile_textures;
+	static int tile_size = 256;
+	static int overlap = 0;
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
+		ImGui::SliderInt("Tile Size", &tile_size, 1, 512);
+		ImGui::SliderInt("Overlap", &overlap, 0, 128);
 		if (ImGui::Button("Calculate Deformation")) {
 			std::vector<uint32_t*> frames;
 			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
-			good = DeformationAnalysisInterface::TestModel(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), 256, 0, output_tiles);
+			good = DeformationAnalysisInterface::RunModel(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), tile_size, overlap, output_tiles);
 			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
 
 		if (!good)
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model exited with an error!");
 
-		if (tiles.size() == 0) {
-			uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_processed_textures[0]->GetData(data);
-			cv::Mat image = cv::Mat(m_processed_textures[0]->GetHeight(), m_processed_textures[0]->GetWidth(), CV_8UC4, data);
-			tiles = utils::splitImageIntoTiles(image, 256, 0);
-			for (int i = 0; i < tiles.size(); i++) {
-				Texture* t = new Texture;
-				t->Load((uint32_t*)tiles[i].data.data, tiles[i].size.width, tiles[i].size.height);
-				tiles_textures.push_back(t);
-			}
-			free(data);
-		}
 		if (output_tile_textures.size() == 0) {
-		for (int i = 0; i < output_tiles.size(); i++) {
+			for (int i = 0; i < output_tiles.size(); i++) {
 				Texture* t = new Texture;
 				cv::Mat image = cv::Mat(output_tiles[i].data.size(), CV_8UC4, output_tiles[i].data.data);
 				cv::cvtColor(image, image, cv::COLOR_BGR2BGRA);
-				t->Load((uint32_t*)image.data, tiles[i].size.width, tiles[i].size.height);
+				t->Load((uint32_t*)image.data, output_tiles[i].data.rows, output_tiles[i].data.cols);
 				output_tile_textures.push_back(t);
-		}
-		}
-		ImGui::NewLine();
-		for (int i = 0; i < tiles_textures.size(); i++) {
-			if (i % 4 != 3) ImGui::SameLine();
-			ImGui::Image(tiles_textures[i]->GetID(), ImVec2(tiles[i].size.width, tiles[i].size.height));
+			}
 		}
 		ImGui::SeparatorText("output tiles");
 		ImGui::NewLine();

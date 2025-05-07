@@ -12,7 +12,8 @@ struct tile {
 
 class DeformationAnalysisInterface {
 	public:
-		static bool TestModel(std::vector<uint32_t *> &images, int width, int height, const int tile_size, const int overlap, std::vector<tile>& tiles);
+		static bool RunModel(std::vector<uint32_t *> &images, int width, int height, const int tile_size, const int overlap, std::vector<tile>& tiles);
+		static bool TestModelCPPFlow(std::vector<uint32_t*>& images, int width, int height, const int tile_size, const int overlap, std::vector<tile>& output_tiles);
 	private:
 		// Structure to hold tile information
 		struct ImageTile {

@@ -25,7 +25,10 @@ namespace utils {
 
 	// Load a tiff image
 	// remember to free this pointer
-	unsigned int* LoadTiff(const char* path, int& width, int& height);
+	uint32_t* LoadTiff(const char* path, int& width, int& height);
+
+	// assumes the images are all the same size, generally true for SEM imagery
+	bool LoadTiffFolder(const char* folder_path, std::vector<uint32_t*>& images, int& width, int& height);
 
 	// writes a tiff image
 	bool WriteTiff(const char* path, unsigned int* data, int width, int height);

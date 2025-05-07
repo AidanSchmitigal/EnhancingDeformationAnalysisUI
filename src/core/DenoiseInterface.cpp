@@ -18,7 +18,7 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 	PROFILE_FUNCTION();
 
 #ifdef UI_INCLUDE_TENSORFLOW
-	cppflow::model model("assets/models/" + model_name);
+	cppflow::model model("assets/models/tk_r_em/" + model_name);
 
 	for (int i = 0; i < images.size(); i++) {
 		PROFILE_SCOPE(DenoiseOneImage);
@@ -34,11 +34,10 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 		std::vector<cppflow::tensor> output;
 		for (auto& tile : tiles) {
 			std::vector<float> image_data;
-			for (int y = 0; y < tile.data.rows; y++) {
-				for (int x = 0; x < tile.data.cols; x++) {
+			for (int y = 0; y < tile.data.rows; y++)
+				for (int x = 0; x < tile.data.cols; x++)
 					image_data.push_back(tile.data.at<float>(y, x));
-				}
-			}
+
 			cppflow::tensor input = cppflow::tensor(image_data, {1, tile.data.rows, tile.data.cols, 1});
 
 			try {

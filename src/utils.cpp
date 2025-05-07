@@ -128,9 +128,12 @@ namespace utils {
 	}
 
 	unsigned int* LoadTiff(const char* path, int& width, int& height) {
-		PROFILE_FUNCTION()
+		PROFILE_FUNCTION();
 
-			TIFF* tif = TIFFOpen(path, "r");
+		// set the warning handler to null to avoid printing warnings
+		// errors are still printed
+		TIFFSetWarningHandler(nullptr);
+		TIFF* tif = TIFFOpen(path, "r");
 		if (!tif) {
 			printf("Could not open file %s\n", path);
 			return NULL;
@@ -169,6 +172,38 @@ namespace utils {
 		_TIFFfree(raster);
 		TIFFClose(tif);
 		return NULL;
+	}
+
+	bool LoadTiffFolder(const char* folder_path, std::vector<uint32_t*>& images, int& width, int& height) {
+		PROFILE_FUNCTION();
+
+		if (!std::filesystem::exists(folder_path)) {
+			printf("Path does not exist\n");
+			return false;
+		}
+
+		// find all .tif files in the folder
+		std::vector<std::string> files;
+		for (const auto& entry : std::filesystem::directory_iterator(folder_path)) {
+			if (entry.path().string().find(".tif") == std::string::npos)
+				continue;
+			files.push_back(entry.path().string());
+		}
+
+		// sort the files by name
+		std::sort(files.begin(), files.end());
+		for (const auto& file : files) {
+			PROFILE_SCOPE(LoadTiffFolderLoop);
+
+			uint32_t* temp = utils::LoadTiff(file.c_str(), width, height);
+			if (!temp) {
+				printf("Could not load file %s\n", file.c_str());
+				return false;
+			}
+			
+			images.push_back(temp);
+		}
+		return true;
 	}
 
 	bool WriteTiff(const char* path, unsigned int* data, int width, int height) {
@@ -333,7 +368,7 @@ namespace utils {
 		// Pad image with zeros
 		cv::Mat paddedImage;
 		cv::copyMakeBorder(image, paddedImage, 0, paddedHeight - image.rows, 
-				0, paddedWidth - image.cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
+				0, paddedWidth - image.cols, cv::BORDER_CONSTANT, cv::Scalar(1.0f));
 
 		// Split into tiles with overlap
 		for (int y = 0; y <= paddedImage.rows - tileSize; y += step) {
@@ -362,12 +397,12 @@ namespace utils {
 		cv::Size paddedSize(maxX, maxY);
 
 		// Initialize accumulation and weight matrices
-		cv::Mat reconstructed = cv::Mat::zeros(paddedSize, CV_32FC4); // Float for accumulation
-		cv::Mat weight = cv::Mat::zeros(paddedSize, CV_32FC4);
+		cv::Mat reconstructed = cv::Mat::zeros(paddedSize, CV_32F); // Float for accumulation
+		cv::Mat weight = cv::Mat::zeros(paddedSize, CV_32F);
 		int tileSize = tiles[0].size.width;
 
 		// Create linear blend mask for overlap
-		cv::Mat blendMask = cv::Mat::ones(tileSize, tileSize, CV_32FC4);
+		cv::Mat blendMask = cv::Mat::ones(tileSize, tileSize, CV_32F);
 		if (overlap > 0) {
 			for (int y = 0; y < tileSize; ++y) {
 				for (int x = 0; x < tileSize; ++x) {
@@ -375,7 +410,7 @@ namespace utils {
 						(x >= tileSize - overlap ? (tileSize - x - 1) / (float)overlap : 1.0f);
 					float wy = (y < overlap) ? (y / (float)overlap) : 
 						(y >= tileSize - overlap ? (tileSize - y - 1) / (float)overlap : 1.0f);
-					blendMask.at<cv::Vec4f>(y, x) = wx * wy;
+					blendMask.at<float>(y, x) = wx * wy;
 				}
 			}
 		}
@@ -384,7 +419,7 @@ namespace utils {
 		for (const auto& tile : tiles) {
 			cv::Rect roi(tile.position, tile.size);
 
-			cv::Mat weightedTile = cv::Mat::zeros(tile.size, CV_32FC4);
+			cv::Mat weightedTile;
 			cv::multiply(tile.data, blendMask, weightedTile);
 			reconstructed(roi) += weightedTile;
 			weight(roi) += blendMask;
@@ -394,8 +429,7 @@ namespace utils {
 		cv::Mat normalized;
 		cv::divide(reconstructed, weight, normalized); // Handle division by zero implicitly
 
-		normalized.convertTo(normalized, CV_8UC4, 1.0f); // Convert to 8-bit
-								 // Crop to original size
+		// Crop to original size
 		return normalized(cv::Rect(0, 0, originalSize.width, originalSize.height));
 	}
 
@@ -421,6 +455,6 @@ Profiler::~Profiler() {
 void Profiler::Stop() {
 	auto end_time = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-	printf("Profiler: %s took %lld ms\n", name, duration);
+	printf("Profiler: %s took %zu ms\n", name, duration);
 	stopped = true;
 }
