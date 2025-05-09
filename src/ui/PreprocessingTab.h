@@ -13,12 +13,12 @@
 class PreprocessingTab {
 	public:
 		PreprocessingTab() = default;
-		PreprocessingTab(std::vector<Texture*>& textures, std::vector<Texture*>& processed_textures);
+		PreprocessingTab(std::vector<std::shared_ptr<Texture>>& textures, std::vector<std::shared_ptr<Texture>>& processed_textures);
 		// don't let this free the textures/texture vectors, they are allocated and freed in ImageSet
 		~PreprocessingTab() {}
 		void DisplayPreprocessingTab(bool& changed);
-		void GetProcessedTextures(std::vector<Texture*>& processed_textures) { processed_textures = m_processed_textures; }
-		void SetProcessedTextures(std::vector<Texture*>& processed_textures) { m_processed_textures = processed_textures; }
+		void GetProcessedTextures(std::vector<std::shared_ptr<Texture>>& processed_textures) { processed_textures = m_processed_textures; }
+		void SetProcessedTextures(std::vector<std::shared_ptr<Texture>>& processed_textures) { m_processed_textures = processed_textures; }
 
 		// Check if processing is currently happening
 		bool IsProcessing() const { return m_is_processing; }
@@ -43,8 +43,8 @@ class PreprocessingTab {
 		void OnProcessingComplete(bool success);
 
 		// Our textures
-		std::vector<Texture*> m_textures;
-		std::vector<Texture*> m_processed_textures;
+		std::vector<std::shared_ptr<Texture>> m_textures;
+		std::vector<std::shared_ptr<Texture>> m_processed_textures;
 		std::unordered_map<int, int> m_selected_textures_map;
 
 		// State for async processing

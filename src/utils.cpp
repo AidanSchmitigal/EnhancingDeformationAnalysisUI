@@ -237,7 +237,7 @@ namespace utils {
 	}
 
 	// write gif using gif.h
-	bool WriteGIFOfImageSet(const char* path, std::vector<Texture*> images, int delay, int loop) {
+	bool WriteGIFOfImageSet(const char* path, std::vector<std::shared_ptr<Texture>> images, int delay, int loop) {
 		PROFILE_FUNCTION()
 
 			if (images.empty()) {
@@ -265,7 +265,7 @@ namespace utils {
 		texture->GetData(data);
 	}
 
-	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<Texture*>& textures) {
+	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<std::shared_ptr<Texture>>& textures) {
 		PROFILE_FUNCTION()
 
 			if (data.size() != textures.size()) data.resize(textures.size());
@@ -275,7 +275,7 @@ namespace utils {
 		}
 	}
 
-	void LoadDataIntoTexturesAndFree(std::vector<Texture*>& textures, std::vector<uint32_t*>& data, int width, int height) {
+	void LoadDataIntoTexturesAndFree(std::vector<std::shared_ptr<Texture>>& textures, std::vector<uint32_t*>& data, int width, int height) {
 		PROFILE_FUNCTION()
 
 			for (int i = 0; i < textures.size(); i++) {

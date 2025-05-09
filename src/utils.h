@@ -34,19 +34,19 @@ namespace utils {
 	bool WriteTiff(const char* path, unsigned int* data, int width, int height);
 
 	// writes a gif of a vector of textures
-	bool WriteGIFOfImageSet(const char* path, std::vector<Texture*> images, int delay = 100, int loop = 0);
+	bool WriteGIFOfImageSet(const char* path, std::vector<std::shared_ptr<Texture>> images, int delay = 100, int loop = 0);
 
 	// gets the data from a texture
 	// assumes data is already allocated
-	void GetDataFromTexture(unsigned int* data, int width, int height, Texture* texture);
+	void GetDataFromTexture(unsigned int* data, int width, int height, std::shared_ptr<Texture> texture);
 
 	// gets the data from a vector of textures
 	// doesn't assume data is already allocated and will allocate if not
-	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<Texture*>& textures);
+	void GetDataFromTextures(std::vector<uint32_t*>& data, int width, int height, std::vector<std::shared_ptr<Texture>>& textures);
 
 	// loads data into textures and frees the data
 	// basically a helper function to consolidate a lot of the code in ImageSet.cpp
-	void LoadDataIntoTexturesAndFree(std::vector<Texture*>& textures, std::vector<uint32_t*>& data, int width, int height);
+	void LoadDataIntoTexturesAndFree(std::vector<std::shared_ptr<Texture>>& textures, std::vector<uint32_t*>& data, int width, int height);
 
 	// writes our auto width tracking data to a csv
 	bool WriteCSV(const char* path, std::vector<std::vector<std::vector<float>>>& data);

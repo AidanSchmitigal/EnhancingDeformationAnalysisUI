@@ -38,6 +38,6 @@ private:
 	std::string m_window_name;
 	int m_window_id = 0;
 	std::string m_folder_path;
-	std::vector<Texture *> m_textures;
-	std::vector<Texture *> m_processed_textures;
+	std::vector<std::shared_ptr<Texture>> m_textures;
+	std::vector<std::shared_ptr<Texture>> m_processed_textures;
 };

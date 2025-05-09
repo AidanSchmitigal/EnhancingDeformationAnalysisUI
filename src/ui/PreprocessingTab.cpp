@@ -14,7 +14,7 @@
 // Define static model names
 const char* PreprocessingTab::m_models[] = {"sfr_hrsem", "sfr_hrstem", "sfr_hrtem", "sfr_lrsem", "sfr_lrstem", "sfr_lrtem"};
 
-PreprocessingTab::PreprocessingTab(std::vector<Texture *> & textures, std::vector<Texture *> & processed_textures) {
+PreprocessingTab::PreprocessingTab(std::vector<std::shared_ptr<Texture>> & textures, std::vector<std::shared_ptr<Texture>> & processed_textures) {
 	m_textures = textures;
 	m_processed_textures = processed_textures;
 }
@@ -143,7 +143,6 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 				for (auto& item : m_selected_textures_map) to_remove.push_back(item.first);
 				std::sort(to_remove.begin(), to_remove.end());
 				for (int i = to_remove.size() - 1; i >= 0; i--) {
-					delete m_processed_textures[to_remove[i]];
 					m_processed_textures.erase(m_processed_textures.begin() + to_remove[i]);
 				}
 				m_selected_textures_map.clear();

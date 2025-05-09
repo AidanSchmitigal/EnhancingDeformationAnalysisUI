@@ -28,12 +28,6 @@ ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_p
 }
 
 ImageSet::~ImageSet() {
-	for (auto& texture : m_textures) {
-		delete texture;
-	}
-	for (auto& texture : m_processed_textures) {
-		delete texture;
-	}
 	free(m_point_image);
 }
 
@@ -96,10 +90,10 @@ void ImageSet::LoadImages() {
 	utils::LoadTiffFolder(m_folder_path.c_str(), images, width, height);
 
 	for (auto& image : images) {
-		Texture* t = new Texture;
+		std::shared_ptr<Texture> t = std::make_shared<Texture>();
 		t->Load(image, width, height);
 		m_textures.push_back(t);
-		Texture* t2 = new Texture;
+		std::shared_ptr<Texture> t2 = std::make_shared<Texture>();
 		t2->Load(image, width, height);
 		m_processed_textures.push_back(t2);
 		free(image);
@@ -122,7 +116,7 @@ void ImageSet::DisplayImageComparisonTab() {
 				PROFILE_SCOPE(ResetProcessedImages);
 
 				while (m_textures.size() > m_processed_textures.size())
-					m_processed_textures.push_back(new Texture);
+					m_processed_textures.push_back(std::make_shared<Texture>());
 				ImVec2 size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
 				uint32_t* data = (uint32_t*)malloc(size.x * size.y * sizeof(uint32_t));
 				for (int i = 0; i < m_textures.size(); i++) {
