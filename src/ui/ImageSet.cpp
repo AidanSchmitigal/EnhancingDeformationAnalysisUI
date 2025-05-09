@@ -353,10 +353,10 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			if (ImGui::Button("Clear Widths")) {
 				manual_widths.clear();
 				m_last_points.clear();
-				uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+				uint32_t* data = (uint32_t*)malloc(m_textures[0]->GetWidth() * m_textures[0]->GetHeight() * 4);
 				for (int i = 0; i < m_processed_textures.size(); i++) {
 					m_textures[i]->GetData(data);
-					m_processed_textures[i]->Load(data, m_textures[i]->GetWidth(), m_textures[i]->GetHeight());
+					m_processed_textures[i]->Load(data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
 				}
 				free(m_point_image);
 				m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
