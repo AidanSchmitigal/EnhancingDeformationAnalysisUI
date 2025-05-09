@@ -7,6 +7,8 @@
 
 #include <OpenGL/Texture.h>
 #include <core/DenoiseInterface.hpp>
+#include <core/Stabilizer.hpp>
+#include <core/CrackDetector.hpp>
 
 class PreprocessingTab {
 	public:
@@ -17,12 +19,24 @@ class PreprocessingTab {
 		void DisplayPreprocessingTab(bool& changed);
 		void GetProcessedTextures(std::vector<Texture*>& processed_textures) { processed_textures = m_processed_textures; }
 		void SetProcessedTextures(std::vector<Texture*>& processed_textures) { m_processed_textures = processed_textures; }
-		
+
 		// Check if processing is currently happening
 		bool IsProcessing() const { return m_is_processing; }
-		
+
 		// Get the current progress (0.0 to 1.0)
-		float GetProgress() const { return DenoiseInterface::GetProgress(); }
+		float GetProgress() const {
+			// Processing status display
+			float progress = 0.0f;
+			if (DenoiseInterface::IsProcessing()) {
+				progress = DenoiseInterface::GetProgress();
+			} else if (Stabilizer::IsProcessing()) {
+				progress = Stabilizer::GetProgress();
+			}
+			else if (CrackDetector::IsProcessing()) {
+				progress = CrackDetector::GetProgress();
+			}
+			return progress;
+		}
 
 	private:
 		// Helper methods to update UI after async processing completes

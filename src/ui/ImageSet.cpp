@@ -16,8 +16,6 @@
 
 int ImageSet::m_id_counter = 0;
 
-int playspeed = 1;
-
 ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_path) {
 	m_window_name = folder_path.find_last_of('/') == std::string::npos ? folder_path : folder_path.substr(folder_path.find_last_of('/') + 1);
 	m_window_id = m_id_counter++;
@@ -44,7 +42,8 @@ void ImageSet::Display() {
 	ImGui::Begin((m_window_name + " " + std::to_string(m_window_id)).c_str(), &m_open);
 
 	// Check if processing is happening in the preprocessing tab
-	bool isProcessing = m_preprocessing_tab.IsProcessing();
+	bool isPreprocessProcessing = m_preprocessing_tab.IsProcessing();
+	bool isDeformationProcessing = DeformationAnalysisInterface::IsProcessing();
 
 	// Start tab bar
 	ImGui::BeginTabBar("Image Set Tabs");
@@ -52,30 +51,30 @@ void ImageSet::Display() {
 	bool changed = false;
 
 	// If processing, only allow the Preprocessing tab
-	if (!isProcessing) {
+	if (!isPreprocessProcessing && !isDeformationProcessing) {
 		DisplayImageComparisonTab();
 	}
 
-	// Force the Preprocessing tab to be visible if processing
-	bool preprocessingTabOpen = true;
-	if (isProcessing) {
+	if (isPreprocessProcessing || isDeformationProcessing) {
 		ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0.8f, 0.5f, 0.0f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(0.9f, 0.6f, 0.0f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_TabActive, ImVec4(1.0f, 0.7f, 0.0f, 1.0f));
 	}
 
-	// Always display the preprocessing tab
-	m_preprocessing_tab.DisplayPreprocessingTab(changed);
+	// if we aren't doing deformation analysis, show the preprocessing tab
+	if (!isDeformationProcessing)
+		m_preprocessing_tab.DisplayPreprocessingTab(changed);
 
-	if (isProcessing) {
+	if (isPreprocessProcessing || isDeformationProcessing) {
 		ImGui::PopStyleColor(3);
 	}
 
-	// Display the other tabs only if not processing
-	if (!isProcessing) {
-#ifndef UI_RELEASE // only display in debug mode while developing
+	// if we aren't doing preprocessing, show the deformation analysis tab
+	if (!isPreprocessProcessing)
 		DisplayDeformationAnalysisTab();
-#endif
+
+	// Display the other tabs only if not processing
+	if (!isPreprocessProcessing) {
 		DisplayFeatureTrackingTab();
 		DisplayImageAnalysisTab();
 	}
@@ -107,87 +106,87 @@ void ImageSet::LoadImages() {
 	}
 }
 
+// TODO: change to incorporate the original images and images from preprocessing, feature tracking, and deformation analysis (all separate)
 void ImageSet::DisplayImageComparisonTab() {
+	static bool isPlaying = false;
 	if (ImGui::BeginTabItem("Image Comparison")) {
-		static bool isPlaying = false;
-
-		// Control buttons
-		if (ImGui::Button("Play/Pause")) isPlaying = !isPlaying;
-		ImGui::SameLine();
-		if (ImGui::Button("Reset Playback")) {
-			m_current_frame = 0;
-			isPlaying = false;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Reset Processed Images")) {
-			PROFILE_SCOPE(ResetProcessedImages);
-
-			while (m_textures.size() > m_processed_textures.size())
-				m_processed_textures.push_back(new Texture);
-			ImVec2 size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
-			uint32_t* data = (uint32_t*)malloc(size.x * size.y * sizeof(uint32_t));
-			for (int i = 0; i < m_textures.size(); i++) {
-				m_textures[i]->GetData(data);
-				m_processed_textures[i]->Load(data, (int)size.x, (int)size.y);
+		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
+		{ // put into scope for visibility
+			// Control buttons
+			if (ImGui::Button("Play/Pause")) isPlaying = !isPlaying;
+			if (ImGui::Button("Reset Playback")) {
+				m_current_frame = 0;
+				isPlaying = false;
 			}
-			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
-			free(data);
-		}
-		ImGui::SameLine();
-		ImGui::TextDisabled("?");
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("This will reset the processed images back to their original unprocessed state.");
+			if (ImGui::Button("Reset Processed Images")) {
+				PROFILE_SCOPE(ResetProcessedImages);
 
-		if (ImGui::Button("Save Processed Images")) {
-			std::string folder = utils::OpenFileDialog(".", "Choose a Folder to Save the Images", true);
-			if (!folder.empty() && m_processed_textures.size() > 0) {
-				uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()];
-				for (int i = 0; i < m_processed_textures.size(); i++) {
-					char path[256];
-					sprintf(path, "%s/frame_%d.tif", folder.c_str(), i);
-					m_processed_textures[i]->GetData(data);
-					utils::WriteTiff(path, data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+				while (m_textures.size() > m_processed_textures.size())
+					m_processed_textures.push_back(new Texture);
+				ImVec2 size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
+				uint32_t* data = (uint32_t*)malloc(size.x * size.y * sizeof(uint32_t));
+				for (int i = 0; i < m_textures.size(); i++) {
+					m_textures[i]->GetData(data);
+					m_processed_textures[i]->Load(data, (int)size.x, (int)size.y);
 				}
+				m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 				free(data);
 			}
-		}
-		ImGui::SameLine();
-		ImGui::TextDisabled("?");
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("This will write the processed images into a folder of your choosing.");
-		ImGui::SameLine();
-		if (ImGui::Button("Save a GIF")) {
-			std::string path = utils::SaveFileDialog(".", "Choose Where to Save the GIF", "gif");
-			if (!path.empty()) {
-				utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
-			}
-		}
-		ImGui::SameLine();
-		ImGui::TextDisabled("?");
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("This will write a GIF of the processed images, and can take some time with larger image sets.");
+			ImGui::SameLine();
+			ImGui::TextDisabled("?");
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("This will reset the processed images back to their original unprocessed state.");
 
-		// Frame slider
-		ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, (int)std::max(m_textures.size(), m_processed_textures.size()) - 1);
+			if (ImGui::Button("Save Processed Images")) {
+				std::string folder = utils::OpenFileDialog(".", "Choose a Folder to Save the Images", true);
+				if (!folder.empty() && m_processed_textures.size() > 0) {
+					uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()];
+					for (int i = 0; i < m_processed_textures.size(); i++) {
+						char path[256];
+						sprintf(path, "%s/frame_%d.tif", folder.c_str(), i);
+						m_processed_textures[i]->GetData(data);
+						utils::WriteTiff(path, data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+					}
+					free(data);
+				}
+			}
+			ImGui::SameLine();
+			ImGui::TextDisabled("?");
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("This will write the processed images into a folder of your choosing.");
+
+			if (ImGui::Button("Save a GIF")) {
+				std::string path = utils::SaveFileDialog(".", "Choose Where to Save the GIF", "gif");
+				if (!path.empty()) {
+					utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
+				}
+			}
+			ImGui::SameLine();
+			ImGui::TextDisabled("?");
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("This will write a GIF of the processed images, and can take some time with larger image sets.");
+
+			// Frame slider
+			ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, (int)std::max(m_textures.size(), m_processed_textures.size()) - 1);
+		}
+		ImGui::EndChild();
+
+		ImGui::SameLine();
 
 		// Side-by-side image display
 		ImGui::BeginChild("Images", ImVec2(0, 0), true);
-		{
-			ImGui::Columns(2, "image_columns");
-
+		{ // put into scope again for visibility
 			// Left sequence
-			ImGui::Text("Original Sequence");
+			ImGui::SeparatorText("Original Sequence");
 			if (!m_textures.empty() && m_current_frame < m_textures.size()) {
 				ImGui::Image(m_textures[m_current_frame]->GetID(), ImVec2(m_textures[0]->GetWidth() / 1.5, m_textures[0]->GetHeight() / 1.5));
 			}
-			ImGui::NextColumn();
 
 			// Right sequence
-			ImGui::Text("Processed Sequence");
+			ImGui::SeparatorText("Processed Sequence");
 			if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
 				ImGui::Image(m_processed_textures[m_current_frame]->GetID(), ImVec2((float)m_processed_textures[0]->GetWidth() / 1.5, (float)m_processed_textures[0]->GetHeight() / 1.5));
 			}
-			ImGui::Columns(1);
 		}
 		ImGui::EndChild();
 
