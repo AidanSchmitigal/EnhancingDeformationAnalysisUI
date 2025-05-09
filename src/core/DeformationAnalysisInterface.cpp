@@ -12,6 +12,8 @@
 #include <torch/script.h>
 #include <torch/torch.h>
 
+bool DeformationAnalysisInterface::m_processing = false;
+
 // ---- split bgra mat into possibly overlapping tiles ----
 inline std::vector<tile> split_tiles(const cv::Mat& img,
                                      int tileSize = 256,
