@@ -279,12 +279,14 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			ImGui::EndTabItem();
 			return;
 		}
+
 		// Initialize point image
 		if (m_point_image == NULL) {
 			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 			m_processed_textures[0]->GetData(m_point_image);
 			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 		}
+
 		// Update point image if it isn't the same size as the ref texture
 		if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
 			free(m_point_image);
@@ -403,6 +405,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				int coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
 				m_points.push_back(cv::Point2f(coordX, coordY));
 
+				// where the user clicks, draw a red dot
 				int size = 3;
 				for (int i = coordX - size; i < coordX + size + 1; i++) {
 					for (int j = coordY - size; j < coordY + size + 1; j++) {
@@ -441,9 +444,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		if (output_tile_textures.size() == 0) {
 			for (int i = 0; i < output_tiles.size(); i++) {
 				Texture* t = new Texture;
-				cv::Mat image = cv::Mat(output_tiles[i].data.size(), CV_8UC4, output_tiles[i].data.data);
-				cv::cvtColor(image, image, cv::COLOR_BGR2BGRA);
-				t->Load((uint32_t*)image.data, output_tiles[i].data.rows, output_tiles[i].data.cols);
+				t->Load((uint32_t*)output_tiles[i].data.data, output_tiles[i].data.rows, output_tiles[i].data.cols);
 				output_tile_textures.push_back(t);
 			}
 		}

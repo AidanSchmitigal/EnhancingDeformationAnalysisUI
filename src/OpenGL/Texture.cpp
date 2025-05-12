@@ -65,7 +65,7 @@ void Texture::GetData(uint32_t* data) {
 	Bind();
 	{
 		PROFILE_SCOPE(OpenGLGetData);
-		glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGetTexImage(GL_TEXTURE_2D, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
 	}
 	Unbind();
 }
