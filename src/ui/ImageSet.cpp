@@ -104,14 +104,105 @@ void ImageSet::LoadImages() {
 void ImageSet::DisplayImageComparisonTab() {
 	static bool isPlaying = false;
 	if (ImGui::BeginTabItem("Image Comparison")) {
+		// Create a window that fills the tab area and has a menu bar
+		ImGui::BeginChild("ImageComparisonTab", ImVec2(0, 0), false, ImGuiWindowFlags_MenuBar);
+
+		// Add a menubar at the top of the tab content
+		if (ImGui::BeginMenuBar()) {
+			if (ImGui::BeginMenu("File")) {
+				// Export options for the current frame
+				if (ImGui::BeginMenu("Export Current Frame")) {
+					if (ImGui::MenuItem("Original as TIFF")) {
+						if (!m_textures.empty() && m_current_frame < m_textures.size()) {
+							std::string path = utils::SaveFileDialog(".", "Save Original Frame as TIFF", "tif");
+							if (!path.empty()) {
+								uint32_t* data = new uint32_t[m_textures[m_current_frame]->GetWidth() * m_textures[m_current_frame]->GetHeight()];
+								m_textures[m_current_frame]->GetData(data);
+								utils::WriteTiff(path.c_str(), data, m_textures[m_current_frame]->GetWidth(), m_textures[m_current_frame]->GetHeight());
+								delete[] data;
+							}
+						}
+					}
+
+					if (ImGui::MenuItem("Processed as TIFF")) {
+						if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
+							std::string path = utils::SaveFileDialog(".", "Save Processed Frame as TIFF", "tif");
+							if (!path.empty()) {
+								uint32_t* data = new uint32_t[m_processed_textures[m_current_frame]->GetWidth() * m_processed_textures[m_current_frame]->GetHeight()];
+								m_processed_textures[m_current_frame]->GetData(data);
+								utils::WriteTiff(path.c_str(), data, m_processed_textures[m_current_frame]->GetWidth(), m_processed_textures[m_current_frame]->GetHeight());
+								delete[] data;
+							}
+						}
+					}
+
+					ImGui::EndMenu();
+				}
+
+				// Export options for all frames
+				if (ImGui::BeginMenu("Export All Frames")) {
+					if (ImGui::MenuItem("Original Sequence as TIFF")) {
+						std::string folder = utils::OpenFileDialog(".", "Choose a Folder to Save Original Images", true);
+						if (!folder.empty() && !m_textures.empty()) {
+							uint32_t* data = new uint32_t[m_textures[0]->GetWidth() * m_textures[0]->GetHeight()];
+							for (int i = 0; i < m_textures.size(); i++) {
+								char path[256];
+								sprintf(path, "%s/original_frame_%d.tif", folder.c_str(), i);
+								m_textures[i]->GetData(data);
+								utils::WriteTiff(path, data, m_textures[i]->GetWidth(), m_textures[i]->GetHeight());
+							}
+							delete[] data;
+						}
+					}
+
+					if (ImGui::MenuItem("Processed Sequence as TIFF")) {
+						std::string folder = utils::OpenFileDialog(".", "Choose a Folder to Save Processed Images", true);
+						if (!folder.empty() && !m_processed_textures.empty()) {
+							uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()];
+							for (int i = 0; i < m_processed_textures.size(); i++) {
+								char path[256];
+								sprintf(path, "%s/processed_frame_%d.tif", folder.c_str(), i);
+								m_processed_textures[i]->GetData(data);
+								utils::WriteTiff(path, data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
+							}
+							delete[] data;
+						}
+					}
+
+					if (ImGui::MenuItem("Processed Sequence as GIF")) {
+						std::string path = utils::SaveFileDialog(".", "Save Processed Sequence as GIF", "gif");
+						if (!path.empty() && !m_processed_textures.empty()) {
+							utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
+						}
+					}
+
+					ImGui::EndMenu();
+				}
+
+				ImGui::Separator();
+
+
+
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMenuBar();
+		}
+
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 		{ // put into scope for visibility
-			// Control buttons
+		  // Control buttons
 			if (ImGui::Button("Play/Pause")) isPlaying = !isPlaying;
 			if (ImGui::Button("Reset Playback")) {
 				m_current_frame = 0;
 				isPlaying = false;
 			}
+
+			// Frame slider
+			ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, (int)std::max(m_textures.size(), m_processed_textures.size()) - 1);
+
+			ImGui::Separator();
+			// Reset options
 			if (ImGui::Button("Reset Processed Images")) {
 				PROFILE_SCOPE(ResetProcessedImages);
 
@@ -126,42 +217,11 @@ void ImageSet::DisplayImageComparisonTab() {
 				m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 				free(data);
 			}
-			ImGui::SameLine();
-			ImGui::TextDisabled("?");
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("This will reset the processed images back to their original unprocessed state.");
 
-			if (ImGui::Button("Save Processed Images")) {
-				std::string folder = utils::OpenFileDialog(".", "Choose a Folder to Save the Images", true);
-				if (!folder.empty() && m_processed_textures.size() > 0) {
-					uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()];
-					for (int i = 0; i < m_processed_textures.size(); i++) {
-						char path[256];
-						sprintf(path, "%s/frame_%d.tif", folder.c_str(), i);
-						m_processed_textures[i]->GetData(data);
-						utils::WriteTiff(path, data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
-					}
-					free(data);
-				}
-			}
-			ImGui::SameLine();
-			ImGui::TextDisabled("?");
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("This will write the processed images into a folder of your choosing.");
+			ImGui::Separator();
 
-			if (ImGui::Button("Save a GIF")) {
-				std::string path = utils::SaveFileDialog(".", "Choose Where to Save the GIF", "gif");
-				if (!path.empty()) {
-					utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
-				}
-			}
-			ImGui::SameLine();
-			ImGui::TextDisabled("?");
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("This will write a GIF of the processed images, and can take some time with larger image sets.");
-
-			// Frame slider
-			ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, (int)std::max(m_textures.size(), m_processed_textures.size()) - 1);
+			ImGui::Text("Tip: Use the File menu above");
+			ImGui::Text("for more export options.");
 		}
 		ImGui::EndChild();
 
@@ -170,7 +230,7 @@ void ImageSet::DisplayImageComparisonTab() {
 		// Side-by-side image display
 		ImGui::BeginChild("Images", ImVec2(0, 0), true);
 		{ // put into scope again for visibility
-			// Left sequence
+		  // Left sequence
 			ImGui::SeparatorText("Original Sequence");
 			if (!m_textures.empty() && m_current_frame < m_textures.size()) {
 				ImGui::Image(m_textures[m_current_frame]->GetID(), ImVec2(m_textures[0]->GetWidth() / 1.5, m_textures[0]->GetHeight() / 1.5));
@@ -191,6 +251,10 @@ void ImageSet::DisplayImageComparisonTab() {
 				m_current_frame = 0;  // Loop back to start
 			}
 		}
+
+		// End the child window with the menu bar
+		ImGui::EndChild();
+
 		ImGui::EndTabItem();
 	}
 }
@@ -457,4 +521,3 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		ImGui::EndTabItem();
 	}
 }
-

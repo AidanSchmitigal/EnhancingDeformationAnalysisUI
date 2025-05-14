@@ -82,6 +82,10 @@ int main(int argc, char** argv) {
 
 	// create a vector of ImageSet pointers to store the image sets
 	std::vector<ImageSet*> image_sets;
+	
+	// State for welcome UI
+	static bool show_welcome = true;
+	
 	while (!glfwWindowShouldClose(window)) {
 		// set the default background and clear the screen
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -103,9 +107,62 @@ int main(int argc, char** argv) {
 		
 		ImGui::SetNextWindowDockID(dockspaceID, ImGuiCond_FirstUseEver);
 
-// apple doesn't have zenity (by default), so use this for now
-#ifdef __APPLE__
+		// for each image set, create a window that will be tabbed in the main window
+		// for each image set tab, have tabs for stabilization and preprocessing etc.
 		ImGui::Begin("Image Folder Selector");
+		
+		// Enhanced UI with welcome section
+		if (show_welcome) {
+			// Styled title
+			ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.28f, 0.56f, 1.0f, 1.0f));
+			ImGui::SetWindowFontScale(1.5f);
+			ImGui::SetCursorPosX((ImGui::GetWindowWidth() - ImGui::CalcTextSize("Deformation Analysis UI").x) * 0.5f);
+			ImGui::Text("Deformation Analysis UI");
+			ImGui::SetWindowFontScale(1.0f);
+			ImGui::PopStyleColor();
+			ImGui::PopFont();
+			
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
+			
+			// Description
+			ImGui::TextWrapped("This application helps analyze deformation in microscopy images using AI-powered tools.");
+			ImGui::Spacing();
+			
+			// Key features
+			ImGui::TextColored(ImVec4(0.28f, 0.56f, 1.0f, 1.0f), "Key Features:");
+			ImGui::Bullet(); ImGui::TextWrapped("Deformation tracking and analysis");
+			ImGui::Bullet(); ImGui::TextWrapped("Image stabilization");
+			ImGui::Bullet(); ImGui::TextWrapped("Feature tracking across image sequences");
+			ImGui::Bullet(); ImGui::TextWrapped("AI-powered crack detection");
+			
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
+			
+			// Getting started
+			ImGui::TextColored(ImVec4(0.28f, 0.56f, 1.0f, 1.0f), "Getting Started:");
+			ImGui::TextWrapped("1. Click the 'Select Folder' button below to load your TIFF images");
+			ImGui::TextWrapped("2. Each image set will open in a new tab");
+			ImGui::TextWrapped("3. Use the tabs within each image set for stabilization, preprocessing, and analysis");
+			
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
+			
+			ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.25f);
+			if (ImGui::Button("Hide Welcome Screen", ImVec2(ImGui::GetWindowWidth() * 0.5f, 0))) {
+				show_welcome = false;
+			}
+			ImGui::SetCursorPosX((ImGui::GetWindowWidth() - ImGui::GetItemRectSize().x) * 0.5f);
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
+		}
+		
+#ifdef __APPLE__
 		ImGui::InputTextWithHint("##image_folder", "Enter image folder path", nullptr, 0);
 		if (ImGui::Button("Load Images")) {
 			const char* folder_path = ImGui::GetInputTextState("##image_folder")->Text;
@@ -114,22 +171,32 @@ int main(int argc, char** argv) {
 			}
 		}
 #else
-		// for each image set, create a window that will be tabbed in the main window
-		// for each image set tab, have tabs for stabilization and preprocessing etc.
-		ImGui::Begin("Image Folder Selector");
-		if (ImGui::Button("Select Folder")) {
+		// Make the folder selector button more prominent
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.28f, 0.56f, 1.0f, 0.7f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.56f, 1.0f, 0.9f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.28f, 0.56f, 1.0f, 1.0f));
+		
+		// Center the button horizontally
+		float buttonWidth = 150.0f;
+		ImGui::SetCursorPosX((ImGui::GetWindowWidth() - buttonWidth) * 0.5f);
+		
+		if (ImGui::Button("Select Folder", ImVec2(buttonWidth, 35))) {
 			std::string folder_path = utils::OpenFileDialog(".", "Choose a Folder to Load", true);
 			if (!folder_path.empty() && std::filesystem::is_directory(folder_path) && utils::DirectoryContainsTiff(folder_path)) {
 				image_sets.emplace_back(new ImageSet(folder_path));
 			}
 		}
-
+		
+		ImGui::PopStyleColor(3);
 #endif
 
 		// display a warning if the assets folder is not found
 		if (!assets_folder_exists) {
-			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Assets folder not found! Please place the assets folder in the same directory as the executable.");
-			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "The assets folder is required for the program to function correctly.");
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
+			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "WARNING: Assets folder not found!");
+			ImGui::TextWrapped("Please place the assets folder in the same directory as the executable. The assets folder is required for the program to function correctly.");
 		}
 
 		ImGui::End();
