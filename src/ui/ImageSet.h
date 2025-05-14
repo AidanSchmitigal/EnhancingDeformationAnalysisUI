@@ -40,4 +40,19 @@ private:
 	std::string m_folder_path;
 	std::vector<std::shared_ptr<Texture>> m_textures;
 	std::vector<std::shared_ptr<Texture>> m_processed_textures;
+
+	// image analysis
+	uint32_t* m_ref_image = nullptr;
+	uint32_t m_ref_image_width = 0, m_ref_image_height = 0;
+	std::vector<std::vector<float>> histograms;
+	std::vector<float> avg_histogram;
+	std::vector<float> snrs;
+	float avg_snr = 0.0f;
+	bool write_success = true;
+
+	// feature tracking
+	std::vector<std::vector<std::vector<float>>> m_widths;
+	std::vector<std::vector<float>> m_manual_widths;
+	bool m_widths_write_success = true;
+	std::chrono::time_point<std::chrono::system_clock> m_last_time = std::chrono::system_clock::now();
 };

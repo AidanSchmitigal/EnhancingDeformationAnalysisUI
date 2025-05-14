@@ -220,8 +220,7 @@ void ImageSet::DisplayImageComparisonTab() {
 
 			ImGui::Separator();
 
-			ImGui::Text("Tip: Use the File menu above");
-			ImGui::Text("for more export options.");
+			ImGui::TextWrapped("Tip: Use the File menu above for more export options.");
 		}
 		ImGui::EndChild();
 
@@ -260,14 +259,7 @@ void ImageSet::DisplayImageComparisonTab() {
 }
 
 void ImageSet::DisplayImageAnalysisTab() {
-	static uint32_t* m_ref_image = nullptr;
-	static uint32_t m_ref_image_width = 0, m_ref_image_height = 0;
-	static std::vector<std::vector<float>> histograms;
-	static std::vector<float> avg_histogram;
-	static std::vector<float> snrs;
-	static float avg_snr = 0.0f;
-	static bool write_success = true;
-	if (ImGui::BeginTabItem("Image Analysis")) {
+		if (ImGui::BeginTabItem("Image Analysis")) {
 		if (m_processed_textures.size() == 0) {
 			ImGui::Text("No images loaded");
 			ImGui::EndTabItem();
@@ -333,11 +325,7 @@ void ImageSet::DisplayImageAnalysisTab() {
 }
 
 void ImageSet::DisplayFeatureTrackingTab() {
-	static std::vector<std::vector<std::vector<float>>> widths;
-	static std::vector<std::vector<float>> manual_widths;
-	static bool write_success = true;
-	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
-	if (ImGui::BeginTabItem("Feature Tracking")) {
+		if (ImGui::BeginTabItem("Feature Tracking")) {
 		if (m_processed_textures.size() == 0) {
 			ImGui::Text("No images loaded");
 			ImGui::EndTabItem();
@@ -389,7 +377,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 					std::vector<uint32_t*> frames;
 					utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
 					std::vector<std::vector<cv::Point2f>> tracked_points;
-					manual_widths = FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+					m_manual_widths = FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					memcpy(m_point_image, frames[0], m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 					m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 					utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
@@ -405,13 +393,13 @@ void ImageSet::DisplayFeatureTrackingTab() {
 				std::vector<uint32_t*> frames;
 				utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
 				auto polygons = CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-				widths = FeatureTracker::TrackCrackWidthProfiles(polygons); // Assuming m_widths is a member variable
+				m_widths = FeatureTracker::TrackCrackWidthProfiles(polygons); // Assuming m_widths is a member variable
 				utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			}
 		}
-		if (manual_widths.size() > 0 && manualMode) {
+		if (m_manual_widths.size() > 0 && manualMode) {
 			if (ImGui::Button("Clear Widths")) {
-				manual_widths.clear();
+				m_manual_widths.clear();
 				m_last_points.clear();
 				uint32_t* data = (uint32_t*)malloc(m_textures[0]->GetWidth() * m_textures[0]->GetHeight() * 4);
 				for (int i = 0; i < m_processed_textures.size(); i++) {
@@ -425,27 +413,27 @@ void ImageSet::DisplayFeatureTrackingTab() {
 			}
 			if (ImGui::Button("Save To")) {
 				auto path = utils::SaveFileDialog(".", "Save Widths CSV", "csv");
-				write_success = utils::WriteCSV(path.c_str(), widths);
+				write_success = utils::WriteCSV(path.c_str(), m_widths);
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
 			}
 			ImGui::Text("Manual Widths:");
-			for (int i = 0; i < manual_widths.size(); i++) {
+			for (int i = 0; i < m_manual_widths.size(); i++) {
 				ImGui::Text("Frame %d:", i);
-				for (int j = 0; j < manual_widths[i].size(); j++) {
+				for (int j = 0; j < m_manual_widths[i].size(); j++) {
 					if (j % 4 != 3) ImGui::SameLine();
-					ImGui::Text("%.2f", manual_widths[i][j]);
+					ImGui::Text("%.2f", m_manual_widths[i][j]);
 				}
 			}
 		}
-		if (widths.size() > 0 && !manualMode) {
+		if (m_widths.size() > 0 && !manualMode) {
 			if (ImGui::Button("Clear Widths")) {
-				widths.clear();
+				m_widths.clear();
 			}
 			if (ImGui::Button("Save To")) {
 				auto path = utils::SaveFileDialog(".", "Save Widths CSV", "csv");
-				write_success = utils::WriteCSV(path.c_str(), widths);
+				write_success = utils::WriteCSV(path.c_str(), m_widths);
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
@@ -463,8 +451,8 @@ void ImageSet::DisplayFeatureTrackingTab() {
 
 		if (manualMode && ImGui::IsItemActive() && ImGui::IsItemHovered()) {
 			const auto now = std::chrono::system_clock::now();
-			if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count() > 250) {
-				last_time = now;
+			if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_last_time).count() > 250) {
+				m_last_time = now;
 				int coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
 				int coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
 				m_points.push_back(cv::Point2f(coordX, coordY));
