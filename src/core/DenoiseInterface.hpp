@@ -9,7 +9,7 @@
 class DenoiseInterface {
 public:
 	// Synchronous methods
-	static bool Denoise(std::vector<uint32_t*>& images, int width, int height, const std::string& model_name, const int tile_size, const int center_size, const bool include_outside);
+	static bool Denoise(std::vector<uint32_t*>& images, int width, int height, const std::string& model_name, const int tile_size, const int center_size = 64, const bool include_outside = false);
 	static bool Blur(std::vector<uint32_t*>& images, int width, int height, int kernel_size, float sigma);
 	
 	// Asynchronous methods with callback

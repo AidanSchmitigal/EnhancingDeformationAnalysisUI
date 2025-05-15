@@ -1,7 +1,6 @@
 #include <cli.hpp>
 
 #include <stdio.h>
-#include <string.h>
 #include <filesystem>
 #include <map>
 #include <functional>
@@ -137,17 +136,6 @@ namespace cli {
 			// Calculate actual args consumed (excluding the flag itself)
 			int args_consumed = i - start_i;
 
-			// Execute based on flags
-			if (do_denoise)
-			{
-				if (strcmp(filter, "blur") == 0)
-				{
-					DenoiseInterface::Blur(images, width, height, 3, 1.0f);
-				}
-				else
-					DenoiseInterface::Denoise(images, width, height, filter, denoise_tile_size, 64, false);
-			}
-
 			// Check that consumed args aren't flags (except the initial flag)
 			for (int j = start_i + 1; j <= i; ++j) {
 				if (isFlag(argv[j])) {
@@ -219,7 +207,7 @@ namespace cli {
 			if (settings.filter == "blur") {
 				DenoiseInterface::Blur(images, width, height, 3, 1.0f);
 			} else {
-				DenoiseInterface::Denoise(images, width, height, settings.filter.c_str(), settings.denoise_tile_size, 10);
+				DenoiseInterface::Denoise(images, width, height, settings.filter, settings.denoise_tile_size);
 			}
 		}
 	}
