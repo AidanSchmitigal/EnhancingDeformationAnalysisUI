@@ -254,7 +254,7 @@ namespace cli
 				DenoiseInterface::Blur(images, width, height, 3, 1.0f);
 			}
 			else
-				DenoiseInterface::Denoise(images, width, height, filter, denoise_tile_size, 10);
+				DenoiseInterface::Denoise(images, width, height, filter, denoise_tile_size, 64, false);
 		}
 
 		if (do_analyze)

@@ -210,15 +210,66 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		}
 		
 #ifdef UI_INCLUDE_TENSORFLOW
+		ImGui::SeparatorText("AI Denoising");
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Model").x);
 		ImGui::Combo("Model", &m_selected_model, m_models, IM_ARRAYSIZE(m_models));
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tiling Type").x);
+		ImGui::Combo("Tiling Type", (int*)&m_tiling_type, "Blended\0Cropped\0\0");
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tile Size").x);
 		ImGui::SliderInt("Tile Size", &m_tile_size, 150, 512);
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tile size. MUST BE AN EVEN NUMBER!\nGenerally leave around 256, but can be varied for different results.");
-		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Overlap").x);
-		ImGui::SliderInt("Overlap", &m_overlap, 0, 128);
+		if (m_tiling_type == TileType::BLENDED) {
+			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Overlap").x);
+			ImGui::SliderInt("Overlap", &m_overlap, 0, 128);
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overlap size. MUST BE LESS THAN TILE SIZE!\nGenerally leave around 0, but can be varied for different results.");
+		} else if (m_tiling_type == TileType::CROPPED) {
+			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Center Size").x);
+			ImGui::SliderInt("Center Size", &m_center_size, 0, 512);
+			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Include Outside").x);
+			ImGui::Checkbox("Include Outside", &m_include_outside);
+		}
+
+		if (ImGui::Button("Show One Tiled Image")) {
+			ImGui::OpenPopup("Tiled Image");
+		}
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Click to show the tiled image.\nThis will split the first image in the sequence into tiles and show them in a popup.\nNote: This is not the final result, just a preview of the tiles.");
+
+		if (ImGui::BeginPopup("Tiled Image")) {
+			if (ImGui::Button("Refresh Tiles")) {
+				m_split_tiles.clear();
+				m_split_textures.clear();
+			}
+			if (m_split_tiles.empty()) {
+				// Split the first image into tiles
+				uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+				utils::GetDataFromTexture(data, m_processed_textures[0]);
+				cv::Mat img = cv::Mat(m_processed_textures[0]->GetHeight(), m_processed_textures[0]->GetWidth(), CV_8UC4, data);
+				if (m_tiling_type == TileType::BLENDED) {
+					m_split_tiles = utils::createBlendedTiles(img, m_tile_size, m_overlap);
+				} else if (m_tiling_type == TileType::CROPPED) {
+					m_split_tiles = utils::createCroppedTiles(img, m_tile_size, m_center_size, m_include_outside);
+				}
+				m_split_textures.clear();
+				for (auto& tile : m_split_tiles) {
+					auto t = std::make_shared<Texture>();
+					cv::cvtColor(tile.data, tile.data, cv::COLOR_RGBA2BGRA);
+					t->Load((uint32_t*)tile.data.data, tile.data.cols, tile.data.rows);
+					m_split_textures.push_back(t);
+				}
+				free(data);
+			}
+			for (int i = 0; i < m_split_textures.size(); i++) {
+				char name[100];
+				sprintf(name, "Tile %d", i);
+				ImGui::ImageButton(name, (ImTextureID)m_split_textures[i]->GetID(), ImVec2(100, 100));
+				if (i % 4 != 3) ImGui::SameLine();
+				if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tile %d", i);
+			}
+			ImGui::EndPopup();
+		}
 		
-		if (ImGui::Button("Use AI Model to Denoise")) {
+		if (ImGui::Button("Denoise")) {
 			m_is_processing = true;
 			
 			// Copy image data
@@ -230,7 +281,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			auto height = m_processed_textures[0]->GetHeight();
 			auto model_name = std::string(m_models[m_selected_model]);
 			auto tile_size = m_tile_size;
-			auto overlap = m_overlap;
+			auto center_size = m_center_size;
+			auto include_outside = m_include_outside;
 			
 			// Use the async version
 			auto future = DenoiseInterface::DenoiseAsync(
@@ -239,7 +291,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 				height, 
 				model_name,
 				tile_size, 
-				overlap,
+				center_size,
+				include_outside,
 				[this](bool result) {
 					// This callback will run in the worker thread
 					// We don't need to do anything here as we check the future in the main loop

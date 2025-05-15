@@ -5,6 +5,8 @@
 #include <future>
 #include <memory>
 
+#include <utils.h>
+
 #include <OpenGL/Texture.h>
 #include <core/DenoiseInterface.hpp>
 #include <core/Stabilizer.hpp>
@@ -47,20 +49,25 @@ class PreprocessingTab {
 		std::vector<std::shared_ptr<Texture>> m_processed_textures;
 		std::unordered_map<int, int> m_selected_textures_map;
 
-		// State for async processing
+		// for splitting tiles and denoising
+		std::vector<Tile> m_split_tiles;
+		std::vector<std::shared_ptr<Texture>> m_split_textures;
+		int m_tile_size = 256; 
+		int m_center_size = 64;
+		int m_overlap = 0;
+		bool m_include_outside = false;
+		TileType m_tiling_type = TileType::BLENDED;
+
+		static const char* m_models[];
+		int m_selected_model = 0;
+
 		std::vector<uint32_t*> m_processing_frames;
 		std::shared_ptr<std::future<bool>> m_processing_future;
 		bool m_is_processing = false;
 		bool m_last_result = true;
 
-		// Processing parameters (preserved between frames)
-		// Denoising parameters
 		int m_kernel_size = 3;
 		float m_sigma = 1.0f;
-		int m_tile_size = 256; 
-		int m_overlap = 0;
-		int m_selected_model = 0;
-		static const char* m_models[];
 
 		// Crack detection parameters
 		int m_crack_darkness = 40;

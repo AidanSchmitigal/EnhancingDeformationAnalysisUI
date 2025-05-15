@@ -424,7 +424,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 
 void ImageSet::DisplayDeformationAnalysisTab() {
 	static bool good = true;
-	static std::vector<tile> output_tiles;
+	static std::vector<Tile> output_tiles;
 	static std::vector<Texture*> output_tile_textures;
 	static int tile_size = 256;
 	static int overlap = 0;

@@ -14,7 +14,7 @@ float DenoiseInterface::m_progress = 0.0f;
 bool DenoiseInterface::m_is_processing = false;
 
 // Original synchronous implementation
-bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int overlap) {
+bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int center_size, const bool include_outside) {
 	PROFILE_FUNCTION();
 
 #ifdef UI_INCLUDE_TENSORFLOW
@@ -29,7 +29,7 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
 		cv::Size paddedSize;
-		auto tiles = utils::splitImageIntoTiles(image, tile_size, overlap);
+		auto tiles = utils::createCroppedTiles(image, tile_size, center_size, include_outside);
 
 		std::vector<cppflow::tensor> output;
 		for (auto& tile : tiles) {
@@ -53,15 +53,15 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 		// convert tensors to cv::Mat and recombine
 		for (int j = 0; j < tiles.size(); j++) {
 			auto output_data = output[j].get_data<float>();
-			cv::Mat output_image(tiles[j].size, CV_32FC1);
-			for (int y = 0; y < tiles[j].size.height; y++) {
-				for (int x = 0; x < tiles[j].size.width; x++) {
-					output_image.at<float>(y, x) = output_data[y * tiles[j].size.width + x];
+			cv::Mat output_image(tiles[j].data.size(), CV_32FC1);
+			for (int y = 0; y < tiles[j].data.rows; y++) {
+				for (int x = 0; x < tiles[j].data.cols; x++) {
+					output_image.at<float>(y, x) = output_data[y * tiles[j].data.cols + x];
 				}
 			}
 			tiles[j].data = output_image;
 		}
-		cv::Mat reconstructed = utils::reconstructImageFromTiles(tiles, image.size(), overlap);
+		cv::Mat reconstructed = utils::stitchCroppedTilesSingleChannel(tiles, image.size(), tile_size);
 		reconstructed.convertTo(reconstructed, CV_8UC1, 255.0);
 		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
 		memcpy(images[i], reconstructed.data, width * height * 4);
@@ -78,7 +78,7 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 // Asynchronous version of Denoise
 std::future<bool> DenoiseInterface::DenoiseAsync(std::vector<uint32_t*>& images, int width, int height, 
                                              const std::string& model_name, const int tile_size, 
-                                             const int overlap, std::function<void(bool)> callback) {
+                                             const int center_size, const bool include_outside, std::function<void(bool)> callback) {
 	// Set processing flag
 	m_is_processing = true;
 	m_progress = 0.0f;
@@ -87,8 +87,8 @@ std::future<bool> DenoiseInterface::DenoiseAsync(std::vector<uint32_t*>& images,
 	auto& pool = ThreadPool::GetThreadPool();
 	
 	// Submit task to thread pool
-	auto future = pool.enqueue([&images, width, height, model_name, tile_size, overlap, callback]() {
-		bool result = Denoise(images, width, height, model_name, tile_size, overlap);
+	auto future = pool.enqueue([&images, width, height, model_name, tile_size, center_size, include_outside, callback]() {
+		bool result = Denoise(images, width, height, model_name, tile_size, center_size, include_outside);
 		
 		// When complete, update processing flag and call callback if provided
 		m_is_processing = false;

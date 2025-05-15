@@ -15,14 +15,14 @@
 bool DeformationAnalysisInterface::m_processing = false;
 
 // ---- split bgra mat into possibly overlapping tiles ----
-inline std::vector<tile> split_tiles(const cv::Mat& img,
+inline std::vector<Tile> split_tiles(const cv::Mat& img,
                                      int tileSize = 256,
                                      int overlap  = 0)
 {
     if (img.empty()) throw std::runtime_error("split_tiles: empty input");
     int step = tileSize - overlap;
     if (step <= 0) throw std::runtime_error("split_tiles: overlap must be < tileSize");
-    std::vector<tile> out;
+    std::vector<Tile> out;
     for (int y = 0; y < img.rows; y += step) {
         for (int x = 0; x < img.cols; x += step) {
             int w = std::min(tileSize, img.cols - x);
@@ -37,7 +37,7 @@ inline std::vector<tile> split_tiles(const cv::Mat& img,
 }
 
 // ---- reconstruct full bgra mat from tiles ----
-inline cv::Mat stitch_tiles(const std::vector<tile>& tiles,
+inline cv::Mat stitch_tiles(const std::vector<Tile>& tiles,
                             cv::Size original,
                             int tileSize = 256,
                             int overlap  = 0)
@@ -47,7 +47,7 @@ inline cv::Mat stitch_tiles(const std::vector<tile>& tiles,
     for (auto& t : tiles) {
         int w = t.data.cols;
         int h = t.data.rows;
-        cv::Rect dst(t.tl.x, t.tl.y, w, h);
+        cv::Rect dst(t.position.x, t.position.y, w, h);
         // ensure dst inside canvas
         dst.width  = std::min(dst.width,  original.width  - dst.x);
         dst.height = std::min(dst.height, original.height - dst.y);
@@ -58,7 +58,7 @@ inline cv::Mat stitch_tiles(const std::vector<tile>& tiles,
     return canvas;
 }
 
-bool DeformationAnalysisInterface::RunModel(std::vector<uint32_t *> &images, int width, int height, int tile_size, int overlap, std::vector<tile>& output_tiles) {
+bool DeformationAnalysisInterface::RunModel(std::vector<uint32_t *> &images, int width, int height, int tile_size, int overlap, std::vector<Tile>& output_tiles) {
 	PROFILE_FUNCTION();
 
 	auto to_tensor = [](const cv::Mat& m) {
@@ -83,7 +83,7 @@ bool DeformationAnalysisInterface::RunModel(std::vector<uint32_t *> &images, int
 		cv::cvtColor(image2, image2, cv::COLOR_BGRA2GRAY);
 		auto tiles2 = split_tiles(image2, tile_size, overlap);
 
-		std::vector<tile> outTiles;
+		std::vector<Tile> outTiles;
 		for (int k = 0; k < tiles.size(); ++k) {
 			// === MODEL INFERENCE ===
 			auto input = torch::cat({to_tensor(tiles[k].data),
@@ -124,8 +124,8 @@ bool DeformationAnalysisInterface::RunModel(std::vector<uint32_t *> &images, int
 			cv::merge(chans, bgr);  // b=0, g=chan1, r=chan0
 						// convert to BGRA (add alpha channel)
 			cv::cvtColor(bgr, bgr, cv::COLOR_BGR2BGRA);
-			outTiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
-			output_tiles.push_back({bgr.clone(), tiles[k].tl}); // own memory
+			outTiles.push_back({bgr.clone(), tiles[k].position}); // own memory
+			output_tiles.push_back({bgr.clone(), tiles[k].position}); // own memory
 		}
 		auto stitched = stitch_tiles(outTiles, image.size(), tile_size);
 
@@ -142,7 +142,7 @@ bool DeformationAnalysisInterface::TestModelCPPFlow(
 		int height,
 		const int tile_size,
 		const int overlap,
-		std::vector<tile>& output_tiles)
+		std::vector<Tile>& output_tiles)
 {
 	// load once, reuse
 	cppflow::model model("assets/models/batch-m4-combo.pb");
@@ -159,7 +159,7 @@ bool DeformationAnalysisInterface::TestModelCPPFlow(
 		cv::cvtColor(img2, img2, cv::COLOR_BGRA2GRAY);
 		auto tiles2 = split_tiles(img2, tile_size);
 
-		std::vector<tile> outTiles;
+		std::vector<Tile> outTiles;
 		for (size_t k = 0; k < tiles1.size(); ++k) {
 			// build nhwc float tensor
 			std::vector<float> buf(tile_size * tile_size * 2);
@@ -196,8 +196,8 @@ bool DeformationAnalysisInterface::TestModelCPPFlow(
 			cv::merge(chans, bgr);
 			cv::cvtColor(bgr, bgra, cv::COLOR_BGR2BGRA);
 
-			outTiles.push_back({bgra.clone(), tiles1[k].tl});
-			output_tiles.push_back({bgra.clone(), tiles1[k].tl});
+			outTiles.push_back({bgra.clone(), tiles1[k].position});
+			output_tiles.push_back({bgra.clone(), tiles1[k].position});
 		}
 		auto stitched = stitch_tiles(outTiles, img1.size(), tile_size);
 		cv::imwrite("cppflow_stitched"+std::to_string(i)+".png", stitched);

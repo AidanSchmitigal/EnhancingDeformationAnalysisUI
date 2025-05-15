@@ -9,13 +9,14 @@
 
 #include <opencv2/opencv.hpp>
 
-// this is here because it's used for the splitImageIntoTiles and reconstructImageFromTiles functions
-// probably should be moved to a different file but idk
-// Structure to hold tile information
-struct ImageTile {
-	cv::Mat data;       // The processed tile
-	cv::Point position; // Top-left position in original image
-	cv::Size size;      // Size of the tile
+struct Tile {
+	cv::Mat data;
+	cv::Point position;
+};
+
+enum class TileType {
+	BLENDED,
+	CROPPED
 };
 
 namespace utils {
@@ -38,7 +39,7 @@ namespace utils {
 
 	// gets the data from a texture
 	// assumes data is already allocated
-	void GetDataFromTexture(unsigned int* data, int width, int height, std::shared_ptr<Texture> texture);
+	void GetDataFromTexture(unsigned int* data, std::shared_ptr<Texture> texture, int width = 0, int height = 0);
 
 	// gets the data from a vector of textures
 	// doesn't assume data is already allocated and will allocate if not
@@ -56,12 +57,14 @@ namespace utils {
 
 	bool saveAnalysisCsv(const char* path, const std::vector<std::vector<float>>& histograms, const std::vector<float>& avg_histogram, const std::vector<float>& snrs, float avg_snr);
 
-	// functions to split an image into tiles and then reconstruct it
-	// used for denoising
-	std::vector<ImageTile> splitImageIntoTiles(const cv::Mat& image, int tileSize, int overlap = 0);
-	cv::Mat reconstructImageFromTiles(const std::vector<ImageTile>& tiles, cv::Size originalSize, int overlap = 0);
-
 	bool DirectoryContainsTiff(const std::filesystem::path& path);
+
+	std::vector<Tile> createCroppedTiles(const cv::Mat& image, int tileSize = 256, int centerSize = 64, bool includeOutside = false);
+	cv::Mat stitchCroppedTiles(const std::vector<Tile>& tiles, const cv::Size& originalSize, int tileSize = 256, int centerSize = 64, bool includeOutside = false);
+	cv::Mat stitchCroppedTilesSingleChannel(const std::vector<Tile>& tiles, const cv::Size& originalSize, int tileSize = 256, int centerSize = 64, bool includeOutside = false);
+
+	std::vector<Tile> createBlendedTiles(const cv::Mat& image, int tileSize = 256, int overlap = 0);
+	cv::Mat stitchBlendedTilesF(const std::vector<Tile>& tiles, const cv::Size& originalSize, int tileSize = 256, int overlap = 0);
 }
 
 class Profiler {
