@@ -61,6 +61,7 @@ inline cv::Mat stitch_tiles(const std::vector<Tile>& tiles,
 bool DeformationAnalysisInterface::RunModel(std::vector<uint32_t *> &images, int width, int height, int tile_size, int overlap, std::vector<Tile>& output_tiles) {
 	PROFILE_FUNCTION();
 
+#ifdef UI_INCLUDE_PYTORCH
 	auto to_tensor = [](const cv::Mat& m) {
 		return torch::from_blob(m.data, {1,1,256,256}, torch::kUInt8).to(torch::kFloat32).clone();
 	};
@@ -133,6 +134,9 @@ bool DeformationAnalysisInterface::RunModel(std::vector<uint32_t *> &images, int
 		memcpy(images[i], stitched.data, width * height * sizeof(uint32_t));
 	}
 	return true;
+#else // UI_INCLUDE_PYTORCH
+	return false;
+#endif // UI_INCLUDE_PYTORCH
 }
 
 // for testing later
@@ -144,6 +148,7 @@ bool DeformationAnalysisInterface::TestModelCPPFlow(
 		const int overlap,
 		std::vector<Tile>& output_tiles)
 {
+#ifdef UI_INCLUDE_TENSORFLOW
 	// load once, reuse
 	cppflow::model model("assets/models/batch-m4-combo.pb");
 
@@ -204,4 +209,7 @@ bool DeformationAnalysisInterface::TestModelCPPFlow(
 		memcpy(images[i], stitched.data, width*height*sizeof(uint32_t));
 	}
 	return true;
+#else // UI_INCLUDE_TENSORFLOW
+	return false;
+#endif // UI_INCLUDE_TENSORFLOW
 }
