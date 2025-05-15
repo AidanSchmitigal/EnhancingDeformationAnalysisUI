@@ -12,13 +12,11 @@
 #include <algorithm>
 
 // Define static model names
-const char *PreprocessingTab::m_models[] = {"sfr_hrsem",  "sfr_hrstem",
-					    "sfr_hrtem",  "sfr_lrsem",
-					    "sfr_lrstem", "sfr_lrtem"};
+const char *PreprocessingTab::m_models[] = {"sfr_hrsem", "sfr_hrstem", "sfr_hrtem",
+					    "sfr_lrsem", "sfr_lrstem", "sfr_lrtem"};
 
-PreprocessingTab::PreprocessingTab(
-    std::vector<std::shared_ptr<Texture>> &textures,
-    std::vector<std::shared_ptr<Texture>> &processed_textures) {
+PreprocessingTab::PreprocessingTab(std::vector<std::shared_ptr<Texture>> &textures,
+				   std::vector<std::shared_ptr<Texture>> &processed_textures) {
 	m_textures = textures;
 	m_processed_textures = processed_textures;
 }
@@ -28,10 +26,9 @@ void PreprocessingTab::OnProcessingComplete(bool success) {
 
 	if (success && !m_processing_frames.empty()) {
 		// Load the processed data back into textures
-		utils::LoadDataIntoTexturesAndFree(
-		    m_processed_textures, m_processing_frames,
-		    m_processed_textures[0]->GetWidth(),
-		    m_processed_textures[0]->GetHeight());
+		utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
+						   m_processed_textures[0]->GetWidth(),
+						   m_processed_textures[0]->GetHeight());
 	} else {
 		// Free any allocated memory in case of failure
 		for (auto frame : m_processing_frames) {
@@ -52,12 +49,10 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		}
 
 		// Check if any async processing has completed
-		if (m_is_processing && m_processing_future &&
-		    m_processing_future->valid()) {
+		if (m_is_processing && m_processing_future && m_processing_future->valid()) {
 			// Poll the future with zero timeout to check if it's
 			// done without blocking
-			auto status = m_processing_future->wait_for(
-			    std::chrono::seconds(0));
+			auto status = m_processing_future->wait_for(std::chrono::seconds(0));
 			if (status == std::future_status::ready) {
 				// Get the result and update the UI
 				bool result = m_processing_future->get();
@@ -69,8 +64,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 		// Processing status display
 		if (m_is_processing) {
-			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
-					   "Processing...");
+			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Processing...");
 			float progress = 0.0f;
 			if (DenoiseInterface::IsProcessing()) {
 				progress = DenoiseInterface::GetProgress();
@@ -89,18 +83,14 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		ImGui::BeginDisabled(m_is_processing);
 		ImGui::SliderInt("Pixels", &crop, 0, 100);
 		if (ImGui::Button("Crop Bottom") && !m_is_processing) {
-			if (crop == 0 ||
-			    crop >= m_processed_textures[0]->GetHeight())
+			if (crop == 0 || crop >= m_processed_textures[0]->GetHeight())
 				return;
 			for (int i = 0; i < m_processed_textures.size(); i++) {
-				uint32_t *data = (uint32_t *)malloc(
-				    m_processed_textures[i]->GetWidth() *
-				    m_processed_textures[i]->GetHeight() * 4);
+				uint32_t *data = (uint32_t *)malloc(m_processed_textures[i]->GetWidth() *
+								    m_processed_textures[i]->GetHeight() * 4);
 				m_processed_textures[i]->GetData(data);
-				m_processed_textures[i]->Load(
-				    data, m_processed_textures[i]->GetWidth(),
-				    m_processed_textures[i]->GetHeight() -
-					crop);
+				m_processed_textures[i]->Load(data, m_processed_textures[i]->GetWidth(),
+							      m_processed_textures[i]->GetHeight() - crop);
 				free(data);
 			}
 		}
@@ -119,26 +109,20 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 			// Copy image data
 			m_processing_frames.clear();
-			utils::GetDataFromTextures(
-			    m_processing_frames,
-			    m_processed_textures[0]->GetWidth(),
-			    m_processed_textures[0]->GetHeight(),
-			    m_processed_textures);
+			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
+						   m_processed_textures[0]->GetHeight(), m_processed_textures);
 
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
 			auto height = m_processed_textures[0]->GetHeight();
 
-			auto future = Stabilizer::StabilizeAsync(
-			    m_processing_frames, width, height,
-			    [this](bool result) {
+			auto future =
+			    Stabilizer::StabilizeAsync(m_processing_frames, width, height, [this](bool result) {
 				    // This callback will run in the worker
 				    // thread We don't need to do anything here
 				    // as we check the future in the main loop
 			    });
-			m_processing_future =
-			    std::make_shared<std::future<bool>>(
-				std::move(future));
+			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}
 		ImGui::EndDisabled();
 
@@ -151,8 +135,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 		if (ImGui::BeginPopup("Choose Frames")) {
 			if (ImGui::Button("Select All")) {
-				for (int i = 0; i < m_processed_textures.size();
-				     i++)
+				for (int i = 0; i < m_processed_textures.size(); i++)
 					m_selected_textures_map[i] = 1;
 			}
 			ImGui::SameLine();
@@ -164,11 +147,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 				for (auto &item : m_selected_textures_map)
 					to_remove.push_back(item.first);
 				std::sort(to_remove.begin(), to_remove.end());
-				for (int i = to_remove.size() - 1; i >= 0;
-				     i--) {
-					m_processed_textures.erase(
-					    m_processed_textures.begin() +
-					    to_remove[i]);
+				for (int i = to_remove.size() - 1; i >= 0; i--) {
+					m_processed_textures.erase(m_processed_textures.begin() + to_remove[i]);
 				}
 				m_selected_textures_map.clear();
 			}
@@ -176,19 +156,12 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			for (int i = 0; i < m_processed_textures.size(); i++) {
 				char name[100];
 				sprintf(name, "Image %d", i);
-				bool selected =
-				    m_selected_textures_map.find(i) !=
-				    m_selected_textures_map.end();
+				bool selected = m_selected_textures_map.find(i) != m_selected_textures_map.end();
 				if (selected) {
-					ImGui::PushStyleColor(
-					    ImGuiCol_Button,
-					    ImVec4(1, 0.2, 0.2, 1));
+					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1, 0.2, 0.2, 1));
 				}
-				ImGui::ImageButton(
-				    name,
-				    (ImTextureID)m_processed_textures[i]
-					->GetID(),
-				    ImVec2(100, 100));
+				ImGui::ImageButton(name, (ImTextureID)m_processed_textures[i]->GetID(),
+						   ImVec2(100, 100));
 				if (selected) {
 					ImGui::PopStyleColor();
 				}
@@ -198,8 +171,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 					ImGui::SetTooltip("Frame %d", i);
 				if (ImGui::IsItemClicked()) {
 					if (selected)
-						m_selected_textures_map.erase(
-						    i);
+						m_selected_textures_map.erase(i);
 					else
 						m_selected_textures_map[i] = 1;
 				}
@@ -211,8 +183,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		// Denoising
 		ImGui::SeparatorText("Denoising");
 		ImGui::BeginDisabled(m_is_processing);
-		ImGui::SetNextItemWidth(235 -
-					ImGui::CalcTextSize("Kernel Size").x);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Kernel Size").x);
 		ImGui::SliderInt("Kernel Size", &m_kernel_size, 1, 9, "%.0d");
 		if (m_kernel_size % 2 == 0)
 			m_kernel_size++;
@@ -223,11 +194,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 			// Copy image data
 			m_processing_frames.clear();
-			utils::GetDataFromTextures(
-			    m_processing_frames,
-			    m_processed_textures[0]->GetWidth(),
-			    m_processed_textures[0]->GetHeight(),
-			    m_processed_textures);
+			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
+						   m_processed_textures[0]->GetHeight(), m_processed_textures);
 
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
@@ -239,37 +207,29 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			// Honestly it runs quick enough this shouldn't matter
 			// but for the sake of consistency we can use the async
 			// version
-			auto future = DenoiseInterface::BlurAsync(
-			    m_processing_frames, width, height, kernel_size,
-			    sigma, [this](bool result) {
-				    // This callback will run in the worker
-				    // thread We don't need to do anything here
-				    // as we check the future in the main loop
-			    });
+			auto future = DenoiseInterface::BlurAsync(m_processing_frames, width, height, kernel_size,
+								  sigma, [this](bool result) {
+									  // This callback will run in the worker
+									  // thread We don't need to do anything here
+									  // as we check the future in the main loop
+								  });
 
-			m_processing_future =
-			    std::make_shared<std::future<bool>>(
-				std::move(future));
+			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}
 
 #ifdef UI_INCLUDE_TENSORFLOW
 		if (m_split_textures.empty()) {
 			// Split the first image into tiles
-			uint32_t *data = (uint32_t *)malloc(
-			    m_processed_textures[0]->GetWidth() *
-			    m_processed_textures[0]->GetHeight() * 4);
-			utils::GetDataFromTexture(data,
-						  m_processed_textures[0]);
-			cv::Mat img = cv::Mat(
-			    m_processed_textures[0]->GetHeight(),
-			    m_processed_textures[0]->GetWidth(), CV_8UC4, data);
-			auto split_tiles =
-			    Tiler::CreateTiles(img, m_tile_config);
+			uint32_t *data = (uint32_t *)malloc(m_processed_textures[0]->GetWidth() *
+							    m_processed_textures[0]->GetHeight() * 4);
+			utils::GetDataFromTexture(data, m_processed_textures[0]);
+			cv::Mat img = cv::Mat(m_processed_textures[0]->GetHeight(), m_processed_textures[0]->GetWidth(),
+					      CV_8UC4, data);
+			auto split_tiles = Tiler::CreateTiles(img, m_tile_config);
 			m_split_textures.clear();
 			for (auto &tile : split_tiles) {
 				auto t = std::make_shared<Texture>();
-				t->Load((uint32_t *)tile.data.data,
-					tile.data.cols, tile.data.rows);
+				t->Load((uint32_t *)tile.data.data, tile.data.cols, tile.data.rows);
 				m_split_textures.push_back(t);
 			}
 			free(data);
@@ -277,41 +237,28 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 		ImGui::SeparatorText("AI Denoising");
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Model").x);
-		ImGui::Combo("Model", &m_selected_model, m_models,
-			     IM_ARRAYSIZE(m_models));
-		ImGui::SetNextItemWidth(235 -
-					ImGui::CalcTextSize("Tiling Type").x);
-		ImGui::Combo("Tiling Type", (int *)&m_tile_config.type,
-			     "Cropped\0Blended\0\0");
-		ImGui::SetNextItemWidth(235 -
-					ImGui::CalcTextSize("Tile Size").x);
-		ImGui::SliderInt("Tile Size", &m_tile_config.tileSize, 150,
-				 512);
+		ImGui::Combo("Model", &m_selected_model, m_models, IM_ARRAYSIZE(m_models));
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tiling Type").x);
+		ImGui::Combo("Tiling Type", (int *)&m_tile_config.type, "Cropped\0Blended\0\0");
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tile Size").x);
+		ImGui::SliderInt("Tile Size", &m_tile_config.tileSize, 150, 512);
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip(
-			    "Tile size. MUST BE AN EVEN NUMBER!\nGenerally "
-			    "leave around "
-			    "256, but can be varied for different results.");
+			ImGui::SetTooltip("Tile size. MUST BE AN EVEN NUMBER!\nGenerally "
+					  "leave around "
+					  "256, but can be varied for different results.");
 		if (m_tile_config.type == TileType::Blended) {
-			ImGui::SetNextItemWidth(
-			    235 - ImGui::CalcTextSize("Overlap").x);
-			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0,
-					 128);
+			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Overlap").x);
+			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
 			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip(
-				    "Overlap size. MUST BE LESS THAN TILE "
-				    "SIZE!\nGenerally "
-				    "leave around 0, but can be varied for "
-				    "different results.");
+				ImGui::SetTooltip("Overlap size. MUST BE LESS THAN TILE "
+						  "SIZE!\nGenerally "
+						  "leave around 0, but can be varied for "
+						  "different results.");
 		} else if (m_tile_config.type == TileType::Cropped) {
-			ImGui::SetNextItemWidth(
-			    235 - ImGui::CalcTextSize("Center Size").x);
-			ImGui::SliderInt("Center Size",
-					 &m_tile_config.centerSize, 0, 512);
-			ImGui::SetNextItemWidth(
-			    235 - ImGui::CalcTextSize("Include Outside").x);
-			ImGui::Checkbox("Include Outside",
-					&m_tile_config.includeOutside);
+			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Center Size").x);
+			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 0, 512);
+			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Include Outside").x);
+			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		}
 
 		ImGui::Text("Tiles per Image: %zu", m_split_textures.size());
@@ -319,11 +266,10 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			ImGui::OpenPopup("Tiled Image");
 		}
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip(
-			    "Click to show the tiled image.\nThis will split "
-			    "the first image in the sequence into tiles and "
-			    "show them in a popup.\nNote: This is not the "
-			    "final result, just a preview of the tiles.");
+			ImGui::SetTooltip("Click to show the tiled image.\nThis will split "
+					  "the first image in the sequence into tiles and "
+					  "show them in a popup.\nNote: This is not the "
+					  "final result, just a preview of the tiles.");
 
 		if (ImGui::BeginPopup("Tiled Image")) {
 			if (ImGui::Button("Refresh Tiles")) {
@@ -332,10 +278,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			for (int i = 0; i < m_split_textures.size(); i++) {
 				char name[100];
 				sprintf(name, "Tile %d", i);
-				ImGui::ImageButton(
-				    name,
-				    (ImTextureID)m_split_textures[i]->GetID(),
-				    ImVec2(100, 100));
+				ImGui::ImageButton(name, (ImTextureID)m_split_textures[i]->GetID(), ImVec2(100, 100));
 				if (i % 4 != 3)
 					ImGui::SameLine();
 				if (ImGui::IsItemHovered())
@@ -349,33 +292,26 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 			// Copy image data
 			m_processing_frames.clear();
-			utils::GetDataFromTextures(
-			    m_processing_frames,
-			    m_processed_textures[0]->GetWidth(),
-			    m_processed_textures[0]->GetHeight(),
-			    m_processed_textures);
+			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
+						   m_processed_textures[0]->GetHeight(), m_processed_textures);
 
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
 			auto height = m_processed_textures[0]->GetHeight();
-			auto model_name =
-			    std::string(m_models[m_selected_model]);
+			auto model_name = std::string(m_models[m_selected_model]);
 			auto tile_size = m_tile_size;
 			auto center_size = m_center_size;
 			auto include_outside = m_include_outside;
 
 			// Use the async version
-			auto future = DenoiseInterface::DenoiseAsync(
-			    m_processing_frames, width, height, model_name,
-			    m_tile_config, [this](bool result) {
-				    // This callback will run in the worker
-				    // thread We don't need to do anything here
-				    // as we check the future in the main loop
-			    });
+			auto future = DenoiseInterface::DenoiseAsync(m_processing_frames, width, height, model_name,
+								     m_tile_config, [this](bool result) {
+									     // This callback will run in the worker
+									     // thread We don't need to do anything here
+									     // as we check the future in the main loop
+								     });
 
-			m_processing_future =
-			    std::make_shared<std::future<bool>>(
-				std::move(future));
+			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}
 #endif
 		ImGui::EndDisabled();
@@ -383,25 +319,20 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip(
-			    "Uses Nvidia GPU if available; otherwise slow.");
+			ImGui::SetTooltip("Uses Nvidia GPU if available; otherwise slow.");
 		if (!m_last_result)
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model error!");
 
 		// Crack Detection
 		ImGui::SeparatorText("Crack Detection");
 		ImGui::BeginDisabled(m_is_processing);
-		ImGui::SetNextItemWidth(
-		    235 - ImGui::CalcTextSize("Crack Darkness").x);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Crack Darkness").x);
 		ImGui::SliderInt("Crack Darkness", &m_crack_darkness, 0, 127);
-		ImGui::SetNextItemWidth(
-		    235 - ImGui::CalcTextSize("Fill Threshold").x);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Fill Threshold").x);
 		ImGui::SliderInt("Fill Threshold", &m_fill_threshold, 0, 127);
-		ImGui::SetNextItemWidth(235 -
-					ImGui::CalcTextSize("Sharpness").x);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Sharpness").x);
 		ImGui::SliderInt("Sharpness", &m_sharpness, 0, 127);
-		ImGui::SetNextItemWidth(235 -
-					ImGui::CalcTextSize("Resolution").x);
+		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Resolution").x);
 		ImGui::SliderInt("Resolution", &m_resolution, 0, 50);
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Amount").x);
 		ImGui::SliderInt("Amount", &m_amount, 0, 20);
@@ -410,54 +341,46 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 			// Copy image data
 			m_processing_frames.clear();
-			utils::GetDataFromTextures(
-			    m_processing_frames,
-			    m_processed_textures[0]->GetWidth(),
-			    m_processed_textures[0]->GetHeight(),
-			    m_processed_textures);
+			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
+						   m_processed_textures[0]->GetHeight(), m_processed_textures);
 
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
 			auto height = m_processed_textures[0]->GetHeight();
 
-			auto future = CrackDetector::DetectCracksAsync(
-			    m_processing_frames, width, height,
-			    m_crack_darkness, // crack_darkness
-			    m_fill_threshold, // fill_threshold
-			    m_sharpness,      // sharpness
-			    m_resolution,     // resolution
-			    m_amount,	      // amount
-			    [this](bool result) {
-				    // This callback will run in the worker
-				    // thread We don't need to do anything here
-				    // as we check the future in the main loop
-			    });
+			auto future = CrackDetector::DetectCracksAsync(m_processing_frames, width, height,
+								       m_crack_darkness, // crack_darkness
+								       m_fill_threshold, // fill_threshold
+								       m_sharpness,	 // sharpness
+								       m_resolution,	 // resolution
+								       m_amount,	 // amount
+								       [this](bool result) {
+									       // This callback will run in the worker
+									       // thread We don't need to do anything
+									       // here as we check the future in the
+									       // main loop
+								       });
 
-			m_processing_future =
-			    std::make_shared<std::future<bool>>(
-				std::move(future));
+			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
 		}
 		ImGui::EndDisabled();
 
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip(
-			    "This will highlight in the image what it thinks "
-			    "is the border "
-			    "of the cracks.\nIt is recommended to crop the "
-			    "infobar before "
-			    "using this, as it is detected as a crack.");
+			ImGui::SetTooltip("This will highlight in the image what it thinks "
+					  "is the border "
+					  "of the cracks.\nIt is recommended to crop the "
+					  "infobar before "
+					  "using this, as it is detected as a crack.");
 
 		ImGui::EndChild();
 
 		ImGui::SameLine();
 		ImGui::BeginChild("ImageView", ImVec2(0, 0), true);
 		if (!m_processed_textures.empty())
-			ImGui::Image(
-			    (ImTextureID)m_processed_textures[0]->GetID(),
-			    ImVec2(m_processed_textures[0]->GetWidth(),
-				   m_processed_textures[0]->GetHeight()));
+			ImGui::Image((ImTextureID)m_processed_textures[0]->GetID(),
+				     ImVec2(m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight()));
 		ImGui::EndChild();
 
 		ImGui::EndTabItem();
