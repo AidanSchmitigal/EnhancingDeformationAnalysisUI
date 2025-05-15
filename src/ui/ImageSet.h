@@ -27,19 +27,22 @@ private:
 
 	static int m_id_counter;
 
-	uint32_t m_current_frame = 0;
-	PreprocessingTab m_preprocessing_tab;
-	std::vector<cv::Point2f> m_points;
-	std::vector<cv::Point2f> m_last_points;
-	std::vector<std::vector<cv::Point2f>> m_last_tracked_points;
-	uint32_t* m_point_image = nullptr;
-	Texture m_point_texture;
 	bool m_open = true;
 	std::string m_window_name;
 	int m_window_id = 0;
 	std::string m_folder_path;
 	std::vector<std::shared_ptr<Texture>> m_textures;
 	std::vector<std::shared_ptr<Texture>> m_processed_textures;
+	uint32_t m_current_frame = 0;
+
+	PreprocessingTab m_preprocessing_tab;
+
+	// feature tracking
+	std::vector<cv::Point2f> m_points;
+	std::vector<cv::Point2f> m_last_points;
+	std::vector<std::vector<cv::Point2f>> m_last_tracked_points;
+	uint32_t* m_point_image = nullptr;
+	Texture m_point_texture;
 
 	// image analysis
 	uint32_t* m_ref_image = nullptr;

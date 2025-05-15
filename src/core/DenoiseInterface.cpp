@@ -14,7 +14,7 @@ float DenoiseInterface::m_progress = 0.0f;
 bool DenoiseInterface::m_is_processing = false;
 
 // Original synchronous implementation
-bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int height, const std::string &model_name, const int tile_size, const int center_size, const bool include_outside) {
+bool DenoiseInterface::Denoise(std::vector<std::shared_ptr<Texture>> &images, int width, int height, const std::string &model_name, const TileConfig& config) {
 	PROFILE_FUNCTION();
 
 #ifdef UI_INCLUDE_TENSORFLOW
@@ -25,11 +25,13 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 		
 		m_progress = (float)i / images.size();
 
-		cv::Mat image = cv::Mat(height, width, CV_8UC4, images[i]);
+		uint32_t* image_data = (uint32_t*)malloc(width * height * 4);
+		images[i]->GetData(image_data);
+		cv::Mat image = cv::Mat(height, width, CV_8UC4, image_data);
 		cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
 		image.convertTo(image, CV_32FC1, 1.0 / 255.0);
 		cv::Size paddedSize;
-		auto tiles = utils::createCroppedTiles(image, tile_size, center_size, include_outside);
+		auto tiles = Tiler::CreateTiles(image, config);
 
 		std::vector<cppflow::tensor> output;
 		for (auto& tile : tiles) {
@@ -61,10 +63,11 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 			}
 			tiles[j].data = output_image;
 		}
-		cv::Mat reconstructed = utils::stitchCroppedTilesSingleChannel(tiles, image.size(), tile_size);
+
+		cv::Mat reconstructed = Tiler::StitchTiles(tiles, config, image.size(), true);
 		reconstructed.convertTo(reconstructed, CV_8UC1, 255.0);
 		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
-		memcpy(images[i], reconstructed.data, width * height * 4);
+		images[i]->Load((uint32_t*)reconstructed.data, reconstructed.cols, reconstructed.rows);
 	}
 	
 	m_progress = 1.0f;
@@ -76,9 +79,8 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 }
 
 // Asynchronous version of Denoise
-std::future<bool> DenoiseInterface::DenoiseAsync(std::vector<uint32_t*>& images, int width, int height, 
-                                             const std::string& model_name, const int tile_size, 
-                                             const int center_size, const bool include_outside, std::function<void(bool)> callback) {
+std::future<bool> DenoiseInterface::DenoiseAsync(std::vector<std::shared_ptr<Texture>>& images, int width, int height, 
+                                             const std::string& model_name, const TileConfig& config, std::function<void(bool)> callback) {
 	// Set processing flag
 	m_is_processing = true;
 	m_progress = 0.0f;
@@ -87,8 +89,8 @@ std::future<bool> DenoiseInterface::DenoiseAsync(std::vector<uint32_t*>& images,
 	auto& pool = ThreadPool::GetThreadPool();
 	
 	// Submit task to thread pool
-	auto future = pool.enqueue([&images, width, height, model_name, tile_size, center_size, include_outside, callback]() {
-		bool result = Denoise(images, width, height, model_name, tile_size, center_size, include_outside);
+	auto future = pool.enqueue([&images, width, height, model_name, config, callback]() {
+		bool result = Denoise(images, width, height, model_name, config);
 		
 		// When complete, update processing flag and call callback if provided
 		m_is_processing = false;

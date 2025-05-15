@@ -6,18 +6,9 @@
 #include <filesystem>
 
 #include <OpenGL/Texture.h>
+#include <core/Tiler.hpp>
 
 #include <opencv2/opencv.hpp>
-
-struct Tile {
-	cv::Mat data;
-	cv::Point position;
-};
-
-enum class TileType {
-	BLENDED,
-	CROPPED
-};
 
 namespace utils {
 	// TODO: fill in the filter for win32 (although it may not matter?)
@@ -37,13 +28,6 @@ namespace utils {
 	void LoadDataIntoTexturesAndFree(std::vector<std::shared_ptr<Texture>>& textures, std::vector<uint32_t*>& data, int width, int height);
 
 	bool DirectoryContainsTiff(const std::filesystem::path& path);
-
-	std::vector<Tile> createCroppedTiles(const cv::Mat& image, int tileSize = 256, int centerSize = 64, bool includeOutside = false);
-	cv::Mat stitchCroppedTiles(const std::vector<Tile>& tiles, const cv::Size& originalSize, int tileSize = 256, int centerSize = 64, bool includeOutside = false);
-	cv::Mat stitchCroppedTilesSingleChannel(const std::vector<Tile>& tiles, const cv::Size& originalSize, int tileSize = 256, int centerSize = 64, bool includeOutside = false);
-
-	std::vector<Tile> createBlendedTiles(const cv::Mat& image, int tileSize = 256, int overlap = 0);
-	cv::Mat stitchBlendedTilesF(const std::vector<Tile>& tiles, const cv::Size& originalSize, int tileSize = 256, int overlap = 0);
 }
 
 namespace io {

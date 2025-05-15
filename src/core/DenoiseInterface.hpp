@@ -6,15 +6,18 @@
 #include <functional>
 #include <future>
 
+#include <OpenGL/Texture.h>
+#include <core/Tiler.hpp>
+
 class DenoiseInterface {
 public:
 	// Synchronous methods
-	static bool Denoise(std::vector<uint32_t*>& images, int width, int height, const std::string& model_name, const int tile_size, const int center_size = 64, const bool include_outside = false);
+	static bool Denoise(std::vector<std::shared_ptr<Texture>>& images, int width, int height, const std::string& model_name, const TileConfig& config);
 	static bool Blur(std::vector<uint32_t*>& images, int width, int height, int kernel_size, float sigma);
 	
 	// Asynchronous methods with callback
-	static std::future<bool> DenoiseAsync(std::vector<uint32_t*>& images, int width, int height, const std::string& model_name, 
-		const int tile_size, const int center_size, const bool include_outside, std::function<void(bool)> callback = nullptr);
+	static std::future<bool> DenoiseAsync(std::vector<std::shared_ptr<Texture>>& images, int width, int height, const std::string& model_name, 
+		const TileConfig& config, std::function<void(bool)> callback = nullptr);
 	static std::future<bool> BlurAsync(std::vector<uint32_t*>& images, int width, int height, int kernel_size, 
 		float sigma, std::function<void(bool)> callback = nullptr);
 	

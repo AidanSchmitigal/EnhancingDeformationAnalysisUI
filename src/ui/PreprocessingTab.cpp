@@ -214,19 +214,19 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Model").x);
 		ImGui::Combo("Model", &m_selected_model, m_models, IM_ARRAYSIZE(m_models));
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tiling Type").x);
-		ImGui::Combo("Tiling Type", (int*)&m_tiling_type, "Blended\0Cropped\0\0");
+		ImGui::Combo("Tiling Type", (int*)&m_tile_config.type, "Cropped\0Blended\0\0");
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tile Size").x);
-		ImGui::SliderInt("Tile Size", &m_tile_size, 150, 512);
+		ImGui::SliderInt("Tile Size", &m_tile_config.tileSize, 150, 512);
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tile size. MUST BE AN EVEN NUMBER!\nGenerally leave around 256, but can be varied for different results.");
-		if (m_tiling_type == TileType::BLENDED) {
+		if (m_tile_config.type == TileType::Blended) {
 			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Overlap").x);
-			ImGui::SliderInt("Overlap", &m_overlap, 0, 128);
+			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overlap size. MUST BE LESS THAN TILE SIZE!\nGenerally leave around 0, but can be varied for different results.");
-		} else if (m_tiling_type == TileType::CROPPED) {
+		} else if (m_tile_config.type == TileType::Cropped) {
 			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Center Size").x);
-			ImGui::SliderInt("Center Size", &m_center_size, 0, 512);
+			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 0, 512);
 			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Include Outside").x);
-			ImGui::Checkbox("Include Outside", &m_include_outside);
+			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		}
 
 		if (ImGui::Button("Show One Tiled Image")) {
@@ -245,15 +245,10 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 				uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
 				utils::GetDataFromTexture(data, m_processed_textures[0]);
 				cv::Mat img = cv::Mat(m_processed_textures[0]->GetHeight(), m_processed_textures[0]->GetWidth(), CV_8UC4, data);
-				if (m_tiling_type == TileType::BLENDED) {
-					m_split_tiles = utils::createBlendedTiles(img, m_tile_size, m_overlap);
-				} else if (m_tiling_type == TileType::CROPPED) {
-					m_split_tiles = utils::createCroppedTiles(img, m_tile_size, m_center_size, m_include_outside);
-				}
+				m_split_tiles = Tiler::CreateTiles(img, m_tile_config);
 				m_split_textures.clear();
 				for (auto& tile : m_split_tiles) {
 					auto t = std::make_shared<Texture>();
-					cv::cvtColor(tile.data, tile.data, cv::COLOR_RGBA2BGRA);
 					t->Load((uint32_t*)tile.data.data, tile.data.cols, tile.data.rows);
 					m_split_textures.push_back(t);
 				}
@@ -286,13 +281,11 @@ void PreprocessingTab::DisplayPreprocessingTab(bool& changed) {
 			
 			// Use the async version
 			auto future = DenoiseInterface::DenoiseAsync(
-				m_processing_frames, 
+				m_processed_textures, 
 				width, 
 				height, 
 				model_name,
-				tile_size, 
-				center_size,
-				include_outside,
+				m_tile_config,
 				[this](bool result) {
 					// This callback will run in the worker thread
 					// We don't need to do anything here as we check the future in the main loop
