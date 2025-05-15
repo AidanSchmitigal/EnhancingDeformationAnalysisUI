@@ -10,14 +10,15 @@
 #include <core/FeatureTracker.hpp>
 
 class ImageSet {
-public:
+      public:
 	ImageSet(const std::string_view &folder_path);
 	~ImageSet();
 
 	void Display();
 
 	bool Closed() { return !m_open; }
-private:
+
+      private:
 	void LoadImages();
 	void DisplayImageComparisonTab();
 	void DisplayImageAnalysisTab();
@@ -41,11 +42,11 @@ private:
 	std::vector<cv::Point2f> m_points;
 	std::vector<cv::Point2f> m_last_points;
 	std::vector<std::vector<cv::Point2f>> m_last_tracked_points;
-	uint32_t* m_point_image = nullptr;
+	uint32_t *m_point_image = nullptr;
 	Texture m_point_texture;
 
 	// image analysis
-	uint32_t* m_ref_image = nullptr;
+	uint32_t *m_ref_image = nullptr;
 	uint32_t m_ref_image_width = 0, m_ref_image_height = 0;
 	std::vector<std::vector<float>> histograms;
 	std::vector<float> avg_histogram;
@@ -57,5 +58,6 @@ private:
 	std::vector<std::vector<std::vector<float>>> m_widths;
 	std::vector<std::vector<float>> m_manual_widths;
 	bool m_widths_write_success = true;
-	std::chrono::time_point<std::chrono::system_clock> m_last_time = std::chrono::system_clock::now();
+	std::chrono::time_point<std::chrono::system_clock> m_last_time =
+	    std::chrono::system_clock::now();
 };

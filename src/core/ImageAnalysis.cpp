@@ -4,7 +4,11 @@
 
 #include <opencv2/opencv.hpp>
 
-void ImageAnalysis::AnalyzeImages(std::vector<uint32_t*>& frames, int width, int height, std::vector<std::vector<float>>& histograms, std::vector<float>& avg_histogram, std::vector<float>& snrs, float& avg_snr) {
+void ImageAnalysis::AnalyzeImages(std::vector<uint32_t *> &frames, int width,
+				  int height,
+				  std::vector<std::vector<float>> &histograms,
+				  std::vector<float> &avg_histogram,
+				  std::vector<float> &snrs, float &avg_snr) {
 	PROFILE_FUNCTION();
 
 	for (int i = 0; i < frames.size(); i++) {
@@ -22,9 +26,10 @@ void ImageAnalysis::AnalyzeImages(std::vector<uint32_t*>& frames, int width, int
 		avg_histogram.resize(bins);
 		cv::Mat hist;
 		float range[] = {0, 256};
-		const float* histRange = {range};
+		const float *histRange = {range};
 		bool uniform = true, accumulate = false;
-		cv::calcHist(&img, 1, 0, cv::Mat(), hist, 1, &bins, &histRange, uniform, accumulate);
+		cv::calcHist(&img, 1, 0, cv::Mat(), hist, 1, &bins, &histRange,
+			     uniform, accumulate);
 		// Normalize for display
 		cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
 

@@ -50,7 +50,6 @@ class PreprocessingTab {
 		std::unordered_map<int, int> m_selected_textures_map;
 
 		// for splitting tiles and denoising
-		std::vector<Tile> m_split_tiles;
 		std::vector<std::shared_ptr<Texture>> m_split_textures;
 		int m_tile_size = 256; 
 		int m_center_size = 64;
