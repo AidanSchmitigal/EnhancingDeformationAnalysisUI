@@ -43,7 +43,7 @@ void Texture::Load(const char* filename) {
 	PROFILE_FUNCTION();
 
 	int width, height;
-	unsigned int* temp = utils::LoadTiff(filename, width, height);
+	unsigned int* temp = io::LoadTiff(filename, width, height);
 	Bind();
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

@@ -40,7 +40,7 @@ private:
     void RenderFolderSelector();
 
     // Process and display all image sets
-    void ProcessImageSets();
+    void RenderImageSets();
 
     // Window handle
     GLFWwindow* m_window;

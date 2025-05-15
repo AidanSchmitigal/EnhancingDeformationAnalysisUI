@@ -9,8 +9,8 @@
 #include <gif-h/gif.h>
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN // i love this
+#define NOMINMAX // i hate this
 #include <windows.h>
 #include <shobjidl.h>
 #endif
@@ -127,140 +127,6 @@ namespace utils {
 #endif
 	}
 
-	unsigned int* LoadTiff(const char* path, int& width, int& height) {
-		PROFILE_FUNCTION();
-
-		// set the warning handler to null to avoid printing warnings
-		// errors are still printed
-		TIFFSetWarningHandler(nullptr);
-		TIFF* tif = TIFFOpen(path, "r");
-		if (!tif) {
-			printf("Could not open file %s\n", path);
-			return NULL;
-		}
-		size_t npixels;
-		uint32_t* raster;
-		size_t samplesperpixel;
-
-		TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
-		TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
-		TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesperpixel);
-
-		TIFFRGBAImage img;
-		char emsg[1024];
-		if (!TIFFRGBAImageBegin(&img, tif, 0, emsg)) {
-			TIFFError(path, "%s", emsg);
-			TIFFClose(tif);
-			return NULL;
-		}
-		npixels = width * height;
-		raster = (uint32_t*)_TIFFmalloc(npixels * sizeof(uint32_t));
-		if (raster) {
-			if (TIFFRGBAImageGet(&img, raster, width, height)) {
-				// flip the image
-				uint32_t* temp = (uint32_t*)_TIFFmalloc(npixels * sizeof(uint32_t));
-				for (int i = 0; i < height; i++) {
-					memcpy(temp + i * width, raster + (height - i - 1) * width, width * sizeof(uint32_t));
-				}
-				TIFFRGBAImageEnd(&img);
-				_TIFFfree(raster);
-				TIFFClose(tif);
-				return temp;
-			}
-		}
-		TIFFRGBAImageEnd(&img);
-		_TIFFfree(raster);
-		TIFFClose(tif);
-		return NULL;
-	}
-
-	bool LoadTiffFolder(const char* folder_path, std::vector<uint32_t*>& images, int& width, int& height) {
-		PROFILE_FUNCTION();
-
-		if (!std::filesystem::exists(folder_path)) {
-			printf("Path does not exist\n");
-			return false;
-		}
-
-		// find all .tif files in the folder
-		std::vector<std::string> files;
-		for (const auto& entry : std::filesystem::directory_iterator(folder_path)) {
-			if (entry.path().string().find(".tif") == std::string::npos)
-				continue;
-			files.push_back(entry.path().string());
-		}
-
-		// sort the files by name
-		std::sort(files.begin(), files.end());
-		for (const auto& file : files) {
-			PROFILE_SCOPE(LoadTiffFolderLoop);
-
-			uint32_t* temp = utils::LoadTiff(file.c_str(), width, height);
-			if (!temp) {
-				printf("Could not load file %s\n", file.c_str());
-				return false;
-			}
-
-			images.push_back(temp);
-		}
-		return true;
-	}
-
-	bool WriteTiff(const char* path, unsigned int* data, int width, int height) {
-		PROFILE_FUNCTION()
-
-			TIFF* tif = TIFFOpen(path, "w");
-		if (!tif) {
-			printf("Could not open file %s\n", path);
-			return false;
-		}
-
-		TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, width);
-		TIFFSetField(tif, TIFFTAG_IMAGELENGTH, height);
-		TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 4);
-		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
-		TIFFSetField(tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
-		TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
-
-		for (int i = 0; i < height; i++) {
-			if (TIFFWriteScanline(tif, data + i * width, i, 0) < 0) {
-				printf("Error writing tiff\n");
-				TIFFClose(tif);
-				return false;
-			}
-		}
-
-		TIFFClose(tif);
-		return true;
-	}
-
-	// write gif using gif.h
-	bool WriteGIFOfImageSet(const char* path, std::vector<std::shared_ptr<Texture>> images, int delay, int loop) {
-		PROFILE_FUNCTION()
-
-			if (images.empty()) {
-				printf("No images to write to gif\n");
-				return false;
-			}
-		// Create gif
-		GifWriter writer;
-		if (!GifBegin(&writer, path, images[0]->GetWidth(), images[0]->GetHeight(), delay, loop))
-			return false;
-
-		// all textures are the same size, so allocate once and then replace each time
-		uint32_t* data = (uint32_t*)malloc(images[0]->GetWidth() * images[0]->GetHeight() * 4);
-		for (int i = 0; i < images.size(); i++) {
-			images[i]->GetData(data);
-			GifWriteFrame(&writer, (uint8_t*)data, images[i]->GetWidth(), images[i]->GetHeight(), delay);
-		}
-		free(data);
-		// Close gif
-		GifEnd(&writer);
-		return true;
-	}
-
 	void GetDataFromTexture(unsigned int* data, std::shared_ptr<Texture> texture, int width, int height) {
 		if (width == 0 || height == 0) {
 			width = texture->GetWidth();
@@ -287,79 +153,6 @@ namespace utils {
 			textures[i]->Load(data[i], width, height);
 			free(data[i]);
 		}
-	}
-
-	bool WriteCSV(const char* path, std::vector<std::vector<std::vector<float>>>& data) {
-		FILE* f = fopen(path, "w");
-		if (!f) {
-			printf("Could not open file %s\n", path);
-			return false;
-		}
-		for (int i = 0; i < data.size(); i++) {
-			for (int j = 0; j < data[i][0].size(); j++) {
-				fprintf(f, "%f", data[i][0][j]);
-				if (j < data[i][0].size() - 1) fprintf(f, ",");
-			}
-			fprintf(f, "\n");
-		}
-		fclose(f);
-		return true;
-	}
-
-	bool WriteCSV(const char* path, std::vector<std::vector<cv::Point2f>>& trackedPts, std::vector<std::vector<float>>& widths) {
-		std::ofstream f(path);
-		if (!f.is_open()) {
-			std::cerr << "Could not open file " << path << std::endl;
-			return false;
-		}
-		// header
-		f << "frame";
-		auto nPairs = widths.empty() ? 0 : widths[0].size();
-		for (size_t p = 0; p < nPairs; ++p) f << ",width" << p;
-		auto nPts = trackedPts.empty() ? 0 : trackedPts[0].size();
-		for (size_t j = 0; j < nPts; ++j)
-			f << ",pt" << j << "_x,pt" << j << "_y";
-		f << "\n";
-
-		auto nFrames = std::min(widths.size(), trackedPts.size());
-		for (size_t i = 0; i < nFrames; ++i) {
-			f << i;
-			for (auto w : widths[i]) f << "," << w;
-			for (auto& pt : trackedPts[i]) f << "," << pt.x << "," << pt.y;
-			f << "\n";
-		}
-		return true;
-	}
-
-	bool saveAnalysisCsv(const char* path, const std::vector<std::vector<float>>& histograms, const std::vector<float>& avg_histogram, const std::vector<float>& snrs, float avg_snr) {
-		std::ofstream f(path);
-		if (!f.is_open()) {
-			std::cerr << "Could not open file " << path << std::endl;
-			return false;
-		}
-		int bins = avg_histogram.size();
-
-		// header
-		f << "frame,snr";
-		for (int b = 0; b < bins; ++b)
-			f << ",bin" << b;
-		f << "\n";
-
-		// per-frame rows
-		size_t n = std::min(histograms.size(), snrs.size());
-		for (size_t i = 0; i < n; ++i) {
-			f << i << "," << snrs[i];
-			for (int b = 0; b < bins; ++b)
-				f << "," << histograms[i][b];
-			f << "\n";
-		}
-
-		// average row
-		f << "avg," << avg_snr;
-		for (int b = 0; b < bins; ++b)
-			f << "," << avg_histogram[b];
-		f << "\n";
-		return true;
 	}
 
 	bool DirectoryContainsTiff(const std::filesystem::path& path)
@@ -602,6 +395,215 @@ namespace utils {
 		weights.setTo(1, zeroM);
 		cv::divide(result, weights, result); // broadcasts over channels
 		return result;
+	}
+}
+
+namespace io {
+	unsigned int* LoadTiff(const char* path, int& width, int& height) {
+		PROFILE_FUNCTION();
+
+		// set the warning handler to null to avoid printing warnings
+		// errors are still printed
+		TIFFSetWarningHandler(nullptr);
+		TIFF* tif = TIFFOpen(path, "r");
+		if (!tif) {
+			printf("Could not open file %s\n", path);
+			return NULL;
+		}
+		size_t npixels;
+		uint32_t* raster;
+		size_t samplesperpixel;
+
+		TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
+		TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
+		TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesperpixel);
+
+		TIFFRGBAImage img;
+		char emsg[1024];
+		if (!TIFFRGBAImageBegin(&img, tif, 0, emsg)) {
+			TIFFError(path, "%s", emsg);
+			TIFFClose(tif);
+			return NULL;
+		}
+		npixels = width * height;
+		raster = (uint32_t*)_TIFFmalloc(npixels * sizeof(uint32_t));
+		if (raster) {
+			if (TIFFRGBAImageGet(&img, raster, width, height)) {
+				// flip the image
+				uint32_t* temp = (uint32_t*)_TIFFmalloc(npixels * sizeof(uint32_t));
+				for (int i = 0; i < height; i++) {
+					memcpy(temp + i * width, raster + (height - i - 1) * width, width * sizeof(uint32_t));
+				}
+				TIFFRGBAImageEnd(&img);
+				_TIFFfree(raster);
+				TIFFClose(tif);
+				return temp;
+			}
+		}
+		TIFFRGBAImageEnd(&img);
+		_TIFFfree(raster);
+		TIFFClose(tif);
+		return NULL;
+	}
+
+	bool LoadTiffFolder(const char* folder_path, std::vector<uint32_t*>& images, int& width, int& height) {
+		PROFILE_FUNCTION();
+
+		if (!std::filesystem::exists(folder_path)) {
+			printf("Path does not exist\n");
+			return false;
+		}
+
+		// find all .tif files in the folder
+		std::vector<std::string> files;
+		for (const auto& entry : std::filesystem::directory_iterator(folder_path)) {
+			if (entry.path().string().find(".tif") == std::string::npos)
+				continue;
+			files.push_back(entry.path().string());
+		}
+
+		// sort the files by name
+		std::sort(files.begin(), files.end());
+		for (const auto& file : files) {
+			PROFILE_SCOPE(LoadTiffFolderLoop);
+
+			uint32_t* temp = io::LoadTiff(file.c_str(), width, height);
+			if (!temp) {
+				printf("Could not load file %s\n", file.c_str());
+				return false;
+			}
+
+			images.push_back(temp);
+		}
+		return true;
+	}
+
+	bool WriteTiff(const char* path, unsigned int* data, int width, int height) {
+		PROFILE_FUNCTION()
+
+			TIFF* tif = TIFFOpen(path, "w");
+		if (!tif) {
+			printf("Could not open file %s\n", path);
+			return false;
+		}
+
+		TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, width);
+		TIFFSetField(tif, TIFFTAG_IMAGELENGTH, height);
+		TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 4);
+		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+		TIFFSetField(tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+		TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+
+		for (int i = 0; i < height; i++) {
+			if (TIFFWriteScanline(tif, data + i * width, i, 0) < 0) {
+				printf("Error writing tiff\n");
+				TIFFClose(tif);
+				return false;
+			}
+		}
+
+		TIFFClose(tif);
+		return true;
+	}
+
+	// write gif using gif.h
+	bool WriteGIFOfImageSet(const char* path, std::vector<std::shared_ptr<Texture>> images, int delay, int loop) {
+		PROFILE_FUNCTION()
+
+			if (images.empty()) {
+				printf("No images to write to gif\n");
+				return false;
+			}
+		// Create gif
+		GifWriter writer;
+		if (!GifBegin(&writer, path, images[0]->GetWidth(), images[0]->GetHeight(), delay, loop))
+			return false;
+
+		// all textures are the same size, so allocate once and then replace each time
+		uint32_t* data = (uint32_t*)malloc(images[0]->GetWidth() * images[0]->GetHeight() * 4);
+		for (int i = 0; i < images.size(); i++) {
+			images[i]->GetData(data);
+			GifWriteFrame(&writer, (uint8_t*)data, images[i]->GetWidth(), images[i]->GetHeight(), delay);
+		}
+		free(data);
+		// Close gif
+		GifEnd(&writer);
+		return true;
+	}
+
+	bool WriteCSV(const char* path, std::vector<std::vector<std::vector<float>>>& data) {
+		FILE* f = fopen(path, "w");
+		if (!f) {
+			printf("Could not open file %s\n", path);
+			return false;
+		}
+		for (int i = 0; i < data.size(); i++) {
+			for (int j = 0; j < data[i][0].size(); j++) {
+				fprintf(f, "%f", data[i][0][j]);
+				if (j < data[i][0].size() - 1) fprintf(f, ",");
+			}
+			fprintf(f, "\n");
+		}
+		fclose(f);
+		return true;
+	}
+
+	bool WriteCSV(const char* path, std::vector<std::vector<cv::Point2f>>& trackedPts, std::vector<std::vector<float>>& widths) {
+		std::ofstream f(path);
+		if (!f.is_open()) {
+			std::cerr << "Could not open file " << path << std::endl;
+			return false;
+		}
+		// header
+		f << "frame";
+		auto nPairs = widths.empty() ? 0 : widths[0].size();
+		for (size_t p = 0; p < nPairs; ++p) f << ",width" << p;
+		auto nPts = trackedPts.empty() ? 0 : trackedPts[0].size();
+		for (size_t j = 0; j < nPts; ++j)
+			f << ",pt" << j << "_x,pt" << j << "_y";
+		f << "\n";
+
+		auto nFrames = std::min(widths.size(), trackedPts.size());
+		for (size_t i = 0; i < nFrames; ++i) {
+			f << i;
+			for (auto w : widths[i]) f << "," << w;
+			for (auto& pt : trackedPts[i]) f << "," << pt.x << "," << pt.y;
+			f << "\n";
+		}
+		return true;
+	}
+
+	bool SaveAnalysisCsv(const char* path, const std::vector<std::vector<float>>& histograms, const std::vector<float>& avg_histogram, const std::vector<float>& snrs, float avg_snr) {
+		std::ofstream f(path);
+		if (!f.is_open()) {
+			std::cerr << "Could not open file " << path << std::endl;
+			return false;
+		}
+		int bins = avg_histogram.size();
+
+		// header
+		f << "frame,snr";
+		for (int b = 0; b < bins; ++b)
+			f << ",bin" << b;
+		f << "\n";
+
+		// per-frame rows
+		size_t n = std::min(histograms.size(), snrs.size());
+		for (size_t i = 0; i < n; ++i) {
+			f << i << "," << snrs[i];
+			for (int b = 0; b < bins; ++b)
+				f << "," << histograms[i][b];
+			f << "\n";
+		}
+
+		// average row
+		f << "avg," << avg_snr;
+		for (int b = 0; b < bins; ++b)
+			f << "," << avg_histogram[b];
+		f << "\n";
+		return true;
 	}
 }
 

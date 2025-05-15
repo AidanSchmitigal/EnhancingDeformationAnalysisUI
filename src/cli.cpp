@@ -183,7 +183,7 @@ namespace cli {
 
 	// Load images from folder
 	bool loadImages(const Settings& settings, std::vector<uint32_t*>& images, int& width, int& height) {
-		bool success = utils::LoadTiffFolder(settings.folder.c_str(), images, width, height);
+		bool success = io::LoadTiffFolder(settings.folder.c_str(), images, width, height);
 		if (!success) {
 			printf("Failed to load images from %s\n", settings.folder.c_str());
 			return false;
@@ -221,7 +221,7 @@ namespace cli {
 			float avg_snr;
 
 			ImageAnalysis::AnalyzeImages(images, width, height, histograms, avg_histogram, snrs, avg_snr);
-			utils::saveAnalysisCsv(settings.stats_output.c_str(), histograms, avg_histogram, snrs, avg_snr);
+			io::SaveAnalysisCsv(settings.stats_output.c_str(), histograms, avg_histogram, snrs, avg_snr);
 		}
 	}
 
@@ -230,7 +230,7 @@ namespace cli {
 		if (settings.do_widths) {
 			auto polygons = CrackDetector::DetectCracks(images, width, height);
 			auto widths = FeatureTracker::TrackCrackWidthProfiles(polygons);
-			utils::WriteCSV(settings.widths_output.c_str(), widths);
+			io::WriteCSV(settings.widths_output.c_str(), widths);
 		}
 	}
 
@@ -252,7 +252,7 @@ namespace cli {
 			for (int i = 0; i < images.size(); i++) {
 				char filename[256];
 				sprintf(filename, "%s/image_%d.tif", outputPath.c_str(), i);
-				utils::WriteTiff(filename, images[i], width, height);
+				io::WriteTiff(filename, images[i], width, height);
 			}
 		}
 	}

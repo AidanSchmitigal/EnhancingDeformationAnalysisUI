@@ -74,7 +74,7 @@ bool Application::InitializeGLFW()
         fprintf(stderr, "GLFW Error %d: %s\n", error, description);
     });
 
-    // Enable vsync
+    // Enable vsync to limit frame rate
     glfwSwapInterval(1);
 
     return true;
@@ -152,8 +152,8 @@ void Application::RenderUI()
     
     ImGui::End();
     
-    // Process all image sets
-    ProcessImageSets();
+    // Render all image sets
+    RenderImageSets();
 }
 
 void Application::RenderWelcomeScreen()
@@ -248,7 +248,7 @@ void Application::RenderFolderSelector()
 #endif
 }
 
-void Application::ProcessImageSets()
+void Application::RenderImageSets()
 {
     // Process all image sets
     for (auto it = m_imageSets.begin(); it != m_imageSets.end();) {
