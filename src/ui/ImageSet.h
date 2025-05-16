@@ -35,6 +35,7 @@ class ImageSet {
 	std::vector<std::shared_ptr<Texture>> m_textures;
 	std::vector<std::shared_ptr<Texture>> m_processed_textures;
 	uint32_t m_current_frame = 0;
+	TileConfig m_tile_config = TileConfig();
 
 	PreprocessingTab m_preprocessing_tab;
 

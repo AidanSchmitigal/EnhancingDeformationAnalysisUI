@@ -566,45 +566,73 @@ void ImageSet::DisplayFeatureTrackingTab() {
 }
 
 void ImageSet::DisplayDeformationAnalysisTab() {
-	static bool good = true;
+	static bool model_ok = true;
 	static std::vector<Tile> output_tiles;
 	static std::vector<Texture *> output_tile_textures;
 	static int tile_size = 256;
 	static int overlap = 0;
+
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
+		// full-tab child with menu bar
+		ImGui::BeginChild("DeformTab", ImVec2(0, 0), false, ImGuiWindowFlags_MenuBar);
+		// left pane: settings + status
+		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
+		ImGui::Text("Settings");
 		ImGui::SliderInt("Tile Size", &tile_size, 1, 512);
-		ImGui::SliderInt("Overlap", &overlap, 0, 128);
-		if (ImGui::Button("Calculate Deformation")) {
+		if (m_tile_config.type == TileType::Cropped) {
+			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 0, 128);
+			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
+		} else if (m_tile_config.type == TileType::Blended) {
+			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
+		}
+		if (ImGui::Button("Run Analysis")) {
+			// gather frames
 			std::vector<uint32_t *> frames;
 			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(),
 						   m_processed_textures[0]->GetHeight(), m_processed_textures);
-			good = DeformationAnalysisInterface::RunModel(frames, m_processed_textures[0]->GetWidth(),
-								      m_processed_textures[0]->GetHeight(), tile_size,
-								      overlap, output_tiles);
+
+			model_ok = DeformationAnalysisInterface::RunModel(frames, m_processed_textures[0]->GetWidth(),
+									  m_processed_textures[0]->GetHeight(),
+									  tile_size, overlap, output_tiles);
+
 			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames,
 							   m_processed_textures[0]->GetWidth(),
 							   m_processed_textures[0]->GetHeight());
+			// rebuild textures
+			output_tile_textures.clear();
 		}
+		if (!model_ok) {
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model error!");
+		}
+		ImGui::Separator();
+		ImGui::Text("Tiles: %d", (int)output_tiles.size());
+		ImGui::EndChild();
 
-		if (!good)
-			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model exited with an error!");
+		ImGui::SameLine();
 
-		if (output_tile_textures.size() == 0) {
-			for (int i = 0; i < output_tiles.size(); i++) {
-				Texture *t = new Texture;
-				t->Load((uint32_t *)output_tiles[i].data.data, output_tiles[i].data.rows,
-					output_tiles[i].data.cols);
-				output_tile_textures.push_back(t);
+		// right pane: tile gallery
+		ImGui::BeginChild("TileView", ImVec2(0, 0), true);
+		ImGui::Text("Output Tiles");
+		ImGui::NewLine();
+
+		// lazy-load textures
+		if (output_tile_textures.empty() && model_ok) {
+			for (auto &t : output_tiles) {
+				Texture *tex = new Texture;
+				tex->Load((uint32_t *)t.data.data, t.data.cols, t.data.rows);
+				output_tile_textures.push_back(tex);
 			}
 		}
-		ImGui::SeparatorText("output tiles");
-		ImGui::NewLine();
-		for (int i = 0; i < output_tile_textures.size(); i++) {
-			if (i % 4 != 3)
+
+		const int cols = 4;
+		for (int i = 0; i < output_tile_textures.size(); ++i) {
+			if (i % cols != 0)
 				ImGui::SameLine();
-			ImGui::Image(output_tile_textures[i]->GetID(),
-				     ImVec2(output_tiles[i].data.rows, output_tiles[i].data.rows));
+			ImGui::Image(output_tile_textures[i]->GetID(), ImVec2((float)tile_size, (float)tile_size));
 		}
+		ImGui::EndChild();
+
+		ImGui::EndChild(); // DeformTab
 		ImGui::EndTabItem();
 	}
 }
