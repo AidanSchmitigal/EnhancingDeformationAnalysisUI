@@ -587,6 +587,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			// Toggle between gallery and full image view
 		}
 
+		ImGui::Combo("Tile Type", (int *)&m_tile_config.type, "Cropped\0Blended\0\0");
 		ImGui::SliderInt("Tile Size", &tile_size, 1, 512);
 		if (m_tile_config.type == TileType::Cropped) {
 			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 0, 128);
