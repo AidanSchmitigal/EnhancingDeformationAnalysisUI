@@ -8,6 +8,8 @@
 #include <opencv2/opencv.hpp>
 #include <tiffio.h>
 
+#include <imgui.h>
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN // i love this
 #define NOMINMAX	    // i hate this
@@ -16,16 +18,14 @@
 #endif
 
 namespace utils {
-std::string OpenFileDialog(const char *open_path, const char *title,
-			   const bool folders_only, const char *filter) {
+std::string OpenFileDialog(const char *open_path, const char *title, const bool folders_only, const char *filter) {
 #ifdef _WIN32
 	CoInitialize(nullptr);
 	IFileDialog *pFileDialog = nullptr;
 	std::wstring folderPath;
 
-	if (SUCCEEDED(CoCreateInstance(
-		CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_IFileDialog,
-		reinterpret_cast<void **>(&pFileDialog)))) {
+	if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_IFileDialog,
+				       reinterpret_cast<void **>(&pFileDialog)))) {
 		DWORD dwOptions;
 		if (SUCCEEDED(pFileDialog->GetOptions(&dwOptions))) {
 			pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS);
@@ -35,8 +35,7 @@ std::string OpenFileDialog(const char *open_path, const char *title,
 			IShellItem *pItem;
 			if (SUCCEEDED(pFileDialog->GetResult(&pItem))) {
 				PWSTR pszFilePath;
-				if (SUCCEEDED(pItem->GetDisplayName(
-					SIGDN_FILESYSPATH, &pszFilePath))) {
+				if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath))) {
 					folderPath = pszFilePath;
 					CoTaskMemFree(pszFilePath);
 				}
@@ -50,11 +49,9 @@ std::string OpenFileDialog(const char *open_path, const char *title,
 	if (folderPath.empty())
 		return std::string();
 
-	int size_needed = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(),
-					      -1, nullptr, 0, nullptr, nullptr);
+	int size_needed = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, nullptr, 0, nullptr, nullptr);
 	std::string str(size_needed - 1, 0);
-	WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, &str[0],
-			    size_needed, nullptr, nullptr);
+	WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, &str[0], size_needed, nullptr, nullptr);
 	return str;
 #else
 
@@ -65,10 +62,7 @@ std::string OpenFileDialog(const char *open_path, const char *title,
 			 "--filename=%s/",
 			 title, open_path);
 	else
-		snprintf(
-		    buf, 256,
-		    "zenity --file-selection --title=\"%s\" --filename=%s/",
-		    title, open_path);
+		snprintf(buf, 256, "zenity --file-selection --title=\"%s\" --filename=%s/", title, open_path);
 	char output[1024];
 	// open the zenity window
 	FILE *f = popen(buf, "r");
@@ -87,26 +81,22 @@ std::string OpenFileDialog(const char *open_path, const char *title,
 #endif
 }
 
-std::string SaveFileDialog(const char *save_path, const char *title,
-			   const char *filter) {
+std::string SaveFileDialog(const char *save_path, const char *title, const char *filter) {
 #ifdef _WIN32
 	CoInitialize(nullptr);
 	IFileDialog *pFileDialog = nullptr;
 	std::wstring folderPath;
-	if (SUCCEEDED(CoCreateInstance(
-		CLSID_FileSaveDialog, nullptr, CLSCTX_ALL, IID_IFileDialog,
-		reinterpret_cast<void **>(&pFileDialog)))) {
+	if (SUCCEEDED(CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_ALL, IID_IFileDialog,
+				       reinterpret_cast<void **>(&pFileDialog)))) {
 		DWORD dwOptions;
 		if (SUCCEEDED(pFileDialog->GetOptions(&dwOptions))) {
-			pFileDialog->SetOptions(dwOptions |
-						FOS_OVERWRITEPROMPT);
+			pFileDialog->SetOptions(dwOptions | FOS_OVERWRITEPROMPT);
 		}
 		if (SUCCEEDED(pFileDialog->Show(nullptr))) {
 			IShellItem *pItem;
 			if (SUCCEEDED(pFileDialog->GetResult(&pItem))) {
 				PWSTR pszFilePath;
-				if (SUCCEEDED(pItem->GetDisplayName(
-					SIGDN_FILESYSPATH, &pszFilePath))) {
+				if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath))) {
 					folderPath = pszFilePath;
 					CoTaskMemFree(pszFilePath);
 				}
@@ -118,17 +108,13 @@ std::string SaveFileDialog(const char *save_path, const char *title,
 	CoUninitialize();
 	if (folderPath.empty())
 		return std::string();
-	int size_needed = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(),
-					      -1, nullptr, 0, nullptr, nullptr);
+	int size_needed = WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, nullptr, 0, nullptr, nullptr);
 	std::string str(size_needed - 1, 0);
-	WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, &str[0],
-			    size_needed, nullptr, nullptr);
+	WideCharToMultiByte(CP_UTF8, 0, folderPath.c_str(), -1, &str[0], size_needed, nullptr, nullptr);
 	return str;
 #else
 	char buf[256];
-	snprintf(buf, 256,
-		 "zenity --file-selection --save --title=\"%s\" --filename=%s",
-		 title, save_path);
+	snprintf(buf, 256, "zenity --file-selection --save --title=\"%s\" --filename=%s", title, save_path);
 	char output[1024];
 	FILE *f = popen(buf, "r");
 	auto out = fgets(output, 1024, f);
@@ -144,8 +130,7 @@ std::string SaveFileDialog(const char *save_path, const char *title,
 #endif
 }
 
-void GetDataFromTexture(unsigned int *data, std::shared_ptr<Texture> texture,
-			int width, int height) {
+void GetDataFromTexture(unsigned int *data, std::shared_ptr<Texture> texture, int width, int height) {
 	if (width == 0 || height == 0) {
 		width = texture->GetWidth();
 		height = texture->GetHeight();
@@ -168,9 +153,8 @@ void GetDataFromTextures(std::vector<uint32_t *> &data, int width, int height,
 	}
 }
 
-void LoadDataIntoTexturesAndFree(
-    std::vector<std::shared_ptr<Texture>> &textures,
-    std::vector<uint32_t *> &data, int width, int height) {
+void LoadDataIntoTexturesAndFree(std::vector<std::shared_ptr<Texture>> &textures, std::vector<uint32_t *> &data,
+				 int width, int height) {
 	PROFILE_FUNCTION();
 
 	for (int i = 0; i < textures.size(); i++) {
@@ -179,13 +163,173 @@ void LoadDataIntoTexturesAndFree(
 	}
 }
 
+void CreateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures,
+			const std::shared_ptr<Texture> &source_texture, const TileConfig &tile_config) {
+	PROFILE_FUNCTION();
+
+	// Clear any existing textures
+	tile_textures.clear();
+
+	// Get the image data from the source texture
+	uint32_t *data = new uint32_t[source_texture->GetWidth() * source_texture->GetHeight()];
+	source_texture->GetData(data);
+
+	// Convert to OpenCV format
+	cv::Mat img = cv::Mat(source_texture->GetHeight(), source_texture->GetWidth(), CV_8UC4, data);
+
+	// Create tiles
+	auto tiles = Tiler::CreateTiles(img, tile_config);
+
+	// Create textures from tiles
+	for (auto &tile : tiles) {
+		auto texture = std::make_shared<Texture>();
+		texture->Load((uint32_t *)tile.data.data, tile.data.cols, tile.data.rows);
+		tile_textures.push_back(texture);
+	}
+
+	// Clean up
+	delete[] data;
+}
+
 bool DirectoryContainsTiff(const std::filesystem::path &path) {
 	for (auto &it : std::filesystem::directory_iterator(path))
 		if (it.path().string().find(".tif") != std::string::npos)
 			return true;
 	return false;
 }
+
 } // namespace utils
+
+// UI helper functions implementation
+namespace ui {
+
+void DisplayTilePreviewWindow(const char *window_title, bool &is_open,
+			      std::vector<std::shared_ptr<Texture>> &tile_textures,
+			      std::function<void()> refresh_callback, int tile_size, int columns) {
+
+	if (!is_open) {
+		return;
+	}
+
+	// Create the window with a specific size
+	ImGui::SetNextWindowSize(ImVec2(columns * (tile_size + 10) + 40, 500), ImGuiCond_Always);
+
+	// Create a regular window with a close button
+	if (ImGui::Begin(window_title, &is_open,
+			 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking)) {
+		// Count of tiles
+		ImGui::Text("Tiles: %d", (int)tile_textures.size());
+
+		// Refresh button if callback provided
+		if (refresh_callback) {
+			if (ImGui::Button("Refresh Tiles")) {
+				refresh_callback();
+			}
+		}
+
+		ImGui::Separator();
+
+		// Display tiles in a grid
+		for (int i = 0; i < tile_textures.size(); i++) {
+			// Start a new row after 'columns' tiles
+			if (i % columns != 0 && i > 0) {
+				ImGui::SameLine();
+			}
+
+			// Display the tile
+			ImGui::Image(tile_textures[i]->GetID(), ImVec2((float)tile_size, (float)tile_size));
+
+			// Show tooltip on hover
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Tile %d", i);
+			}
+		}
+
+		ImGui::Separator();
+	}
+	ImGui::End();
+}
+
+void DisplayFrameSelectionWindow(const char *window_title, bool &is_open,
+				 std::vector<std::shared_ptr<Texture>> &textures, std::map<int, int> &selected_map,
+				 std::function<void()> on_remove_callback, int frame_size, int columns) {
+
+	if (!is_open) {
+		return;
+	}
+
+	// Set a reasonable initial size for the window
+	ImGui::SetNextWindowSize(ImVec2(columns * (frame_size + 10) + 40, 600), ImGuiCond_Always);
+
+	// Create a regular window with a close button
+	if (ImGui::Begin(window_title, &is_open,
+			 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking)) {
+		ImGui::Text("Select Frames to Modify");
+		ImGui::Separator();
+
+		// Action buttons
+		if (ImGui::Button("Select All")) {
+			for (int i = 0; i < textures.size(); i++)
+				selected_map[i] = 1;
+		}
+		ImGui::SameLine();
+
+		if (ImGui::Button("Deselect All"))
+			selected_map.clear();
+
+		if (ImGui::Button("Remove Selected")) {
+			// Call the provided callback to handle removal
+			if (on_remove_callback) {
+				on_remove_callback();
+			}
+		}
+
+		ImGui::SeparatorText("Frames");
+
+		// Display frames in a grid
+		for (int i = 0; i < textures.size(); i++) {
+			char name[100];
+			sprintf(name, "Image %d", i);
+
+			bool selected = selected_map.find(i) != selected_map.end();
+
+			// Highlight selected frames
+			if (selected) {
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1, 0.2, 0.2, 1));
+			}
+
+			ImGui::ImageButton(name, (ImTextureID)textures[i]->GetID(),
+					   ImVec2((float)frame_size, (float)frame_size));
+
+			if (selected) {
+				ImGui::PopStyleColor();
+			}
+
+			// Start a new row after 'columns' frames
+			if (i % columns != columns - 1 && i < textures.size() - 1) {
+				ImGui::SameLine();
+			}
+
+			// Show tooltip on hover
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Frame %d", i);
+			}
+
+			// Toggle selection on click
+			if (ImGui::IsItemClicked()) {
+				if (selected)
+					selected_map.erase(i);
+				else
+					selected_map[i] = 1;
+			}
+		}
+
+		ImGui::Separator();
+	}
+	ImGui::End();
+}
+
+} // namespace ui
 
 namespace io {
 unsigned int *LoadTiff(const char *path, int &width, int &height) {
@@ -219,12 +363,9 @@ unsigned int *LoadTiff(const char *path, int &width, int &height) {
 	if (raster) {
 		if (TIFFRGBAImageGet(&img, raster, width, height)) {
 			// flip the image
-			uint32_t *temp =
-			    (uint32_t *)_TIFFmalloc(npixels * sizeof(uint32_t));
+			uint32_t *temp = (uint32_t *)_TIFFmalloc(npixels * sizeof(uint32_t));
 			for (int i = 0; i < height; i++) {
-				memcpy(temp + i * width,
-				       raster + (height - i - 1) * width,
-				       width * sizeof(uint32_t));
+				memcpy(temp + i * width, raster + (height - i - 1) * width, width * sizeof(uint32_t));
 			}
 			TIFFRGBAImageEnd(&img);
 			_TIFFfree(raster);
@@ -238,8 +379,7 @@ unsigned int *LoadTiff(const char *path, int &width, int &height) {
 	return NULL;
 }
 
-bool LoadTiffFolder(const char *folder_path, std::vector<uint32_t *> &images,
-		    int &width, int &height) {
+bool LoadTiffFolder(const char *folder_path, std::vector<uint32_t *> &images, int &width, int &height) {
 	PROFILE_FUNCTION();
 
 	if (!std::filesystem::exists(folder_path)) {
@@ -249,8 +389,7 @@ bool LoadTiffFolder(const char *folder_path, std::vector<uint32_t *> &images,
 
 	// find all .tif files in the folder
 	std::vector<std::string> files;
-	for (const auto &entry :
-	     std::filesystem::directory_iterator(folder_path)) {
+	for (const auto &entry : std::filesystem::directory_iterator(folder_path)) {
 		if (entry.path().string().find(".tif") == std::string::npos)
 			continue;
 		files.push_back(entry.path().string());
@@ -303,9 +442,7 @@ bool WriteTiff(const char *path, unsigned int *data, int width, int height) {
 }
 
 // write gif using gif.h
-bool WriteGIFOfImageSet(const char *path,
-			std::vector<std::shared_ptr<Texture>> images, int delay,
-			int loop) {
+bool WriteGIFOfImageSet(const char *path, std::vector<std::shared_ptr<Texture>> images, int delay, int loop) {
 	PROFILE_FUNCTION()
 
 	if (images.empty()) {
@@ -314,18 +451,15 @@ bool WriteGIFOfImageSet(const char *path,
 	}
 	// Create gif
 	GifWriter writer;
-	if (!GifBegin(&writer, path, images[0]->GetWidth(),
-		      images[0]->GetHeight(), delay, loop))
+	if (!GifBegin(&writer, path, images[0]->GetWidth(), images[0]->GetHeight(), delay, loop))
 		return false;
 
 	// all textures are the same size, so allocate once and then replace
 	// each time
-	uint32_t *data = (uint32_t *)malloc(images[0]->GetWidth() *
-					    images[0]->GetHeight() * 4);
+	uint32_t *data = (uint32_t *)malloc(images[0]->GetWidth() * images[0]->GetHeight() * 4);
 	for (int i = 0; i < images.size(); i++) {
 		images[i]->GetData(data);
-		GifWriteFrame(&writer, (uint8_t *)data, images[i]->GetWidth(),
-			      images[i]->GetHeight(), delay);
+		GifWriteFrame(&writer, (uint8_t *)data, images[i]->GetWidth(), images[i]->GetHeight(), delay);
 	}
 	free(data);
 	// Close gif
@@ -333,8 +467,7 @@ bool WriteGIFOfImageSet(const char *path,
 	return true;
 }
 
-bool WriteCSV(const char *path,
-	      std::vector<std::vector<std::vector<float>>> &data) {
+bool WriteCSV(const char *path, std::vector<std::vector<std::vector<float>>> &data) {
 	FILE *f = fopen(path, "w");
 	if (!f) {
 		printf("Could not open file %s\n", path);
@@ -352,8 +485,7 @@ bool WriteCSV(const char *path,
 	return true;
 }
 
-bool WriteCSV(const char *path,
-	      std::vector<std::vector<cv::Point2f>> &trackedPts,
+bool WriteCSV(const char *path, std::vector<std::vector<cv::Point2f>> &trackedPts,
 	      std::vector<std::vector<float>> &widths) {
 	std::ofstream f(path);
 	if (!f.is_open()) {
@@ -382,10 +514,8 @@ bool WriteCSV(const char *path,
 	return true;
 }
 
-bool SaveAnalysisCsv(const char *path,
-		     const std::vector<std::vector<float>> &histograms,
-		     const std::vector<float> &avg_histogram,
-		     const std::vector<float> &snrs, float avg_snr) {
+bool SaveAnalysisCsv(const char *path, const std::vector<std::vector<float>> &histograms,
+		     const std::vector<float> &avg_histogram, const std::vector<float> &snrs, float avg_snr) {
 	std::ofstream f(path);
 	if (!f.is_open()) {
 		std::cerr << "Could not open file " << path << std::endl;
@@ -429,9 +559,7 @@ Profiler::~Profiler() {
 
 void Profiler::Stop() {
 	auto end_time = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-			    end_time - start_time)
-			    .count();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 	printf("Profiler: %s took %zu ms\n", name, duration);
 	stopped = true;
 }

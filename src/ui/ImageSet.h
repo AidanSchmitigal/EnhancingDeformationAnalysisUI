@@ -36,6 +36,7 @@ class ImageSet {
 	std::vector<std::shared_ptr<Texture>> m_processed_textures;
 	uint32_t m_current_frame = 0;
 	TileConfig m_tile_config = TileConfig();
+	bool m_show_gallery_view = true; // For toggling between tile gallery and full image in deformation analysis
 
 	PreprocessingTab m_preprocessing_tab;
 
@@ -61,4 +62,7 @@ class ImageSet {
 	bool m_widths_write_success = true;
 	std::chrono::time_point<std::chrono::system_clock> m_last_time =
 	    std::chrono::system_clock::now();
+	    
+	// deformation analysis preview
+	std::vector<std::shared_ptr<Texture>> m_preview_tile_textures;
 };

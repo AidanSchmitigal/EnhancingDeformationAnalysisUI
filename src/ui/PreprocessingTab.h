@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <unordered_map>
 #include <future>
 #include <memory>
 
@@ -47,7 +46,7 @@ class PreprocessingTab {
 		// Our textures
 		std::vector<std::shared_ptr<Texture>> m_textures;
 		std::vector<std::shared_ptr<Texture>> m_processed_textures;
-		std::unordered_map<int, int> m_selected_textures_map;
+		std::map<int, int> m_selected_textures_map;
 
 		// for splitting tiles and denoising
 		std::vector<std::shared_ptr<Texture>> m_split_textures;

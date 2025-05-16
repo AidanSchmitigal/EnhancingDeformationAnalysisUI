@@ -571,13 +571,22 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 	static std::vector<Texture *> output_tile_textures;
 	static int tile_size = 256;
 	static int overlap = 0;
+	static std::shared_ptr<Texture> full_image_texture;
+	static uint32_t current_tile_index = 0;
 
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
 		// full-tab child with menu bar
 		ImGui::BeginChild("DeformTab", ImVec2(0, 0), false, ImGuiWindowFlags_MenuBar);
+
 		// left pane: settings + status
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 		ImGui::Text("Settings");
+
+		// View toggle
+		if (ImGui::Checkbox("Gallery View", &m_show_gallery_view)) {
+			// Toggle between gallery and full image view
+		}
+
 		ImGui::SliderInt("Tile Size", &tile_size, 1, 512);
 		if (m_tile_config.type == TileType::Cropped) {
 			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 0, 128);
@@ -585,6 +594,40 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		} else if (m_tile_config.type == TileType::Blended) {
 			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
 		}
+
+		// Update tile configuration for previews
+		m_tile_config.tileSize = tile_size;
+
+		// Add preview tile button
+		static bool preview_tiles_open = false;
+		if (ImGui::Button("Preview Tiles")) {
+			preview_tiles_open = true;
+			// Generate preview tiles if they don't exist or if they need to be refreshed
+			if (m_preview_tile_textures.empty() && !m_processed_textures.empty()) {
+				utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0],
+							  m_tile_config);
+			}
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Preview how the current image will be split into tiles\n"
+					  "before running the full analysis. This helps you\n"
+					  "adjust tile size and other parameters.");
+		}
+
+		// Use the common UI function to display the tile preview window
+		auto refreshTiles = [this]() {
+			if (!m_processed_textures.empty()) {
+				utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0],
+							  m_tile_config);
+			}
+		};
+
+		ui::DisplayTilePreviewWindow("Tile Preview", preview_tiles_open, m_preview_tile_textures, refreshTiles);
+
+		ImGui::Separator();
+
 		if (ImGui::Button("Run Analysis")) {
 			// gather frames
 			std::vector<uint32_t *> frames;
@@ -600,36 +643,155 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 							   m_processed_textures[0]->GetHeight());
 			// rebuild textures
 			output_tile_textures.clear();
+
+			// Create or update the full image texture when analysis is run
+			if (!output_tiles.empty() && model_ok) {
+				// Check if we need to create a new full image texture
+				if (!full_image_texture) {
+					full_image_texture = std::make_shared<Texture>();
+				}
+				// Use the first processed texture as the base for the full view
+				if (!m_processed_textures.empty()) {
+					uint32_t *img_data = new uint32_t[m_processed_textures[0]->GetWidth() *
+									  m_processed_textures[0]->GetHeight()];
+					m_processed_textures[0]->GetData(img_data);
+					full_image_texture->Load(img_data, m_processed_textures[0]->GetWidth(),
+								 m_processed_textures[0]->GetHeight());
+					delete[] img_data;
+				}
+			}
 		}
+
 		if (!model_ok) {
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model error!");
 		}
+
 		ImGui::Separator();
 		ImGui::Text("Tiles: %d", (int)output_tiles.size());
+
+		// For full image view, add a tile selector
+		if (!m_show_gallery_view && !output_tile_textures.empty()) {
+			ImGui::SliderInt("Current Tile", (int *)&current_tile_index, 0,
+					 (int)output_tile_textures.size() - 1);
+		}
+
 		ImGui::EndChild();
 
 		ImGui::SameLine();
 
-		// right pane: tile gallery
+		// right pane: either tile gallery or full image with overlay
 		ImGui::BeginChild("TileView", ImVec2(0, 0), true);
-		ImGui::Text("Output Tiles");
-		ImGui::NewLine();
 
-		// lazy-load textures
-		if (output_tile_textures.empty() && model_ok) {
-			for (auto &t : output_tiles) {
-				Texture *tex = new Texture;
-				tex->Load((uint32_t *)t.data.data, t.data.cols, t.data.rows);
-				output_tile_textures.push_back(tex);
+		if (m_show_gallery_view) {
+			// Gallery view
+			ImGui::Text("Output Tiles");
+
+			if (output_tiles.empty()) {
+				ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "No tiles available. Run analysis first.");
+			}
+
+			// lazy-load textures
+			if (output_tile_textures.empty() && model_ok) {
+				for (auto &t : output_tiles) {
+					Texture *tex = new Texture;
+					tex->Load((uint32_t *)t.data.data, t.data.cols, t.data.rows);
+					output_tile_textures.push_back(tex);
+				}
+			}
+
+			const int cols = 4;
+			for (int i = 0; i < output_tile_textures.size(); ++i) {
+				if (i % cols != 0)
+					ImGui::SameLine();
+				ImGui::Image(output_tile_textures[i]->GetID(),
+					     ImVec2((float)tile_size, (float)tile_size));
+
+				// Make the tiles selectable for the full view
+				if (ImGui::IsItemClicked()) {
+					current_tile_index = i;
+					m_show_gallery_view = false;
+				}
+			}
+		} else {
+			// Full image view with overlay of selected tile
+			ImGui::Text("Full Image View");
+
+			// Display the full image if available
+			if (full_image_texture) {
+				ImVec2 available_space = ImGui::GetContentRegionAvail();
+				float scale_factor =
+				    std::min(available_space.x / (float)full_image_texture->GetWidth(),
+					     available_space.y / (float)full_image_texture->GetHeight());
+
+				ImVec2 display_size(full_image_texture->GetWidth() * scale_factor,
+						    full_image_texture->GetHeight() * scale_factor);
+
+				ImGui::Image(full_image_texture->GetID(), display_size);
+
+				// Indicate the position of the selected tile on the full image
+				if (!output_tiles.empty() && current_tile_index < output_tiles.size()) {
+					// Draw a rectangle overlay to indicate where the current tile is on the full
+					// image This assumes tiles are stored in row-major order
+					ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
+					ImDrawList *draw_list = ImGui::GetWindowDrawList();
+
+					// Calculate position of selected tile in full image coordinates
+					const int full_width = full_image_texture->GetWidth();
+					const int full_height = full_image_texture->GetHeight();
+
+					// Get the rows and columns based on full image and tile size
+					int cols_in_full = full_width / tile_size;
+					if (cols_in_full == 0)
+						cols_in_full = 1;
+
+					int tile_row = current_tile_index / cols_in_full;
+					int tile_col = current_tile_index % cols_in_full;
+
+					float rect_x_pos =
+					    cursor_pos.x - display_size.x + (tile_col * tile_size * scale_factor);
+					float rect_y_pos =
+					    cursor_pos.y - display_size.y + (tile_row * tile_size * scale_factor);
+
+					// Draw the rectangle
+					draw_list->AddRect(ImVec2(rect_x_pos, rect_y_pos),
+							   ImVec2(rect_x_pos + tile_size * scale_factor,
+								  rect_y_pos + tile_size * scale_factor),
+							   IM_COL32(255, 0, 0, 255), // Red
+							   0.0f,		     // rounding
+							   0,			     // flags
+							   2.0f			     // thickness
+					);
+				}
+
+				// Display the current selected tile in an inset
+				if (!output_tile_textures.empty() && current_tile_index < output_tile_textures.size()) {
+					// Draw the selected tile in a corner
+					ImVec2 window_pos = ImGui::GetWindowPos();
+					ImVec2 window_size = ImGui::GetWindowSize();
+
+					// Position for the tile inset (bottom-right corner)
+					float inset_size = tile_size / 1.5f; // slightly smaller than the original
+					ImVec2 inset_pos(window_pos.x + window_size.x - inset_size -
+							     20, // 20px padding from edge
+							 window_pos.y + window_size.y - inset_size - 20);
+
+					// Draw a background for the inset
+					ImGui::GetWindowDrawList()->AddRectFilled(
+					    inset_pos, ImVec2(inset_pos.x + inset_size, inset_pos.y + inset_size),
+					    IM_COL32(40, 40, 40, 200) // Dark background with some transparency
+					);
+
+					// Draw the tile
+					ImGui::GetWindowDrawList()->AddImage(
+					    output_tile_textures[current_tile_index]->GetID(), inset_pos,
+					    ImVec2(inset_pos.x + inset_size, inset_pos.y + inset_size));
+				}
+			} else {
+				ImGui::TextColored(ImVec4(1, 0.5f, 0, 1),
+						   "No full image available. Run analysis first.");
 			}
 		}
 
-		const int cols = 4;
-		for (int i = 0; i < output_tile_textures.size(); ++i) {
-			if (i % cols != 0)
-				ImGui::SameLine();
-			ImGui::Image(output_tile_textures[i]->GetID(), ImVec2((float)tile_size, (float)tile_size));
-		}
 		ImGui::EndChild();
 
 		ImGui::EndChild(); // DeformTab

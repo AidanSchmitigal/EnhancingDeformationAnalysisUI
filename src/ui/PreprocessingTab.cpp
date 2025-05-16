@@ -129,55 +129,28 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		// Frame Selection
 		ImGui::SeparatorText("Frame Selection");
 		ImGui::BeginDisabled(m_is_processing);
+
+		static bool choose_frames_open = false;
 		if (ImGui::Button("Choose Frames")) {
-			ImGui::OpenPopup("Choose Frames");
+			choose_frames_open = true;
 		}
 
-		if (ImGui::BeginPopup("Choose Frames")) {
-			if (ImGui::Button("Select All")) {
-				for (int i = 0; i < m_processed_textures.size(); i++)
-					m_selected_textures_map[i] = 1;
+		// Create a callback for removing selected frames
+		auto removeSelectedFrames = [this, &changed]() {
+			changed = true;
+			std::vector<int> to_remove;
+			for (auto &item : m_selected_textures_map)
+				to_remove.push_back(item.first);
+			std::sort(to_remove.begin(), to_remove.end());
+			for (int i = to_remove.size() - 1; i >= 0; i--) {
+				m_processed_textures.erase(m_processed_textures.begin() + to_remove[i]);
 			}
-			ImGui::SameLine();
-			if (ImGui::Button("Deselect All"))
-				m_selected_textures_map.clear();
-			if (ImGui::Button("Remove Selected")) {
-				changed = true;
-				std::vector<int> to_remove;
-				for (auto &item : m_selected_textures_map)
-					to_remove.push_back(item.first);
-				std::sort(to_remove.begin(), to_remove.end());
-				for (int i = to_remove.size() - 1; i >= 0; i--) {
-					m_processed_textures.erase(m_processed_textures.begin() + to_remove[i]);
-				}
-				m_selected_textures_map.clear();
-			}
-			ImGui::SeparatorText("Frames");
-			for (int i = 0; i < m_processed_textures.size(); i++) {
-				char name[100];
-				sprintf(name, "Image %d", i);
-				bool selected = m_selected_textures_map.find(i) != m_selected_textures_map.end();
-				if (selected) {
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1, 0.2, 0.2, 1));
-				}
-				ImGui::ImageButton(name, (ImTextureID)m_processed_textures[i]->GetID(),
-						   ImVec2(100, 100));
-				if (selected) {
-					ImGui::PopStyleColor();
-				}
-				if (i % 6 != 5)
-					ImGui::SameLine();
-				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("Frame %d", i);
-				if (ImGui::IsItemClicked()) {
-					if (selected)
-						m_selected_textures_map.erase(i);
-					else
-						m_selected_textures_map[i] = 1;
-				}
-			}
-			ImGui::EndPopup();
-		}
+			m_selected_textures_map.clear();
+		};
+
+		// Use the common UI function to display the frame selection window
+		ui::DisplayFrameSelectionWindow("Frame Selection", choose_frames_open, m_processed_textures,
+						m_selected_textures_map, removeSelectedFrames);
 		ImGui::EndDisabled();
 
 		// Denoising
@@ -218,22 +191,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		}
 
 #ifdef UI_INCLUDE_TENSORFLOW
-		if (m_split_textures.empty()) {
-			// Split the first image into tiles
-			uint32_t *data = (uint32_t *)malloc(m_processed_textures[0]->GetWidth() *
-							    m_processed_textures[0]->GetHeight() * 4);
-			utils::GetDataFromTexture(data, m_processed_textures[0]);
-			cv::Mat img = cv::Mat(m_processed_textures[0]->GetHeight(), m_processed_textures[0]->GetWidth(),
-					      CV_8UC4, data);
-			auto split_tiles = Tiler::CreateTiles(img, m_tile_config);
-			m_split_textures.clear();
-			for (auto &tile : split_tiles) {
-				auto t = std::make_shared<Texture>();
-				t->Load((uint32_t *)tile.data.data, tile.data.cols, tile.data.rows);
-				m_split_textures.push_back(t);
-			}
-			free(data);
-		}
+		utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
 
 		ImGui::SeparatorText("AI Denoising");
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Model").x);
@@ -243,9 +201,8 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Tile Size").x);
 		ImGui::SliderInt("Tile Size", &m_tile_config.tileSize, 150, 512);
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("Tile size. MUST BE AN EVEN NUMBER!\nGenerally "
-					  "leave around "
-					  "256, but can be varied for different results.");
+			ImGui::SetTooltip("We recommend leaving this at 256. Smaller or larger numbers can cause the "
+					  "models to emit errors, but we leave the choice to you.");
 		if (m_tile_config.type == TileType::Blended) {
 			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Overlap").x);
 			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
@@ -261,31 +218,31 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		}
 
-		ImGui::Text("Tiles per Image: %zu", m_split_textures.size());
+		static bool show_tiled_image_open = false;
 		if (ImGui::Button("Show One Tiled Image")) {
-			ImGui::OpenPopup("Tiled Image");
+			show_tiled_image_open = true;
+			// Ensure we have tiles to display when opening the window
+			if (m_split_textures.empty() && !m_processed_textures.empty()) {
+				utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
+			}
 		}
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("Click to show the tiled image.\nThis will split "
 					  "the first image in the sequence into tiles and "
-					  "show them in a popup.\nNote: This is not the "
+					  "show them in a window.\nNote: This is not the "
 					  "final result, just a preview of the tiles.");
 
-		if (ImGui::BeginPopup("Tiled Image")) {
-			if (ImGui::Button("Refresh Tiles")) {
-				m_split_textures.clear();
+		// Create a refresh callback
+		auto refreshTiles = [this]() {
+			m_split_textures.clear();
+			if (!m_processed_textures.empty()) {
+				utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
 			}
-			for (int i = 0; i < m_split_textures.size(); i++) {
-				char name[100];
-				sprintf(name, "Tile %d", i);
-				ImGui::ImageButton(name, (ImTextureID)m_split_textures[i]->GetID(), ImVec2(100, 100));
-				if (i % 4 != 3)
-					ImGui::SameLine();
-				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("Tile %d", i);
-			}
-			ImGui::EndPopup();
-		}
+		};
+
+		// Use the common UI function to display the tile preview window
+		ui::DisplayTilePreviewWindow("Tiled Image Preview", show_tiled_image_open, m_split_textures,
+					     refreshTiles);
 
 		if (ImGui::Button("Denoise")) {
 			m_is_processing = true;
