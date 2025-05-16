@@ -73,4 +73,7 @@ class PreprocessingTab {
 		int m_sharpness = 50;
 		int m_resolution = 3;
 		int m_amount = 1;
+		
+		// Frame navigation
+		int m_current_frame = 0;
 };

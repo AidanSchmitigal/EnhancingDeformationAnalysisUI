@@ -7,6 +7,7 @@
 struct Tile {
 	cv::Mat data;
 	cv::Point position;
+	int sourceFrameIndex = -1; // Stores the index of the source frame
 };
 
 enum class TileType { Cropped, Blended };

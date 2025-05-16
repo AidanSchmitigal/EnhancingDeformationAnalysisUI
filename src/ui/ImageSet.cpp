@@ -40,6 +40,17 @@ void ImageSet::Display() {
 	// Check if processing is happening in the preprocessing tab
 	bool isPreprocessProcessing = m_preprocessing_tab.IsProcessing();
 	bool isDeformationProcessing = DeformationAnalysisInterface::IsProcessing();
+	
+	// Check if an async processing task has completed
+	if (isDeformationProcessing && m_processing_future && m_processing_future->valid()) {
+		// Poll the future with zero timeout to check if it's done without blocking
+		auto status = m_processing_future->wait_for(std::chrono::seconds(0));
+		if (status == std::future_status::ready) {
+			// Get the result and update the UI if needed
+			bool result = m_processing_future->get();
+			// Processing is complete at this point
+		}
+	}
 
 	// Start tab bar
 	ImGui::BeginTabBar("Image Set Tabs");
@@ -70,7 +81,7 @@ void ImageSet::Display() {
 		DisplayDeformationAnalysisTab();
 
 	// Display the other tabs only if not processing
-	if (!isPreprocessProcessing) {
+	if (!isPreprocessProcessing && !isDeformationProcessing) {
 		DisplayFeatureTrackingTab();
 		DisplayImageAnalysisTab();
 	}
@@ -236,69 +247,228 @@ void ImageSet::DisplayImageComparisonTab() {
 		}
 
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
-		{ // put into scope for visibility
-		  // Control buttons
-			if (ImGui::Button("Play/Pause"))
-				isPlaying = !isPlaying;
-			if (ImGui::Button("Reset Playback")) {
-				m_current_frame = 0;
-				isPlaying = false;
-			}
-
-			// Frame slider
-			ImGui::SliderInt("Frame", (int *)&m_current_frame, 0,
-					 (int)std::max(m_textures.size(), m_processed_textures.size()) - 1);
-
-			ImGui::Separator();
-			// Reset options
-			if (ImGui::Button("Reset Processed Images")) {
-				PROFILE_SCOPE(ResetProcessedImages);
-
-				while (m_textures.size() > m_processed_textures.size())
-					m_processed_textures.push_back(std::make_shared<Texture>());
-				ImVec2 size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
-				uint32_t *data = (uint32_t *)malloc(size.x * size.y * sizeof(uint32_t));
-				for (int i = 0; i < m_textures.size(); i++) {
-					m_textures[i]->GetData(data);
-					m_processed_textures[i]->Load(data, (int)size.x, (int)size.y);
-				}
-				m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
-				free(data);
-			}
-
-			ImGui::Separator();
-			ImGui::TextWrapped("Tip: Use the File menu above for "
-					   "more export options.");
+		
+		// Playback controls section
+		ImGui::SeparatorText("Playback Controls");
+		
+		// Frame navigation controls
+		int max_frame = (int)std::max(m_textures.size(), m_processed_textures.size()) - 1;
+		
+		// Keep within bounds if frames were removed
+		if (m_current_frame > max_frame) m_current_frame = max_frame;
+		
+		// Frame counter with slider
+		ImGui::Text("Frame: %d/%d", m_current_frame + 1, max_frame + 1);
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		if (ImGui::SliderInt("##FrameSlider", (int *)&m_current_frame, 0, max_frame, "")) {
+			// Frame changed - handle any necessary state updates
 		}
+		
+		// Create a row of navigation controls
+		float button_width = ImGui::GetContentRegionAvail().x / 3 - 2;
+		
+		// Previous frame button
+		ImGui::BeginDisabled(m_current_frame <= 0);
+		if (ImGui::Button("Previous", ImVec2(button_width, 0))) {
+			m_current_frame--;
+		}
+		ImGui::EndDisabled();
+		
+		ImGui::SameLine();
+		
+		// Play/Pause button
+		if (ImGui::Button(isPlaying ? "Pause" : "Play", ImVec2(button_width, 0))) {
+			isPlaying = !isPlaying;
+		}
+		
+		ImGui::SameLine();
+		
+		// Next frame button
+		ImGui::BeginDisabled(m_current_frame >= max_frame);
+		if (ImGui::Button("Next", ImVec2(button_width, 0))) {
+			m_current_frame++;
+		}
+		ImGui::EndDisabled();
+		
+		// Speed control
+		static float playback_speed = 10.0f; // frames per second
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::SliderFloat("Speed", &playback_speed, 1.0f, 30.0f, "%.1f fps");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Frames per second");
+		}
+		
+		// Reset playback button
+		if (ImGui::Button("Reset Playback", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+			m_current_frame = 0;
+			isPlaying = false;
+		}
+		
+		// Image options section
+		ImGui::SeparatorText("Image Options");
+		
+		// Display scaling slider
+		static float display_scale = 1.5f;
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::SliderFloat("Scale", &display_scale, 1.0f, 3.0f, "%.1fx");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Adjust image display size");
+		}
+		
+		// Reset processed images button
+		if (ImGui::Button("Reset Processed Images", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+			PROFILE_SCOPE(ResetProcessedImages);
+
+			while (m_textures.size() > m_processed_textures.size())
+				m_processed_textures.push_back(std::make_shared<Texture>());
+			ImVec2 size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
+			uint32_t *data = (uint32_t *)malloc(size.x * size.y * sizeof(uint32_t));
+			for (int i = 0; i < m_textures.size(); i++) {
+				m_textures[i]->GetData(data);
+				m_processed_textures[i]->Load(data, (int)size.x, (int)size.y);
+			}
+			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
+			free(data);
+		}
+		
+		// View options section
+		ImGui::SeparatorText("View Options");
+		static bool sync_view = true;
+		ImGui::Checkbox("Synchronize View", &sync_view);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Keep original and processed images in sync");
+		}
+		
+		// Help section
+		ImGui::SeparatorText("Help");
+		ImGui::TextWrapped("Tip: Use the File menu above for export options.");
+		
 		ImGui::EndChild();
 
 		ImGui::SameLine();
 
-		// Side-by-side image display
+		// Side-by-side image display with improved styling
 		ImGui::BeginChild("Images", ImVec2(0, 0), true);
-		{ // put into scope again for visibility
-		  // Left sequence
-			ImGui::SeparatorText("Original Sequence");
-			if (!m_textures.empty() && m_current_frame < m_textures.size()) {
-				ImGui::Image(m_textures[m_current_frame]->GetID(),
-					     ImVec2(m_textures[0]->GetWidth() / 1.5, m_textures[0]->GetHeight() / 1.5));
+		
+		// Image navigation bar at the top
+		if (!m_textures.empty() && !m_processed_textures.empty()) {
+			// Frame navigation strip at the top
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
+			
+			// Left/right buttons
+			ImGui::BeginDisabled(m_current_frame <= 0);
+			if (ImGui::ArrowButton("##left_top", ImGuiDir_Left)) m_current_frame--;
+			ImGui::EndDisabled();
+			
+			ImGui::SameLine();
+			
+			// Frame slider (more compact version for the top)
+			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 70);
+			if (ImGui::SliderInt("##FrameSliderTop", (int*)&m_current_frame, 0, max_frame, "Frame %d")) {
+				// Frame changed
 			}
-
-			// Right sequence
-			ImGui::SeparatorText("Processed Sequence");
-			if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
-				ImGui::Image(m_processed_textures[m_current_frame]->GetID(),
-					     ImVec2((float)m_processed_textures[0]->GetWidth() / 1.5,
-						    (float)m_processed_textures[0]->GetHeight() / 1.5));
+			ImGui::PopItemWidth();
+			
+			ImGui::SameLine();
+			
+			ImGui::BeginDisabled(m_current_frame >= max_frame);
+			if (ImGui::ArrowButton("##right_top", ImGuiDir_Right)) m_current_frame++;
+			ImGui::EndDisabled();
+			
+			ImGui::SameLine();
+			
+			// Play/Pause button
+			if (ImGui::Button(isPlaying ? "⏸" : "▶")) {
+				isPlaying = !isPlaying;
 			}
+			
+			ImGui::PopStyleVar();
+			
+			ImGui::Separator();
 		}
+		
+		// Image display area
+		ImGui::Columns(2);
+		
+		// Left sequence (original)
+		ImGui::SeparatorText("Original Sequence");
+		if (!m_textures.empty() && m_current_frame < m_textures.size()) {
+			// Calculate the available size
+			ImVec2 avail = ImGui::GetContentRegionAvail();
+			ImVec2 img_size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
+			float aspect = img_size.x / img_size.y;
+			
+			// Scale the image to fit the available width
+			ImVec2 display_size = ImVec2(
+				std::min(avail.x, img_size.x / display_scale),
+				std::min(avail.x / aspect, img_size.y / display_scale)
+			);
+			
+			// Calculate centered position
+			ImVec2 cursor_pos = ImGui::GetCursorPos();
+			ImVec2 centered_pos = ImVec2(
+				cursor_pos.x + (avail.x - display_size.x) * 0.5f,
+				cursor_pos.y
+			);
+			ImGui::SetCursorPos(centered_pos);
+			
+			// Display image
+			ImGui::Image(m_textures[m_current_frame]->GetID(), display_size);
+			
+			// Image information
+			ImGui::SetCursorPosX(cursor_pos.x);
+			ImGui::TextUnformatted(("Size: " + std::to_string((int)img_size.x) + "x" + 
+				std::to_string((int)img_size.y)).c_str());
+		}
+
+		ImGui::NextColumn();
+		
+		// Right sequence (processed)
+		ImGui::SeparatorText("Processed Sequence");
+		if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
+			// Calculate the available size
+			ImVec2 avail = ImGui::GetContentRegionAvail();
+			ImVec2 img_size = ImVec2(m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			float aspect = img_size.x / img_size.y;
+			
+			// Scale the image to fit the available width
+			ImVec2 display_size = ImVec2(
+				std::min(avail.x, img_size.x / display_scale),
+				std::min(avail.x / aspect, img_size.y / display_scale)
+			);
+			
+			// Calculate centered position
+			ImVec2 cursor_pos = ImGui::GetCursorPos();
+			ImVec2 centered_pos = ImVec2(
+				cursor_pos.x + (avail.x - display_size.x) * 0.5f,
+				cursor_pos.y
+			);
+			ImGui::SetCursorPos(centered_pos);
+			
+			// Display image
+			ImGui::Image(m_processed_textures[m_current_frame]->GetID(), display_size);
+			
+			// Image information
+			ImGui::SetCursorPosX(cursor_pos.x);
+			ImGui::TextUnformatted(("Size: " + std::to_string((int)img_size.x) + "x" + 
+				std::to_string((int)img_size.y)).c_str());
+		}
+		
+		ImGui::Columns(1);
 		ImGui::EndChild();
 
-		// Playback logic
+		// Playback logic with speed control
 		if (isPlaying) {
-			m_current_frame++;
-			if (m_current_frame >= std::max(m_textures.size(), m_processed_textures.size())) {
-				m_current_frame = 0; // Loop back to start
+			static float last_time = ImGui::GetTime();
+			float current_time = ImGui::GetTime();
+			float frame_time = 1.0f / playback_speed;
+			
+			if (current_time - last_time > frame_time) {
+				m_current_frame++;
+				if (m_current_frame >= std::max(m_textures.size(), m_processed_textures.size())) {
+					m_current_frame = 0; // Loop back to start
+				}
+				last_time = current_time;
 			}
 		}
 
@@ -580,27 +750,44 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 		// left pane: settings + status
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
-		ImGui::Text("Settings");
-
+		
+		// Check if processing is happening
+		bool isProcessing = DeformationAnalysisInterface::IsProcessing();
+		
+		if (isProcessing) {
+			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Processing...");
+			float progress = DeformationAnalysisInterface::GetProgress();
+			ImGui::ProgressBar(progress, ImVec2(-1, 0), "");
+		}
+		
+		ImGui::SeparatorText("View Settings");
+		
 		// View toggle
+		ImGui::BeginDisabled(isProcessing);
 		if (ImGui::Checkbox("Gallery View", &m_show_gallery_view)) {
 			// Toggle between gallery and full image view
 		}
+		ImGui::EndDisabled();
 
+		ImGui::SeparatorText("Tiling Configuration");
+		
+		ImGui::BeginDisabled(isProcessing);
 		ImGui::Combo("Tile Type", (int *)&m_tile_config.type, "Cropped\0Blended\0\0");
-		ImGui::SliderInt("Tile Size", &tile_size, 1, 512);
+		ImGui::SliderInt("Tile Size", &tile_size, 156, 512);
 		if (m_tile_config.type == TileType::Cropped) {
-			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 0, 128);
+			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 16, 128);
 			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		} else if (m_tile_config.type == TileType::Blended) {
 			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
 		}
+		ImGui::EndDisabled();
 
 		// Update tile configuration for previews
 		m_tile_config.tileSize = tile_size;
 
 		// Add preview tile button
 		static bool preview_tiles_open = false;
+		ImGui::BeginDisabled(isProcessing);
 		if (ImGui::Button("Preview Tiles")) {
 			preview_tiles_open = true;
 			// Generate preview tiles if they don't exist or if they need to be refreshed
@@ -609,12 +796,19 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 							  m_tile_config);
 			}
 		}
+		ImGui::EndDisabled();
+		
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Preview how the current image will be split into tiles\n"
 					  "before running the full analysis. This helps you\n"
 					  "adjust tile size and other parameters.");
+		}
+
+		// Generate preview tiles if window is open
+		if (preview_tiles_open && !m_processed_textures.empty()) {
+			utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0], m_tile_config);
 		}
 
 		// Use the common UI function to display the tile preview window
@@ -625,19 +819,81 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			}
 		};
 
-		ui::DisplayTilePreviewWindow("Tile Preview", preview_tiles_open, m_preview_tile_textures, refreshTiles);
+		ui::DisplayTilePreviewWindow("Tiled Image Preview", preview_tiles_open, m_preview_tile_textures,
+					     refreshTiles);
 
 		ImGui::Separator();
+		
+		// Batch Processing Mode
+		ImGui::SeparatorText("Processing Mode");
+		
+		static int batch_mode = 0; // 0: Single, 1: Batch Consecutive, 2: Batch Reference
+		static int reference_frame = 0;
+		
+		ImGui::BeginDisabled(isProcessing);
+		ImGui::RadioButton("Single Pair Analysis", &batch_mode, 0);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Process a single pair of consecutive frames");
+		}
+		
+		ImGui::RadioButton("Batch Process - Consecutive", &batch_mode, 1);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Process all consecutive frame pairs: (0,1), (1,2), (2,3), etc.");
+		}
+		
+		ImGui::RadioButton("Batch Process - Reference Frame", &batch_mode, 2);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Process all frames against a reference frame: (ref,0), (ref,1), etc.");
+		}
+		
+		// Reference frame selection (only enabled for reference frame mode)
+		if (batch_mode == 2) {
+			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+			ImGui::SliderInt("Reference Frame", &reference_frame, 0, 
+				std::max(0, static_cast<int>(m_processed_textures.size()) - 1));
+		}
+		ImGui::EndDisabled();
 
-		if (ImGui::Button("Run Analysis")) {
+		// Run Analysis button
+		ImGui::BeginDisabled(isProcessing || m_processed_textures.size() < 2);
+		if (ImGui::Button("Run Analysis", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 			// gather frames
 			std::vector<uint32_t *> frames;
 			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(),
 						   m_processed_textures[0]->GetHeight(), m_processed_textures);
-
-			model_ok = DeformationAnalysisInterface::RunModel(frames, m_processed_textures[0]->GetWidth(),
-									  m_processed_textures[0]->GetHeight(),
-									  tile_size, overlap, output_tiles);
+			
+			// Clear previous results
+			output_tiles.clear();
+			
+			// Process based on selected mode
+			if (batch_mode == 0) {
+				// Single pair mode (legacy)
+				model_ok = DeformationAnalysisInterface::RunModel(frames, m_processed_textures[0]->GetWidth(),
+										  m_processed_textures[0]->GetHeight(),
+										  output_tiles, m_tile_config);
+			} else {
+				// Batch processing
+				DeformationAnalysisInterface::BatchProcessingParams params;
+				
+				if (batch_mode == 1) {
+					params.mode = DeformationAnalysisInterface::BatchProcessMode::Consecutive;
+				} else if (batch_mode == 2) {
+					params.mode = DeformationAnalysisInterface::BatchProcessMode::ReferenceFrame;
+					params.referenceFrameIndex = reference_frame;
+				}
+				
+				// Run asynchronous batch processing
+				auto future = DeformationAnalysisInterface::BatchProcessAsync(
+					frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(),
+					params, output_tiles, m_tile_config,
+					[this](bool result) {
+						// This will run in the worker thread when processing completes
+						model_ok = result;
+					});
+					
+				// Store the future for polling in the next frame
+				m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
+			}
 
 			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames,
 							   m_processed_textures[0]->GetWidth(),
@@ -662,6 +918,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 				}
 			}
 		}
+		ImGui::EndDisabled();
 
 		if (!model_ok) {
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model error!");

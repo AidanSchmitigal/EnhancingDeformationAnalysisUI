@@ -2,12 +2,15 @@
 
 #include <string>
 #include <vector>
+#include <future>
+#include <memory>
 
 #include <ui/PreprocessingTab.h>
 
 #include <OpenGL/Texture.h>
 
 #include <core/FeatureTracker.hpp>
+#include <core/DeformationAnalysisInterface.hpp>
 
 class ImageSet {
       public:
@@ -65,4 +68,7 @@ class ImageSet {
 	    
 	// deformation analysis preview
 	std::vector<std::shared_ptr<Texture>> m_preview_tile_textures;
+	
+	// Async processing
+	std::shared_ptr<std::future<bool>> m_processing_future;
 };

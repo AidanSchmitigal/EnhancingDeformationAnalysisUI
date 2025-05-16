@@ -191,6 +191,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		}
 
 #ifdef UI_INCLUDE_TENSORFLOW
+		// TODO: optimize and fix, if there are no textures...
 		utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
 
 		ImGui::SeparatorText("AI Denoising");
@@ -209,11 +210,11 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			if (ImGui::IsItemHovered())
 				ImGui::SetTooltip("Overlap size. MUST BE LESS THAN TILE "
 						  "SIZE!\nGenerally "
-						  "leave around 0, but can be varied for "
+						  "leave slightly above zero, but can be varied for "
 						  "different results.");
 		} else if (m_tile_config.type == TileType::Cropped) {
 			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Center Size").x);
-			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 0, 512);
+			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 16, 256);
 			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Include Outside").x);
 			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		}
@@ -234,6 +235,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 		// Create a refresh callback
 		auto refreshTiles = [this]() {
+			printf("Refreshing tiles...\n");
 			m_split_textures.clear();
 			if (!m_processed_textures.empty()) {
 				utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
@@ -335,9 +337,61 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 		ImGui::SameLine();
 		ImGui::BeginChild("ImageView", ImVec2(0, 0), true);
-		if (!m_processed_textures.empty())
-			ImGui::Image((ImTextureID)m_processed_textures[0]->GetID(),
-				     ImVec2(m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight()));
+		if (!m_processed_textures.empty()) {
+			// Add frame navigation controls
+			ImGui::BeginDisabled(m_is_processing);
+			if (m_processed_textures.size() > 1) {
+				// Frame slider with text showing current/total frames
+				ImGui::Text("Frame: %d/%d", m_current_frame + 1, (int)m_processed_textures.size());
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 100);
+				if (ImGui::SliderInt("##FrameSlider", &m_current_frame, 0, m_processed_textures.size() - 1, "")) {
+					// Keep within bounds
+					m_current_frame = std::max(0, std::min(m_current_frame, (int)m_processed_textures.size() - 1));
+				}
+				
+				// Navigation buttons
+				ImGui::SameLine();
+				ImGui::BeginDisabled(m_current_frame <= 0);
+				if (ImGui::ArrowButton("##left", ImGuiDir_Left)) m_current_frame--;
+				ImGui::EndDisabled();
+				
+				ImGui::SameLine();
+				ImGui::BeginDisabled(m_current_frame >= m_processed_textures.size() - 1);
+				if (ImGui::ArrowButton("##right", ImGuiDir_Right)) m_current_frame++;
+				ImGui::EndDisabled();
+				
+				// Play/Pause button
+				ImGui::SameLine();
+				static bool isPlaying = false;
+				if (ImGui::Button(isPlaying ? "Pause" : "Play")) {
+					isPlaying = !isPlaying;
+				}
+				
+				// Playback logic
+				if (isPlaying) {
+					// static...
+					static float lastTime = ImGui::GetTime();
+					float currentTime = ImGui::GetTime();
+					if (currentTime - lastTime > 0.1f) { // Advance frame every 100ms
+						m_current_frame++;
+						if (m_current_frame >= m_processed_textures.size()) {
+							m_current_frame = 0; // Loop back to start
+						}
+						lastTime = currentTime;
+					}
+				}
+			}
+			ImGui::EndDisabled();
+			
+			// Add a separator between controls and image
+			ImGui::Separator();
+			
+			// Display the current frame
+			ImGui::Image((ImTextureID)m_processed_textures[m_current_frame]->GetID(),
+				     ImVec2(m_processed_textures[m_current_frame]->GetWidth(), 
+				            m_processed_textures[m_current_frame]->GetHeight()));
+		}
 		ImGui::EndChild();
 
 		ImGui::EndTabItem();
