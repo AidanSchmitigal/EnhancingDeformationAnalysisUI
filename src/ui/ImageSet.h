@@ -66,8 +66,15 @@ class ImageSet {
 	std::chrono::time_point<std::chrono::system_clock> m_last_time =
 	    std::chrono::system_clock::now();
 	    
-	// deformation analysis preview
+	// deformation analysis members
 	std::vector<std::shared_ptr<Texture>> m_preview_tile_textures;
+	std::vector<Tile> m_output_tiles;
+	std::vector<std::shared_ptr<Texture>> m_output_tile_textures;
+	std::shared_ptr<Texture> m_full_image_texture;
+	std::vector<uint32_t*> m_processing_frames;
+	bool m_model_ok = true;
+	int m_tile_size = 256;
+	uint32_t m_current_tile_index = 0;
 	
 	// Async processing
 	std::shared_ptr<std::future<bool>> m_processing_future;

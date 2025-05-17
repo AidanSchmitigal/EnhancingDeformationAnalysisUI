@@ -231,8 +231,16 @@ cv::Mat Tiler::StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size
 	// finalize: avoid div by zero
 	cv::Mat zeroMask = (weights == 0);
 	weights.setTo(1, zeroMask);
-	cv::divide(result, weights, result); // auto-broadcast across channels
+
+	// replicate cumulative weights into nch channels
+	cv::Mat weightsC;
+	if (ch > 1) {
+		std::vector<cv::Mat> wmv(ch, weights);
+		cv::merge(wmv, weightsC);
+	} else {
+		weightsC = weights;
+	}
+	cv::divide(result, weightsC, result); // auto-broadcast across channels
 
 	return result;
 }
-

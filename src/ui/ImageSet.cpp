@@ -40,15 +40,14 @@ void ImageSet::Display() {
 	// Check if processing is happening in the preprocessing tab
 	bool isPreprocessProcessing = m_preprocessing_tab.IsProcessing();
 	bool isDeformationProcessing = DeformationAnalysisInterface::IsProcessing();
-	
+
 	// Check if an async processing task has completed
 	if (isDeformationProcessing && m_processing_future && m_processing_future->valid()) {
 		// Poll the future with zero timeout to check if it's done without blocking
 		auto status = m_processing_future->wait_for(std::chrono::seconds(0));
 		if (status == std::future_status::ready) {
-			// Get the result and update the UI if needed
-			bool result = m_processing_future->get();
-			// Processing is complete at this point
+			// Just get the result - our callback will already have processed everything
+			m_processing_future->get();
 		}
 	}
 
@@ -247,49 +246,50 @@ void ImageSet::DisplayImageComparisonTab() {
 		}
 
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
-		
+
 		// Playback controls section
 		ImGui::SeparatorText("Playback Controls");
-		
+
 		// Frame navigation controls
 		int max_frame = (int)std::max(m_textures.size(), m_processed_textures.size()) - 1;
-		
+
 		// Keep within bounds if frames were removed
-		if (m_current_frame > max_frame) m_current_frame = max_frame;
-		
+		if (m_current_frame > max_frame)
+			m_current_frame = max_frame;
+
 		// Frame counter with slider
 		ImGui::Text("Frame: %d/%d", m_current_frame + 1, max_frame + 1);
 		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
 		if (ImGui::SliderInt("##FrameSlider", (int *)&m_current_frame, 0, max_frame, "")) {
 			// Frame changed - handle any necessary state updates
 		}
-		
+
 		// Create a row of navigation controls
 		float button_width = ImGui::GetContentRegionAvail().x / 3 - 2;
-		
+
 		// Previous frame button
 		ImGui::BeginDisabled(m_current_frame <= 0);
 		if (ImGui::Button("Previous", ImVec2(button_width, 0))) {
 			m_current_frame--;
 		}
 		ImGui::EndDisabled();
-		
+
 		ImGui::SameLine();
-		
+
 		// Play/Pause button
 		if (ImGui::Button(isPlaying ? "Pause" : "Play", ImVec2(button_width, 0))) {
 			isPlaying = !isPlaying;
 		}
-		
+
 		ImGui::SameLine();
-		
+
 		// Next frame button
 		ImGui::BeginDisabled(m_current_frame >= max_frame);
 		if (ImGui::Button("Next", ImVec2(button_width, 0))) {
 			m_current_frame++;
 		}
 		ImGui::EndDisabled();
-		
+
 		// Speed control
 		static float playback_speed = 10.0f; // frames per second
 		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
@@ -297,16 +297,16 @@ void ImageSet::DisplayImageComparisonTab() {
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Frames per second");
 		}
-		
+
 		// Reset playback button
 		if (ImGui::Button("Reset Playback", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 			m_current_frame = 0;
 			isPlaying = false;
 		}
-		
+
 		// Image options section
 		ImGui::SeparatorText("Image Options");
-		
+
 		// Display scaling slider
 		static float display_scale = 1.5f;
 		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
@@ -314,7 +314,7 @@ void ImageSet::DisplayImageComparisonTab() {
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Adjust image display size");
 		}
-		
+
 		// Reset processed images button
 		if (ImGui::Button("Reset Processed Images", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 			PROFILE_SCOPE(ResetProcessedImages);
@@ -330,7 +330,7 @@ void ImageSet::DisplayImageComparisonTab() {
 			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 			free(data);
 		}
-		
+
 		// View options section
 		ImGui::SeparatorText("View Options");
 		static bool sync_view = true;
@@ -338,58 +338,60 @@ void ImageSet::DisplayImageComparisonTab() {
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Keep original and processed images in sync");
 		}
-		
+
 		// Help section
 		ImGui::SeparatorText("Help");
 		ImGui::TextWrapped("Tip: Use the File menu above for export options.");
-		
+
 		ImGui::EndChild();
 
 		ImGui::SameLine();
 
 		// Side-by-side image display with improved styling
 		ImGui::BeginChild("Images", ImVec2(0, 0), true);
-		
+
 		// Image navigation bar at the top
 		if (!m_textures.empty() && !m_processed_textures.empty()) {
 			// Frame navigation strip at the top
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
-			
+
 			// Left/right buttons
 			ImGui::BeginDisabled(m_current_frame <= 0);
-			if (ImGui::ArrowButton("##left_top", ImGuiDir_Left)) m_current_frame--;
+			if (ImGui::ArrowButton("##left_top", ImGuiDir_Left))
+				m_current_frame--;
 			ImGui::EndDisabled();
-			
+
 			ImGui::SameLine();
-			
+
 			// Frame slider (more compact version for the top)
 			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 70);
-			if (ImGui::SliderInt("##FrameSliderTop", (int*)&m_current_frame, 0, max_frame, "Frame %d")) {
+			if (ImGui::SliderInt("##FrameSliderTop", (int *)&m_current_frame, 0, max_frame, "Frame %d")) {
 				// Frame changed
 			}
 			ImGui::PopItemWidth();
-			
+
 			ImGui::SameLine();
-			
+
 			ImGui::BeginDisabled(m_current_frame >= max_frame);
-			if (ImGui::ArrowButton("##right_top", ImGuiDir_Right)) m_current_frame++;
+			if (ImGui::ArrowButton("##right_top", ImGuiDir_Right))
+				m_current_frame++;
 			ImGui::EndDisabled();
-			
+
 			ImGui::SameLine();
-			
+
 			// Play/Pause button
 			if (ImGui::Button(isPlaying ? "⏸" : "▶")) {
 				isPlaying = !isPlaying;
 			}
-			
+
 			ImGui::PopStyleVar();
-			
+
 			ImGui::Separator();
 		}
-		
+
 		// Image display area
 		ImGui::Columns(2);
-		
+
 		// Left sequence (original)
 		ImGui::SeparatorText("Original Sequence");
 		if (!m_textures.empty() && m_current_frame < m_textures.size()) {
@@ -397,63 +399,56 @@ void ImageSet::DisplayImageComparisonTab() {
 			ImVec2 avail = ImGui::GetContentRegionAvail();
 			ImVec2 img_size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
 			float aspect = img_size.x / img_size.y;
-			
+
 			// Scale the image to fit the available width
-			ImVec2 display_size = ImVec2(
-				std::min(avail.x, img_size.x / display_scale),
-				std::min(avail.x / aspect, img_size.y / display_scale)
-			);
-			
+			ImVec2 display_size = ImVec2(std::min(avail.x, img_size.x / display_scale),
+						     std::min(avail.x / aspect, img_size.y / display_scale));
+
 			// Calculate centered position
 			ImVec2 cursor_pos = ImGui::GetCursorPos();
-			ImVec2 centered_pos = ImVec2(
-				cursor_pos.x + (avail.x - display_size.x) * 0.5f,
-				cursor_pos.y
-			);
+			ImVec2 centered_pos = ImVec2(cursor_pos.x + (avail.x - display_size.x) * 0.5f, cursor_pos.y);
 			ImGui::SetCursorPos(centered_pos);
-			
+
 			// Display image
 			ImGui::Image(m_textures[m_current_frame]->GetID(), display_size);
-			
+
 			// Image information
 			ImGui::SetCursorPosX(cursor_pos.x);
-			ImGui::TextUnformatted(("Size: " + std::to_string((int)img_size.x) + "x" + 
-				std::to_string((int)img_size.y)).c_str());
+			ImGui::TextUnformatted(
+			    ("Size: " + std::to_string((int)img_size.x) + "x" + std::to_string((int)img_size.y))
+				.c_str());
 		}
 
 		ImGui::NextColumn();
-		
+
 		// Right sequence (processed)
 		ImGui::SeparatorText("Processed Sequence");
 		if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
 			// Calculate the available size
 			ImVec2 avail = ImGui::GetContentRegionAvail();
-			ImVec2 img_size = ImVec2(m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			ImVec2 img_size =
+			    ImVec2(m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
 			float aspect = img_size.x / img_size.y;
-			
+
 			// Scale the image to fit the available width
-			ImVec2 display_size = ImVec2(
-				std::min(avail.x, img_size.x / display_scale),
-				std::min(avail.x / aspect, img_size.y / display_scale)
-			);
-			
+			ImVec2 display_size = ImVec2(std::min(avail.x, img_size.x / display_scale),
+						     std::min(avail.x / aspect, img_size.y / display_scale));
+
 			// Calculate centered position
 			ImVec2 cursor_pos = ImGui::GetCursorPos();
-			ImVec2 centered_pos = ImVec2(
-				cursor_pos.x + (avail.x - display_size.x) * 0.5f,
-				cursor_pos.y
-			);
+			ImVec2 centered_pos = ImVec2(cursor_pos.x + (avail.x - display_size.x) * 0.5f, cursor_pos.y);
 			ImGui::SetCursorPos(centered_pos);
-			
+
 			// Display image
 			ImGui::Image(m_processed_textures[m_current_frame]->GetID(), display_size);
-			
+
 			// Image information
 			ImGui::SetCursorPosX(cursor_pos.x);
-			ImGui::TextUnformatted(("Size: " + std::to_string((int)img_size.x) + "x" + 
-				std::to_string((int)img_size.y)).c_str());
+			ImGui::TextUnformatted(
+			    ("Size: " + std::to_string((int)img_size.x) + "x" + std::to_string((int)img_size.y))
+				.c_str());
 		}
-		
+
 		ImGui::Columns(1);
 		ImGui::EndChild();
 
@@ -462,7 +457,7 @@ void ImageSet::DisplayImageComparisonTab() {
 			static float last_time = ImGui::GetTime();
 			float current_time = ImGui::GetTime();
 			float frame_time = 1.0f / playback_speed;
-			
+
 			if (current_time - last_time > frame_time) {
 				m_current_frame++;
 				if (m_current_frame >= std::max(m_textures.size(), m_processed_textures.size())) {
@@ -736,13 +731,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 }
 
 void ImageSet::DisplayDeformationAnalysisTab() {
-	static bool model_ok = true;
-	static std::vector<Tile> output_tiles;
-	static std::vector<Texture *> output_tile_textures;
-	static int tile_size = 256;
 	static int overlap = 0;
-	static std::shared_ptr<Texture> full_image_texture;
-	static uint32_t current_tile_index = 0;
 
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
 		// full-tab child with menu bar
@@ -750,18 +739,18 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 		// left pane: settings + status
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
-		
+
 		// Check if processing is happening
 		bool isProcessing = DeformationAnalysisInterface::IsProcessing();
-		
+
 		if (isProcessing) {
 			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Processing...");
 			float progress = DeformationAnalysisInterface::GetProgress();
 			ImGui::ProgressBar(progress, ImVec2(-1, 0), "");
 		}
-		
+
 		ImGui::SeparatorText("View Settings");
-		
+
 		// View toggle
 		ImGui::BeginDisabled(isProcessing);
 		if (ImGui::Checkbox("Gallery View", &m_show_gallery_view)) {
@@ -770,10 +759,10 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		ImGui::EndDisabled();
 
 		ImGui::SeparatorText("Tiling Configuration");
-		
+
 		ImGui::BeginDisabled(isProcessing);
 		ImGui::Combo("Tile Type", (int *)&m_tile_config.type, "Cropped\0Blended\0\0");
-		ImGui::SliderInt("Tile Size", &tile_size, 156, 512);
+		ImGui::SliderInt("Tile Size", &m_tile_size, 156, 512);
 		if (m_tile_config.type == TileType::Cropped) {
 			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 16, 128);
 			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
@@ -783,7 +772,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		ImGui::EndDisabled();
 
 		// Update tile configuration for previews
-		m_tile_config.tileSize = tile_size;
+		m_tile_config.tileSize = m_tile_size;
 
 		// Add preview tile button
 		static bool preview_tiles_open = false;
@@ -797,7 +786,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			}
 		}
 		ImGui::EndDisabled();
-		
+
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
 		if (ImGui::IsItemHovered()) {
@@ -823,34 +812,34 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					     refreshTiles);
 
 		ImGui::Separator();
-		
+
 		// Batch Processing Mode
 		ImGui::SeparatorText("Processing Mode");
-		
+
 		static int batch_mode = 0; // 0: Single, 1: Batch Consecutive, 2: Batch Reference
 		static int reference_frame = 0;
-		
+
 		ImGui::BeginDisabled(isProcessing);
 		ImGui::RadioButton("Single Pair Analysis", &batch_mode, 0);
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Process a single pair of consecutive frames");
 		}
-		
+
 		ImGui::RadioButton("Batch Process - Consecutive", &batch_mode, 1);
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Process all consecutive frame pairs: (0,1), (1,2), (2,3), etc.");
 		}
-		
+
 		ImGui::RadioButton("Batch Process - Reference Frame", &batch_mode, 2);
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Process all frames against a reference frame: (ref,0), (ref,1), etc.");
 		}
-		
+
 		// Reference frame selection (only enabled for reference frame mode)
 		if (batch_mode == 2) {
 			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-			ImGui::SliderInt("Reference Frame", &reference_frame, 0, 
-				std::max(0, static_cast<int>(m_processed_textures.size()) - 1));
+			ImGui::SliderInt("Reference Frame", &reference_frame, 0,
+					 std::max(0, static_cast<int>(m_processed_textures.size()) - 1));
 		}
 		ImGui::EndDisabled();
 
@@ -858,79 +847,88 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		ImGui::BeginDisabled(isProcessing || m_processed_textures.size() < 2);
 		if (ImGui::Button("Run Analysis", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 			// gather frames
-			std::vector<uint32_t *> frames;
-			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(),
+			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
 						   m_processed_textures[0]->GetHeight(), m_processed_textures);
-			
+
 			// Clear previous results
-			output_tiles.clear();
-			
-			// Process based on selected mode
-			if (batch_mode == 0) {
-				// Single pair mode (legacy)
-				model_ok = DeformationAnalysisInterface::RunModel(frames, m_processed_textures[0]->GetWidth(),
-										  m_processed_textures[0]->GetHeight(),
-										  output_tiles, m_tile_config);
-			} else {
-				// Batch processing
-				DeformationAnalysisInterface::BatchProcessingParams params;
+			m_output_tiles.clear();
+			m_output_tile_textures.clear();
+
+			// Create callback function to handle completion
+			auto completionCallback = [this](bool result) {
+				m_model_ok = result;
 				
-				if (batch_mode == 1) {
-					params.mode = DeformationAnalysisInterface::BatchProcessMode::Consecutive;
-				} else if (batch_mode == 2) {
-					params.mode = DeformationAnalysisInterface::BatchProcessMode::ReferenceFrame;
-					params.referenceFrameIndex = reference_frame;
+				std::cout << "Callback executed with " << m_output_tiles.size() << " output tiles" << std::endl;
+				
+				// Debug print out the first tile info
+				if (!m_output_tiles.empty()) {
+					auto& first_tile = m_output_tiles[0];
+					std::cout << "First tile: " << first_tile.data.cols << "x" << first_tile.data.rows 
+						<< " channels: " << first_tile.data.channels() 
+						<< " data ptr: " << (first_tile.data.data != nullptr ? "valid" : "null") 
+						<< std::endl;
 				}
 				
-				// Run asynchronous batch processing
-				auto future = DeformationAnalysisInterface::BatchProcessAsync(
-					frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(),
-					params, output_tiles, m_tile_config,
-					[this](bool result) {
-						// This will run in the worker thread when processing completes
-						model_ok = result;
-					});
+				// Create textures for the output tiles
+				for (auto& tile : m_output_tiles) {
+					// Make sure we have valid image data
+					if (tile.data.data && tile.data.cols > 0 && tile.data.rows > 0) {
+						m_output_tile_textures.push_back(std::make_shared<Texture>());
+						m_output_tile_textures.back()->Load((uint32_t*)tile.data.data, tile.data.cols, tile.data.rows);
+					}
+				}
+				
+				// Create full image texture if tiles are available
+				if (!m_output_tiles.empty() && !m_processed_textures.empty()) {
+					m_full_image_texture = std::make_shared<Texture>();
 					
-				// Store the future for polling in the next frame
-				m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
-			}
-
-			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames,
-							   m_processed_textures[0]->GetWidth(),
-							   m_processed_textures[0]->GetHeight());
-			// rebuild textures
-			output_tile_textures.clear();
-
-			// Create or update the full image texture when analysis is run
-			if (!output_tiles.empty() && model_ok) {
-				// Check if we need to create a new full image texture
-				if (!full_image_texture) {
-					full_image_texture = std::make_shared<Texture>();
+					// Copy data from the first processed texture
+					uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * 
+								     m_processed_textures[0]->GetHeight()];
+					m_processed_textures[0]->GetData(data);
+					m_full_image_texture->Load(data, m_processed_textures[0]->GetWidth(), 
+								  m_processed_textures[0]->GetHeight());
+					delete[] data;
 				}
-				// Use the first processed texture as the base for the full view
-				if (!m_processed_textures.empty()) {
-					uint32_t *img_data = new uint32_t[m_processed_textures[0]->GetWidth() *
-									  m_processed_textures[0]->GetHeight()];
-					m_processed_textures[0]->GetData(img_data);
-					full_image_texture->Load(img_data, m_processed_textures[0]->GetWidth(),
-								 m_processed_textures[0]->GetHeight());
-					delete[] img_data;
-				}
-			}
+				
+				utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
+							 m_processed_textures[0]->GetWidth(),
+							 m_processed_textures[0]->GetHeight());
+
+				m_processing_frames.clear();
+
+				std::cout << "Created " << m_output_tile_textures.size() << " tile textures" << std::endl;
+			};
+
+			// Run the model asynchronously with the callback
+			auto future = DeformationAnalysisInterface::RunModelBatchAsync(
+				m_processing_frames, 
+				m_processed_textures[0]->GetWidth(), 
+				m_processed_textures[0]->GetHeight(), 
+				m_output_tiles, 
+				m_tile_config, 
+				16, // Batch size of 8
+				completionCallback
+			);
+
+			// Store the future for polling in the next frame
+			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
+
+			m_output_tile_textures.clear();
 		}
 		ImGui::EndDisabled();
 
-		if (!model_ok) {
+		if (!m_model_ok) {
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model error!");
 		}
 
 		ImGui::Separator();
-		ImGui::Text("Tiles: %d", (int)output_tiles.size());
+		ImGui::Text("Tiles: %d", (int)m_output_tiles.size());
 
 		// For full image view, add a tile selector
-		if (!m_show_gallery_view && !output_tile_textures.empty()) {
-			ImGui::SliderInt("Current Tile", (int *)&current_tile_index, 0,
-					 (int)output_tile_textures.size() - 1);
+		if (!m_show_gallery_view && !m_output_tile_textures.empty()) {
+			ImGui::SliderInt("Current Tile", (int *)&m_current_tile_index, 0,
+					 (int)m_output_tile_textures.size() - 1);
 		}
 
 		ImGui::EndChild();
@@ -944,29 +942,22 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			// Gallery view
 			ImGui::Text("Output Tiles");
 
-			if (output_tiles.empty()) {
+			if (m_output_tiles.empty()) {
 				ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "No tiles available. Run analysis first.");
 			}
 
-			// lazy-load textures
-			if (output_tile_textures.empty() && model_ok) {
-				for (auto &t : output_tiles) {
-					Texture *tex = new Texture;
-					tex->Load((uint32_t *)t.data.data, t.data.cols, t.data.rows);
-					output_tile_textures.push_back(tex);
-				}
-			}
+			// Textures are now loaded when processing completes in Display()
 
 			const int cols = 4;
-			for (int i = 0; i < output_tile_textures.size(); ++i) {
+			for (int i = 0; i < m_output_tile_textures.size(); ++i) {
 				if (i % cols != 0)
 					ImGui::SameLine();
-				ImGui::Image(output_tile_textures[i]->GetID(),
-					     ImVec2((float)tile_size, (float)tile_size));
+				ImGui::Image(m_output_tile_textures[i]->GetID(),
+					     ImVec2((float)m_tile_size, (float)m_tile_size));
 
 				// Make the tiles selectable for the full view
 				if (ImGui::IsItemClicked()) {
-					current_tile_index = i;
+					m_current_tile_index = i;
 					m_show_gallery_view = false;
 				}
 			}
@@ -975,45 +966,45 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			ImGui::Text("Full Image View");
 
 			// Display the full image if available
-			if (full_image_texture) {
+			if (m_full_image_texture) {
 				ImVec2 available_space = ImGui::GetContentRegionAvail();
 				float scale_factor =
-				    std::min(available_space.x / (float)full_image_texture->GetWidth(),
-					     available_space.y / (float)full_image_texture->GetHeight());
+				    std::min(available_space.x / (float)m_full_image_texture->GetWidth(),
+					     available_space.y / (float)m_full_image_texture->GetHeight());
 
-				ImVec2 display_size(full_image_texture->GetWidth() * scale_factor,
-						    full_image_texture->GetHeight() * scale_factor);
+				ImVec2 display_size(m_full_image_texture->GetWidth() * scale_factor,
+						    m_full_image_texture->GetHeight() * scale_factor);
 
-				ImGui::Image(full_image_texture->GetID(), display_size);
+				ImGui::Image(m_full_image_texture->GetID(), display_size);
 
 				// Indicate the position of the selected tile on the full image
-				if (!output_tiles.empty() && current_tile_index < output_tiles.size()) {
+				if (!m_output_tiles.empty() && m_current_tile_index < m_output_tiles.size()) {
 					// Draw a rectangle overlay to indicate where the current tile is on the full
 					// image This assumes tiles are stored in row-major order
 					ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
 					ImDrawList *draw_list = ImGui::GetWindowDrawList();
 
 					// Calculate position of selected tile in full image coordinates
-					const int full_width = full_image_texture->GetWidth();
-					const int full_height = full_image_texture->GetHeight();
+					const int full_width = m_full_image_texture->GetWidth();
+					const int full_height = m_full_image_texture->GetHeight();
 
 					// Get the rows and columns based on full image and tile size
-					int cols_in_full = full_width / tile_size;
+					int cols_in_full = full_width / m_tile_size;
 					if (cols_in_full == 0)
 						cols_in_full = 1;
 
-					int tile_row = current_tile_index / cols_in_full;
-					int tile_col = current_tile_index % cols_in_full;
+					int tile_row = m_current_tile_index / cols_in_full;
+					int tile_col = m_current_tile_index % cols_in_full;
 
 					float rect_x_pos =
-					    cursor_pos.x - display_size.x + (tile_col * tile_size * scale_factor);
+					    cursor_pos.x - display_size.x + (tile_col * m_tile_size * scale_factor);
 					float rect_y_pos =
-					    cursor_pos.y - display_size.y + (tile_row * tile_size * scale_factor);
+					    cursor_pos.y - display_size.y + (tile_row * m_tile_size * scale_factor);
 
 					// Draw the rectangle
 					draw_list->AddRect(ImVec2(rect_x_pos, rect_y_pos),
-							   ImVec2(rect_x_pos + tile_size * scale_factor,
-								  rect_y_pos + tile_size * scale_factor),
+							   ImVec2(rect_x_pos + m_tile_size * scale_factor,
+								  rect_y_pos + m_tile_size * scale_factor),
 							   IM_COL32(255, 0, 0, 255), // Red
 							   0.0f,		     // rounding
 							   0,			     // flags
@@ -1022,13 +1013,14 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 				}
 
 				// Display the current selected tile in an inset
-				if (!output_tile_textures.empty() && current_tile_index < output_tile_textures.size()) {
+				if (!m_output_tile_textures.empty() &&
+				    m_current_tile_index < m_output_tile_textures.size()) {
 					// Draw the selected tile in a corner
 					ImVec2 window_pos = ImGui::GetWindowPos();
 					ImVec2 window_size = ImGui::GetWindowSize();
 
 					// Position for the tile inset (bottom-right corner)
-					float inset_size = tile_size / 1.5f; // slightly smaller than the original
+					float inset_size = m_tile_size / 1.5f; // slightly smaller than the original
 					ImVec2 inset_pos(window_pos.x + window_size.x - inset_size -
 							     20, // 20px padding from edge
 							 window_pos.y + window_size.y - inset_size - 20);
@@ -1041,7 +1033,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 					// Draw the tile
 					ImGui::GetWindowDrawList()->AddImage(
-					    output_tile_textures[current_tile_index]->GetID(), inset_pos,
+					    m_output_tile_textures[m_current_tile_index]->GetID(), inset_pos,
 					    ImVec2(inset_pos.x + inset_size, inset_pos.y + inset_size));
 				}
 			} else {
