@@ -73,8 +73,9 @@ class ImageSet {
 	std::shared_ptr<Texture> m_full_image_texture;
 	std::vector<uint32_t*> m_processing_frames;
 	bool m_model_ok = true;
-	int m_tile_size = 256;
+	int m_batch_size = 8;
 	uint32_t m_current_tile_index = 0;
+	bool m_tile_need_refresh = false;
 	
 	// Async processing
 	std::shared_ptr<std::future<bool>> m_processing_future;

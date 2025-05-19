@@ -41,6 +41,7 @@ void PreprocessingTab::OnProcessingComplete(bool success) {
 }
 
 void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
+	static TileConfig compare_config;
 	if (ImGui::BeginTabItem("Preprocessing")) {
 		if (m_processed_textures.size() == 0) {
 			ImGui::Text("No images loaded");
@@ -191,8 +192,6 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		}
 
 #ifdef UI_INCLUDE_TENSORFLOW
-		// TODO: optimize and fix, if there are no textures...
-		utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
 
 		ImGui::SeparatorText("AI Denoising");
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Model").x);
@@ -219,6 +218,11 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		}
 
+		if (m_tile_config != compare_config)
+			m_tile_need_refresh = true;
+
+		compare_config = m_tile_config;
+
 		static bool show_tiled_image_open = false;
 		if (ImGui::Button("Show One Tiled Image")) {
 			show_tiled_image_open = true;
@@ -235,10 +239,10 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 		// Create a refresh callback
 		auto refreshTiles = [this]() {
-			printf("Refreshing tiles...\n");
-			m_split_textures.clear();
-			if (!m_processed_textures.empty()) {
-				utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
+			if (!m_processed_textures.empty() && m_tile_need_refresh) {
+				m_split_textures.clear();
+				utils::UpdateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
+				m_tile_need_refresh = false;
 			}
 		};
 

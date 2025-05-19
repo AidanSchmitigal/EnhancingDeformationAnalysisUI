@@ -55,6 +55,7 @@ class PreprocessingTab {
 		int m_overlap = 0;
 		bool m_include_outside = false;
 		TileConfig m_tile_config = TileConfig(TileType::Cropped, m_tile_size, m_overlap, m_center_size, m_include_outside);
+		bool m_tile_need_refresh = false;
 
 		static const char* m_models[];
 		int m_selected_model = 0;

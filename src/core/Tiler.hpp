@@ -17,6 +17,12 @@ struct TileConfig {
 		   bool includeOutside = false)
 	    : type(type), tileSize(tileSize), overlap(overlap), centerSize(centerSize), includeOutside(includeOutside) {
 	}
+	
+	bool operator==(const TileConfig &other) const {
+		return type == other.type && tileSize == other.tileSize && overlap == other.overlap &&
+		       centerSize == other.centerSize && includeOutside == other.includeOutside;
+	}
+
 	TileType type;
 	int tileSize;
 	int overlap;

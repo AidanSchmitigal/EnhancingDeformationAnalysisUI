@@ -731,7 +731,7 @@ void ImageSet::DisplayFeatureTrackingTab() {
 }
 
 void ImageSet::DisplayDeformationAnalysisTab() {
-	static int overlap = 0;
+	static TileConfig compare_config;
 
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
 		// full-tab child with menu bar
@@ -753,26 +753,29 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 		// View toggle
 		ImGui::BeginDisabled(isProcessing);
-		if (ImGui::Checkbox("Gallery View", &m_show_gallery_view)) {
-			// Toggle between gallery and full image view
-		}
+
+		ImGui::Checkbox("Gallery View", &m_show_gallery_view);
+
 		ImGui::EndDisabled();
 
 		ImGui::SeparatorText("Tiling Configuration");
 
 		ImGui::BeginDisabled(isProcessing);
 		ImGui::Combo("Tile Type", (int *)&m_tile_config.type, "Cropped\0Blended\0\0");
-		ImGui::SliderInt("Tile Size", &m_tile_size, 156, 512);
+		ImGui::SliderInt("Tile Size", &m_tile_config.tileSize, 156, 512);
 		if (m_tile_config.type == TileType::Cropped) {
 			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 16, 128);
 			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		} else if (m_tile_config.type == TileType::Blended) {
 			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
 		}
+
 		ImGui::EndDisabled();
 
-		// Update tile configuration for previews
-		m_tile_config.tileSize = m_tile_size;
+		if (m_tile_config != compare_config)
+			m_tile_need_refresh = true;
+
+		compare_config = m_tile_config;
 
 		// Add preview tile button
 		static bool preview_tiles_open = false;
@@ -795,16 +798,13 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					  "adjust tile size and other parameters.");
 		}
 
-		// Generate preview tiles if window is open
-		if (preview_tiles_open && !m_processed_textures.empty()) {
-			utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0], m_tile_config);
-		}
-
 		// Use the common UI function to display the tile preview window
 		auto refreshTiles = [this]() {
-			if (!m_processed_textures.empty()) {
-				utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0],
+			if (!m_processed_textures.empty() && m_tile_need_refresh) {
+				m_preview_tile_textures.clear();
+				utils::UpdateTileTextures(m_preview_tile_textures, m_processed_textures[0],
 							  m_tile_config);
+				m_tile_need_refresh = false;
 			}
 		};
 
@@ -813,38 +813,15 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 		ImGui::Separator();
 
-		// Batch Processing Mode
-		ImGui::SeparatorText("Processing Mode");
-
-		static int batch_mode = 0; // 0: Single, 1: Batch Consecutive, 2: Batch Reference
-		static int reference_frame = 0;
-
-		ImGui::BeginDisabled(isProcessing);
-		ImGui::RadioButton("Single Pair Analysis", &batch_mode, 0);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Process a single pair of consecutive frames");
-		}
-
-		ImGui::RadioButton("Batch Process - Consecutive", &batch_mode, 1);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Process all consecutive frame pairs: (0,1), (1,2), (2,3), etc.");
-		}
-
-		ImGui::RadioButton("Batch Process - Reference Frame", &batch_mode, 2);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Process all frames against a reference frame: (ref,0), (ref,1), etc.");
-		}
-
-		// Reference frame selection (only enabled for reference frame mode)
-		if (batch_mode == 2) {
-			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-			ImGui::SliderInt("Reference Frame", &reference_frame, 0,
-					 std::max(0, static_cast<int>(m_processed_textures.size()) - 1));
-		}
-		ImGui::EndDisabled();
-
 		// Run Analysis button
 		ImGui::BeginDisabled(isProcessing || m_processed_textures.size() < 2);
+
+		ImGui::SliderInt("Batch Size", &m_batch_size, 1, 32);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Number of tiles to process in parallel.\nHigher values may improve "
+					  "performance but require more memory.");
+		}
+
 		if (ImGui::Button("Run Analysis", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 			// gather frames
 			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
@@ -857,59 +834,55 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			// Create callback function to handle completion
 			auto completionCallback = [this](bool result) {
 				m_model_ok = result;
-				
-				std::cout << "Callback executed with " << m_output_tiles.size() << " output tiles" << std::endl;
-				
+
+				std::cout << "Callback executed with " << m_output_tiles.size() << " output tiles"
+					  << std::endl;
+
 				// Debug print out the first tile info
 				if (!m_output_tiles.empty()) {
-					auto& first_tile = m_output_tiles[0];
-					std::cout << "First tile: " << first_tile.data.cols << "x" << first_tile.data.rows 
-						<< " channels: " << first_tile.data.channels() 
-						<< " data ptr: " << (first_tile.data.data != nullptr ? "valid" : "null") 
-						<< std::endl;
+					auto &first_tile = m_output_tiles[0];
+					std::cout
+					    << "First tile: " << first_tile.data.cols << "x" << first_tile.data.rows
+					    << " channels: " << first_tile.data.channels()
+					    << " data ptr: " << (first_tile.data.data != nullptr ? "valid" : "null")
+					    << std::endl;
 				}
-				
+
 				// Create textures for the output tiles
-				for (auto& tile : m_output_tiles) {
+				for (auto &tile : m_output_tiles) {
 					// Make sure we have valid image data
 					if (tile.data.data && tile.data.cols > 0 && tile.data.rows > 0) {
 						m_output_tile_textures.push_back(std::make_shared<Texture>());
-						m_output_tile_textures.back()->Load((uint32_t*)tile.data.data, tile.data.cols, tile.data.rows);
+						m_output_tile_textures.back()->Load((uint32_t *)tile.data.data,
+										    tile.data.cols, tile.data.rows);
 					}
 				}
-				
+
 				// Create full image texture if tiles are available
 				if (!m_output_tiles.empty() && !m_processed_textures.empty()) {
 					m_full_image_texture = std::make_shared<Texture>();
-					
+
 					// Copy data from the first processed texture
-					uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * 
-								     m_processed_textures[0]->GetHeight()];
+					uint32_t *data = new uint32_t[m_processed_textures[0]->GetWidth() *
+								      m_processed_textures[0]->GetHeight()];
 					m_processed_textures[0]->GetData(data);
-					m_full_image_texture->Load(data, m_processed_textures[0]->GetWidth(), 
-								  m_processed_textures[0]->GetHeight());
+					m_full_image_texture->Load(data, m_processed_textures[0]->GetWidth(),
+								   m_processed_textures[0]->GetHeight());
 					delete[] data;
 				}
-				
+
 				utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
-							 m_processed_textures[0]->GetWidth(),
-							 m_processed_textures[0]->GetHeight());
+								   m_processed_textures[0]->GetWidth(),
+								   m_processed_textures[0]->GetHeight());
 
 				m_processing_frames.clear();
-
-				std::cout << "Created " << m_output_tile_textures.size() << " tile textures" << std::endl;
 			};
 
 			// Run the model asynchronously with the callback
 			auto future = DeformationAnalysisInterface::RunModelBatchAsync(
-				m_processing_frames, 
-				m_processed_textures[0]->GetWidth(), 
-				m_processed_textures[0]->GetHeight(), 
-				m_output_tiles, 
-				m_tile_config, 
-				16, // Batch size of 8
-				completionCallback
-			);
+			    m_processing_frames, m_processed_textures[0]->GetWidth(),
+			    m_processed_textures[0]->GetHeight(), m_output_tiles, m_tile_config, m_batch_size,
+			    completionCallback);
 
 			// Store the future for polling in the next frame
 			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
@@ -953,7 +926,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 				if (i % cols != 0)
 					ImGui::SameLine();
 				ImGui::Image(m_output_tile_textures[i]->GetID(),
-					     ImVec2((float)m_tile_size, (float)m_tile_size));
+					     ImVec2((float)m_tile_config.tileSize, (float)m_tile_config.tileSize));
 
 				// Make the tiles selectable for the full view
 				if (ImGui::IsItemClicked()) {
@@ -989,7 +962,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					const int full_height = m_full_image_texture->GetHeight();
 
 					// Get the rows and columns based on full image and tile size
-					int cols_in_full = full_width / m_tile_size;
+					int cols_in_full = full_width / m_tile_config.tileSize;
 					if (cols_in_full == 0)
 						cols_in_full = 1;
 
@@ -997,14 +970,14 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					int tile_col = m_current_tile_index % cols_in_full;
 
 					float rect_x_pos =
-					    cursor_pos.x - display_size.x + (tile_col * m_tile_size * scale_factor);
+					    cursor_pos.x - display_size.x + (tile_col * m_tile_config.tileSize * scale_factor);
 					float rect_y_pos =
-					    cursor_pos.y - display_size.y + (tile_row * m_tile_size * scale_factor);
+					    cursor_pos.y - display_size.y + (tile_row * m_tile_config.tileSize * scale_factor);
 
 					// Draw the rectangle
 					draw_list->AddRect(ImVec2(rect_x_pos, rect_y_pos),
-							   ImVec2(rect_x_pos + m_tile_size * scale_factor,
-								  rect_y_pos + m_tile_size * scale_factor),
+							   ImVec2(rect_x_pos + m_tile_config.tileSize * scale_factor,
+								  rect_y_pos + m_tile_config.tileSize * scale_factor),
 							   IM_COL32(255, 0, 0, 255), // Red
 							   0.0f,		     // rounding
 							   0,			     // flags
@@ -1020,7 +993,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					ImVec2 window_size = ImGui::GetWindowSize();
 
 					// Position for the tile inset (bottom-right corner)
-					float inset_size = m_tile_size / 1.5f; // slightly smaller than the original
+					float inset_size = m_tile_config.tileSize / 1.5f; // slightly smaller than the original
 					ImVec2 inset_pos(window_pos.x + window_size.x - inset_size -
 							     20, // 20px padding from edge
 							 window_pos.y + window_size.y - inset_size - 20);
