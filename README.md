@@ -129,18 +129,6 @@ Process image sequences from material testing experiments to quantify:
 - Strain localization patterns
 - Material failure mechanisms
 
-### Nanomaterial Characterization
-Analyze deformation behavior in:
-- Nanocomposites
-- Thin films
-- Advanced ceramic materials
-
-### Quality Control
-Identify defects and anomalies in materials:
-- Detect manufacturing flaws
-- Assess material degradation
-- Verify material performance under stress
-
 ## Troubleshooting
 
 ### Common Issues
