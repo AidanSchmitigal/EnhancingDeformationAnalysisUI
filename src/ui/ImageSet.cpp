@@ -1,9 +1,9 @@
 #include <ui/ImageSet.h>
 
 #include <core/CrackDetector.hpp>
+#include <core/DeformationAnalysisInterface.hpp>
 #include <core/DenoiseInterface.hpp>
 #include <core/FeatureTracker.hpp>
-#include <core/DeformationAnalysisInterface.hpp>
 #include <core/ImageAnalysis.hpp>
 
 #include <utils.h>
@@ -12,16 +12,17 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <format>
 #include <string>
-#include <filesystem>
 
 int ImageSet::m_id_counter = 0;
 
-int playspeed = 1;
-
 ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_path) {
-	m_window_name = folder_path.find_last_of('/') == std::string::npos ? folder_path : folder_path.substr(folder_path.find_last_of('/') + 1);
 	m_window_id = m_id_counter++;
+	m_window_name = folder_path.find_last_of('/') == std::string::npos
+			    ? folder_path
+			    : folder_path.substr(folder_path.find_last_of('/') + 1);
+	m_window_name = std::format("{} {}", m_window_name, m_window_id);
 
 	LoadImages();
 
@@ -30,57 +31,62 @@ ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_p
 	m_preprocessing_tab = PreprocessingTab(m_textures, m_processed_textures);
 }
 
-ImageSet::~ImageSet() {
-	for (auto& texture : m_textures) {
-		delete texture;
-	}
-	for (auto& texture : m_processed_textures) {
-		delete texture;
-	}
-	free(m_point_image);
-}
+ImageSet::~ImageSet() { free(m_point_image); }
 
+// display the image set window and the tabs
 void ImageSet::Display() {
-	ImGui::Begin((m_window_name + " " + std::to_string(m_window_id)).c_str(), &m_open);
+	ImGui::Begin(m_window_name.c_str(), &m_open);
 
 	// Check if processing is happening in the preprocessing tab
-	bool isProcessing = m_preprocessing_tab.IsProcessing();
+	bool isPreprocessProcessing = m_preprocessing_tab.IsProcessing();
+	bool isDeformationProcessing = DeformationAnalysisInterface::IsProcessing();
+
+	// Check if an async processing task has completed
+	if (isDeformationProcessing && m_processing_future && m_processing_future->valid()) {
+		// Poll the future with zero timeout to check if it's done without blocking
+		auto status = m_processing_future->wait_for(std::chrono::seconds(0));
+		if (status == std::future_status::ready) {
+			// Just get the result - our callback will already have processed everything
+			m_processing_future->get();
+		}
+	}
 
 	// Start tab bar
-	ImGui::BeginTabBar("PreProcessing");
+	ImGui::BeginTabBar("Image Set Tabs");
 
 	bool changed = false;
 
 	// If processing, only allow the Preprocessing tab
-	if (!isProcessing) {
+	if (!isPreprocessProcessing && !isDeformationProcessing) {
 		DisplayImageComparisonTab();
 	}
 
-	// Force the Preprocessing tab to be visible if processing
-	bool preprocessingTabOpen = true;
-	if (isProcessing) {
+	if (isPreprocessProcessing || isDeformationProcessing) {
 		ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0.8f, 0.5f, 0.0f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(0.9f, 0.6f, 0.0f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_TabActive, ImVec4(1.0f, 0.7f, 0.0f, 1.0f));
 	}
 
-	// Always display the preprocessing tab
-	m_preprocessing_tab.DisplayPreprocessingTab(changed);
+	// if we aren't doing deformation analysis, show the preprocessing tab
+	if (!isDeformationProcessing)
+		m_preprocessing_tab.DisplayPreprocessingTab(changed);
 
-	if (isProcessing) {
+	if (isPreprocessProcessing || isDeformationProcessing) {
 		ImGui::PopStyleColor(3);
 	}
 
-	// Display the other tabs only if not processing
-	if (!isProcessing) {
-		DisplayImageAnalysisTab();
-		DisplayFeatureTrackingTab();
-#ifndef UI_RELEASE // only display in debug mode while developing
+	// if we aren't doing preprocessing, show the deformation analysis tab
+	if (!isPreprocessProcessing)
 		DisplayDeformationAnalysisTab();
-#endif
+
+	// Display the other tabs only if not processing
+	if (!isPreprocessProcessing && !isDeformationProcessing) {
+		DisplayFeatureTrackingTab();
+		DisplayImageAnalysisTab();
 	}
 
-	// only necessary when we modify the vector by changing its size (this only happens in the preprocessing tab)
+	// only necessary when we modify the vector by changing its size (this
+	// only happens in the preprocessing tab)
 	if (changed) {
 		m_preprocessing_tab.GetProcessedTextures(m_processed_textures);
 	}
@@ -92,183 +98,441 @@ void ImageSet::Display() {
 void ImageSet::LoadImages() {
 	PROFILE_FUNCTION();
 
-	if (!std::filesystem::exists(m_folder_path)) {
-		printf("Path does not exist\n");
-		return;
-	}
+	std::vector<uint32_t *> images;
+	int width, height;
+	io::LoadTiffFolder(m_folder_path.c_str(), images, width, height);
 
-	// find all .tif files in the folder
-	std::vector<std::string> files;
-	for (const auto& entry : std::filesystem::directory_iterator(m_folder_path)) {
-		if (entry.path().string().find(".tif") == std::string::npos)
-			continue;
-		files.push_back(entry.path().string());
-	}
-
-	// sort the files by name
-	std::sort(files.begin(), files.end());
-	for (const auto& file : files) {
-		PROFILE_SCOPE(LoadImagesLoop);
-
-		int width, height;
-		uint32_t* temp = utils::LoadTiff(file.c_str(), width, height);
-		Texture* t = new Texture();
-		t->Load(temp, width, height);
+	for (auto &image : images) {
+		std::shared_ptr<Texture> t = std::make_shared<Texture>();
+		t->Load(image, width, height);
 		m_textures.push_back(t);
-		Texture* t2 = new Texture();
-		t2->Load(temp, width, height);
+		std::shared_ptr<Texture> t2 = std::make_shared<Texture>();
+		t2->Load(image, width, height);
 		m_processed_textures.push_back(t2);
-		free(temp);
+		free(image);
 	}
 }
 
+// TODO: change to incorporate the original images and images from
+// preprocessing, feature tracking, and deformation analysis (all separate)
 void ImageSet::DisplayImageComparisonTab() {
+	static bool isPlaying = false;
 	if (ImGui::BeginTabItem("Image Comparison")) {
-		static bool isPlaying = false;
+		// Create a window that fills the tab area and has a menu bar
+		ImGui::BeginChild("ImageComparisonTab", ImVec2(0, 0), false, ImGuiWindowFlags_MenuBar);
 
-		// Control buttons
-		if (ImGui::Button("Play/Pause")) isPlaying = !isPlaying;
+		// Add a menubar at the top of the tab content
+		if (ImGui::BeginMenuBar()) {
+			if (ImGui::BeginMenu("File")) {
+				// Export options for the current frame
+				if (ImGui::BeginMenu("Export Current Frame")) {
+					if (ImGui::MenuItem("Original as TIFF")) {
+						if (!m_textures.empty() && m_current_frame < m_textures.size()) {
+							std::string path = utils::SaveFileDialog(".",
+												 "Save "
+												 "Original "
+												 "Frame as "
+												 "TIFF",
+												 "tif");
+							if (!path.empty()) {
+								uint32_t *data = new uint32_t
+								    [m_textures[m_current_frame]->GetWidth() *
+								     m_textures[m_current_frame]->GetHeight()];
+								m_textures[m_current_frame]->GetData(data);
+								io::WriteTiff(path.c_str(), data,
+									      m_textures[m_current_frame]->GetWidth(),
+									      m_textures[m_current_frame]->GetHeight());
+								delete[] data;
+							}
+						}
+					}
+
+					if (ImGui::MenuItem("Processed as TIFF")) {
+						if (!m_processed_textures.empty() &&
+						    m_current_frame < m_processed_textures.size()) {
+							std::string path = utils::SaveFileDialog(".",
+												 "Save "
+												 "Processed "
+												 "Frame as "
+												 "TIFF",
+												 "tif");
+							if (!path.empty()) {
+								uint32_t *data =
+								    new uint32_t[m_processed_textures[m_current_frame]
+										     ->GetWidth() *
+										 m_processed_textures[m_current_frame]
+										     ->GetHeight()];
+								m_processed_textures[m_current_frame]->GetData(data);
+								io::WriteTiff(
+								    path.c_str(), data,
+								    m_processed_textures[m_current_frame]->GetWidth(),
+								    m_processed_textures[m_current_frame]->GetHeight());
+								delete[] data;
+							}
+						}
+					}
+					ImGui::EndMenu();
+				}
+
+				// Export options for all frames
+				if (ImGui::BeginMenu("Export All Frames")) {
+					if (ImGui::MenuItem("Original Sequence as TIFF")) {
+						std::string folder = utils::OpenFileDialog(".",
+											   "Choose a Folder to "
+											   "Save Original Images",
+											   true);
+						if (!folder.empty() && !m_textures.empty()) {
+							uint32_t *data = new uint32_t[m_textures[0]->GetWidth() *
+										      m_textures[0]->GetHeight()];
+							for (int i = 0; i < m_textures.size(); i++) {
+								char path[256];
+								sprintf(path,
+									"%s/"
+									"original_"
+									"frame_%d."
+									"tif",
+									folder.c_str(), i);
+								m_textures[i]->GetData(data);
+								io::WriteTiff(path, data, m_textures[i]->GetWidth(),
+									      m_textures[i]->GetHeight());
+							}
+							delete[] data;
+						}
+					}
+
+					if (ImGui::MenuItem("Processed Sequence as TIFF")) {
+						std::string folder = utils::OpenFileDialog(".",
+											   "Choose a Folder to "
+											   "Save Processed Images",
+											   true);
+						if (!folder.empty() && !m_processed_textures.empty()) {
+							uint32_t *data =
+							    new uint32_t[m_processed_textures[0]->GetWidth() *
+									 m_processed_textures[0]->GetHeight()];
+							for (int i = 0; i < m_processed_textures.size(); i++) {
+								char path[256];
+								sprintf(path,
+									"%s/"
+									"processed_"
+									"frame_%d."
+									"tif",
+									folder.c_str(), i);
+								m_processed_textures[i]->GetData(data);
+								io::WriteTiff(path, data,
+									      m_processed_textures[i]->GetWidth(),
+									      m_processed_textures[i]->GetHeight());
+							}
+							delete[] data;
+						}
+					}
+
+					if (ImGui::MenuItem("Processed Sequence as GIF")) {
+						std::string path = utils::SaveFileDialog(".",
+											 "Save Processed "
+											 "Sequence as GIF",
+											 "gif");
+						if (!path.empty() && !m_processed_textures.empty()) {
+							io::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40,
+									       0);
+						}
+					}
+					ImGui::EndMenu();
+				}
+				ImGui::Separator();
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMenuBar();
+		}
+
+		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
+
+		// Playback controls section
+		ImGui::SeparatorText("Playback Controls");
+
+		// Frame navigation controls
+		int max_frame = (int)std::max(m_textures.size(), m_processed_textures.size()) - 1;
+
+		// Keep within bounds if frames were removed
+		if (m_current_frame > max_frame)
+			m_current_frame = max_frame;
+
+		// Frame counter with slider
+		ImGui::Text("Frame: %d/%d", m_current_frame + 1, max_frame + 1);
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		if (ImGui::SliderInt("##FrameSlider", (int *)&m_current_frame, 0, max_frame, "")) {
+			// Frame changed - handle any necessary state updates
+		}
+
+		// Create a row of navigation controls
+		float button_width = ImGui::GetContentRegionAvail().x / 3 - 2;
+
+		// Previous frame button
+		ImGui::BeginDisabled(m_current_frame <= 0);
+		if (ImGui::Button("Previous", ImVec2(button_width, 0))) {
+			m_current_frame--;
+		}
+		ImGui::EndDisabled();
+
 		ImGui::SameLine();
-		if (ImGui::Button("Reset Playback")) {
+
+		// Play/Pause button
+		if (ImGui::Button(isPlaying ? "Pause" : "Play", ImVec2(button_width, 0))) {
+			isPlaying = !isPlaying;
+		}
+
+		ImGui::SameLine();
+
+		// Next frame button
+		ImGui::BeginDisabled(m_current_frame >= max_frame);
+		if (ImGui::Button("Next", ImVec2(button_width, 0))) {
+			m_current_frame++;
+		}
+		ImGui::EndDisabled();
+
+		// Speed control
+		static float playback_speed = 10.0f; // frames per second
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::SliderFloat("Speed", &playback_speed, 1.0f, 30.0f, "%.1f fps");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Frames per second");
+		}
+
+		// Reset playback button
+		if (ImGui::Button("Reset Playback", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 			m_current_frame = 0;
 			isPlaying = false;
 		}
-		ImGui::SameLine();
-		if (ImGui::Button("Reset Processed Images")) {
+
+		// Image options section
+		ImGui::SeparatorText("Image Options");
+
+		// Display scaling slider
+		static float display_scale = 1.5f;
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::SliderFloat("Scale", &display_scale, 1.0f, 3.0f, "%.1fx");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Adjust image display size");
+		}
+
+		// Reset processed images button
+		if (ImGui::Button("Reset Processed Images", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 			PROFILE_SCOPE(ResetProcessedImages);
 
 			while (m_textures.size() > m_processed_textures.size())
-				m_processed_textures.push_back(new Texture);
+				m_processed_textures.push_back(std::make_shared<Texture>());
 			ImVec2 size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
-			uint32_t* data = (uint32_t*)malloc(size.x * size.y * sizeof(uint32_t));
+			uint32_t *data = (uint32_t *)malloc(size.x * size.y * sizeof(uint32_t));
 			for (int i = 0; i < m_textures.size(); i++) {
 				m_textures[i]->GetData(data);
-				m_processed_textures[i]->Load(data, size.x, size.y);
+				m_processed_textures[i]->Load(data, (int)size.x, (int)size.y);
 			}
 			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 			free(data);
 		}
-		ImGui::SameLine();
-		ImGui::TextDisabled("?");
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("This will reset the processed images back to their original unprocessed state.");
 
-		if (ImGui::Button("Save Processed Images")) {
-			std::string folder = utils::OpenFileDialog(".", "Choose a Folder to Save the Images", true);
-			if (!folder.empty() && m_processed_textures.size() > 0) {
-				uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()];
-				for (int i = 0; i < m_processed_textures.size(); i++) {
-					char path[256];
-					sprintf(path, "%s/frame_%d.tif", folder.c_str(), i);
-					m_processed_textures[i]->GetData(data);
-					utils::WriteTiff(path, data, m_processed_textures[i]->GetWidth(), m_processed_textures[i]->GetHeight());
-				}
-				free(data);
-			}
+		// View options section
+		ImGui::SeparatorText("View Options");
+		static bool sync_view = true;
+		ImGui::Checkbox("Synchronize View", &sync_view);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Keep original and processed images in sync");
 		}
-		ImGui::SameLine();
-		ImGui::TextDisabled("?");
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("This will write the processed images into a folder of your choosing.");
-		ImGui::SameLine();
-		if (ImGui::Button("Save a GIF")) {
-			std::string path = utils::SaveFileDialog(".", "Choose Where to Save the GIF", "gif");
-			if (!path.empty()) {
-				utils::WriteGIFOfImageSet(path.c_str(), m_processed_textures, 40, 0);
-			}
-		}
-		ImGui::SameLine();
-		ImGui::TextDisabled("?");
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("This will write a GIF of the processed images, and can take some time with larger image sets.");
 
-		// Frame slider
-		ImGui::SliderInt("Frame", (int*)&m_current_frame, 0, std::max(m_textures.size(), m_processed_textures.size()) - 1);
+		// Help section
+		ImGui::SeparatorText("Help");
+		ImGui::TextWrapped("Tip: Use the File menu above for export options.");
 
-		// Side-by-side image display
-		ImGui::BeginChild("Images", ImVec2(0, 0), true);
-		{
-			ImGui::Columns(2, "image_columns");
-
-			// Left sequence
-			ImGui::Text("Original Sequence");
-			if (!m_textures.empty() && m_current_frame < m_textures.size()) {
-				ImGui::Image(m_textures[m_current_frame]->GetID(), ImVec2(m_textures[0]->GetWidth() / 1.5, m_textures[0]->GetHeight() / 1.5));
-			}
-			ImGui::NextColumn();
-
-			// Right sequence
-			ImGui::Text("Processed Sequence");
-			if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
-				ImGui::Image(m_processed_textures[m_current_frame]->GetID(), ImVec2(m_processed_textures[0]->GetWidth() / 1.5, m_processed_textures[0]->GetHeight() / 1.5));
-			}
-			ImGui::Columns(1);
-		}
 		ImGui::EndChild();
 
-		// Playback logic
+		ImGui::SameLine();
+
+		// Side-by-side image display with improved styling
+		ImGui::BeginChild("Images", ImVec2(0, 0), true);
+
+		// Image navigation bar at the top
+		if (!m_textures.empty() && !m_processed_textures.empty()) {
+			// Frame navigation strip at the top
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
+
+			// Left/right buttons
+			ImGui::BeginDisabled(m_current_frame <= 0);
+			if (ImGui::ArrowButton("##left_top", ImGuiDir_Left))
+				m_current_frame--;
+			ImGui::EndDisabled();
+
+			ImGui::SameLine();
+
+			// Frame slider (more compact version for the top)
+			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 70);
+			if (ImGui::SliderInt("##FrameSliderTop", (int *)&m_current_frame, 0, max_frame, "Frame %d")) {
+				// Frame changed
+			}
+			ImGui::PopItemWidth();
+
+			ImGui::SameLine();
+
+			ImGui::BeginDisabled(m_current_frame >= max_frame);
+			if (ImGui::ArrowButton("##right_top", ImGuiDir_Right))
+				m_current_frame++;
+			ImGui::EndDisabled();
+
+			ImGui::SameLine();
+
+			// Play/Pause button
+			if (ImGui::Button(isPlaying ? "⏸" : "▶")) {
+				isPlaying = !isPlaying;
+			}
+
+			ImGui::PopStyleVar();
+
+			ImGui::Separator();
+		}
+
+		// Image display area
+		ImGui::Columns(2);
+
+		// Left sequence (original)
+		ImGui::SeparatorText("Original Sequence");
+		if (!m_textures.empty() && m_current_frame < m_textures.size()) {
+			// Calculate the available size
+			ImVec2 avail = ImGui::GetContentRegionAvail();
+			ImVec2 img_size = ImVec2(m_textures[0]->GetWidth(), m_textures[0]->GetHeight());
+			float aspect = img_size.x / img_size.y;
+
+			// Scale the image to fit the available width
+			ImVec2 display_size = ImVec2(std::min(avail.x, img_size.x / display_scale),
+						     std::min(avail.x / aspect, img_size.y / display_scale));
+
+			// Calculate centered position
+			ImVec2 cursor_pos = ImGui::GetCursorPos();
+			ImVec2 centered_pos = ImVec2(cursor_pos.x + (avail.x - display_size.x) * 0.5f, cursor_pos.y);
+			ImGui::SetCursorPos(centered_pos);
+
+			// Display image
+			ImGui::Image(m_textures[m_current_frame]->GetID(), display_size);
+
+			// Image information
+			ImGui::SetCursorPosX(cursor_pos.x);
+			ImGui::TextUnformatted(
+			    ("Size: " + std::to_string((int)img_size.x) + "x" + std::to_string((int)img_size.y))
+				.c_str());
+		}
+
+		ImGui::NextColumn();
+
+		// Right sequence (processed)
+		ImGui::SeparatorText("Processed Sequence");
+		if (!m_processed_textures.empty() && m_current_frame < m_processed_textures.size()) {
+			// Calculate the available size
+			ImVec2 avail = ImGui::GetContentRegionAvail();
+			ImVec2 img_size =
+			    ImVec2(m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+			float aspect = img_size.x / img_size.y;
+
+			// Scale the image to fit the available width
+			ImVec2 display_size = ImVec2(std::min(avail.x, img_size.x / display_scale),
+						     std::min(avail.x / aspect, img_size.y / display_scale));
+
+			// Calculate centered position
+			ImVec2 cursor_pos = ImGui::GetCursorPos();
+			ImVec2 centered_pos = ImVec2(cursor_pos.x + (avail.x - display_size.x) * 0.5f, cursor_pos.y);
+			ImGui::SetCursorPos(centered_pos);
+
+			// Display image
+			ImGui::Image(m_processed_textures[m_current_frame]->GetID(), display_size);
+
+			// Image information
+			ImGui::SetCursorPosX(cursor_pos.x);
+			ImGui::TextUnformatted(
+			    ("Size: " + std::to_string((int)img_size.x) + "x" + std::to_string((int)img_size.y))
+				.c_str());
+		}
+
+		ImGui::Columns(1);
+		ImGui::EndChild();
+
+		// Playback logic with speed control
 		if (isPlaying) {
-			m_current_frame++;
-			if (m_current_frame >= std::max(m_textures.size(), m_processed_textures.size())) {
-				m_current_frame = 0;  // Loop back to start
+			static float last_time = ImGui::GetTime();
+			float current_time = ImGui::GetTime();
+			float frame_time = 1.0f / playback_speed;
+
+			if (current_time - last_time > frame_time) {
+				m_current_frame++;
+				if (m_current_frame >= std::max(m_textures.size(), m_processed_textures.size())) {
+					m_current_frame = 0; // Loop back to start
+				}
+				last_time = current_time;
 			}
 		}
+
+		// End the child window with the menu bar
+		ImGui::EndChild();
+
 		ImGui::EndTabItem();
 	}
 }
 
 void ImageSet::DisplayImageAnalysisTab() {
-	static uint32_t* m_ref_image = nullptr;
-	static uint32_t m_ref_image_width = 0, m_ref_image_height = 0;
-	static std::vector<std::vector<float>> histograms;
-	static std::vector<float> avg_histogram;
-	static std::vector<float> snrs;
-	static float avg_snr = 0.0f;
+	static uint32_t *s_comparison_image = nullptr;
+	static uint32_t s_ref_image_width = 0, s_ref_image_height = 0;
 	if (ImGui::BeginTabItem("Image Analysis")) {
 		if (m_processed_textures.size() == 0) {
 			ImGui::Text("No images loaded");
 			ImGui::EndTabItem();
 			return;
 		}
-		if (m_ref_image == nullptr || m_ref_image_width * m_ref_image_height != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
-			if (m_ref_image) free(m_ref_image);
+		if (s_comparison_image == nullptr ||
+		    s_ref_image_width * s_ref_image_height !=
+			m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+			free(s_comparison_image);
+			s_comparison_image = (uint32_t *)malloc(m_processed_textures[0]->GetWidth() *
+								m_processed_textures[0]->GetHeight() * 4);
+			s_ref_image_width = m_processed_textures[0]->GetWidth();
+			s_ref_image_height = m_processed_textures[0]->GetHeight();
+		}
+		if (m_ref_image == nullptr ||
+		    m_ref_image_width * m_ref_image_height !=
+			m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+			free(m_ref_image);
+			m_ref_image =
+			    new uint32_t[m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()];
 			m_ref_image_width = m_processed_textures[0]->GetWidth();
 			m_ref_image_height = m_processed_textures[0]->GetHeight();
-			m_ref_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+		}
+		m_processed_textures[0]->GetData(s_comparison_image);
+		if (memcmp(m_ref_image, s_comparison_image, m_ref_image_width * m_ref_image_height * 4) != 0) {
 			m_processed_textures[0]->GetData(m_ref_image);
 			histograms.clear();
 			avg_histogram.clear();
 			snrs.clear();
 			avg_snr = 0.0f;
-			std::vector<uint32_t*> frames;
-			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
-			ImageAnalysis::AnalyzeImages(frames, m_ref_image_width, m_ref_image_height, histograms, avg_histogram, snrs, avg_snr);
-			for (auto& frame : frames) {
+			std::vector<uint32_t *> frames;
+			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(),
+						   m_processed_textures[0]->GetHeight(), m_processed_textures);
+			ImageAnalysis::AnalyzeImages(frames, m_ref_image_width, m_ref_image_height, histograms,
+						     avg_histogram, snrs, avg_snr);
+			for (auto &frame : frames) {
 				free(frame);
 			}
 		}
-		uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-		m_processed_textures[0]->GetData(data);
-		if (memcmp(m_ref_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4) != 0) {
-			memcpy(m_ref_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			histograms.clear();
-			avg_histogram.clear();
-			snrs.clear();
-			avg_snr = 0.0f;
-			std::vector<uint32_t*> frames;
-			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
-			ImageAnalysis::AnalyzeImages(frames, m_ref_image_width, m_ref_image_height, histograms, avg_histogram, snrs, avg_snr);
-			for (auto& frame : frames) {
-				free(frame);
-			}
+
+		ImGui::SeparatorText("Write Analysis to CSV");
+		if (ImGui::Button("Save To")) {
+			auto path = utils::SaveFileDialog(".", "Save Analysis CSV", "csv");
+			write_success = io::SaveAnalysisCsv(path.c_str(), histograms, avg_histogram, snrs, avg_snr);
 		}
-		free(data);
+		if (!write_success) {
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
+		}
 
 		ImGui::SeparatorText("Average Analysis");
 		ImGui::Text("Average SNR: %.2f", avg_snr);
 		auto size = ImGui::GetIO().DisplaySize;
 		size.x = size.x / 1.3f;
-		ImGui::PlotHistogram("Average Histogram", &avg_histogram[0], 256, 0, NULL, 0.0f, 1.0f, ImVec2(size.x, 300));
+		ImGui::PlotHistogram("Average Histogram", &avg_histogram[0], 256, 0, NULL, 0.0f, 1.0f,
+				     ImVec2(size.x, 300));
 		ImGui::SeparatorText("Frame Analysis");
 		for (int i = 0; i < histograms.size(); i++) {
 			char label[256];
@@ -281,136 +545,150 @@ void ImageSet::DisplayImageAnalysisTab() {
 }
 
 void ImageSet::DisplayFeatureTrackingTab() {
-	static std::vector<std::vector<std::vector<float>>> widths;
-	static std::vector<std::vector<float>> manual_widths;
-	static bool write_success = true;
-	static std::chrono::time_point<std::chrono::system_clock> last_time = std::chrono::system_clock::now();
+	static uint32_t *s_comparison_image = nullptr;
+	static uint32_t s_ref_image_width = 0, s_ref_image_height = 0;
 	if (ImGui::BeginTabItem("Feature Tracking")) {
 		if (m_processed_textures.size() == 0) {
 			ImGui::Text("No images loaded");
 			ImGui::EndTabItem();
 			return;
 		}
-		// Initialize point image
-		if (m_point_image == NULL) {
-			printf("Refreshing point image\n");
-			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_processed_textures[0]->GetData(m_point_image);
-			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-		}
-		// Update point image if it isn't the same size as the ref texture
-		if (m_point_texture.GetWidth() * m_point_texture.GetHeight() != m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
-			free(m_point_image);
-			m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_processed_textures[0]->GetData(m_point_image);
-			m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+
+		if (s_comparison_image == NULL ||
+		    s_ref_image_width * s_ref_image_height !=
+			m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+			free(s_comparison_image);
+			s_comparison_image = (uint32_t *)malloc(m_processed_textures[0]->GetWidth() *
+								m_processed_textures[0]->GetHeight() * 4);
+			s_ref_image_width = m_processed_textures[0]->GetWidth();
+			s_ref_image_height = m_processed_textures[0]->GetHeight();
 		}
 
-		// Update point image if it isn't the same as the ref texture
-		uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-		m_processed_textures[0]->GetData(data);
-		if (m_points.size() == 0 && memcmp(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4) != 0) {
-			memcpy(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_point_texture.Load(data, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+		// Update point image if it isn't the same size as the ref
+		// texture
+		if (m_point_image == NULL ||
+		    m_point_texture.GetWidth() * m_point_texture.GetHeight() !=
+			m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
+			free(m_point_image);
+			m_point_image = (uint32_t *)malloc(m_processed_textures[0]->GetWidth() *
+							   m_processed_textures[0]->GetHeight() * 4);
 		}
-		free(data);
+
+		m_processed_textures[0]->GetData(s_comparison_image);
+		if (m_points.size() == 0 &&
+		    memcmp(m_point_image, s_comparison_image,
+			   m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4) != 0) {
+			memcpy(m_point_image, s_comparison_image,
+			       m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+			m_point_texture.Load(s_comparison_image, m_processed_textures[0]->GetWidth(),
+					     m_processed_textures[0]->GetHeight());
+		}
 
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 		static bool manualMode = false;
 		ImGui::Text("Mode:");
-		ImGui::RadioButton("Manual", (int*)&manualMode, true);
+		ImGui::RadioButton("Manual", (int *)&manualMode, true);
 		ImGui::SameLine();
-		ImGui::RadioButton("Auto", (int*)&manualMode, false);
+		ImGui::RadioButton("Auto", (int *)&manualMode, false);
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
 		if (ImGui::IsItemHovered()) {
 			ImGui::BeginTooltip();
-			ImGui::Text("Manual mode allows you to select points to track features. Auto mode will automatically detect cracks and track their widths.\nWe suggest cropping the infobar for automatic tracking.");
+			ImGui::Text("Manual mode allows you to select points to track "
+				    "features. Auto mode will automatically detect "
+				    "cracks and track their widths.\nWe suggest "
+				    "cropping the infobar for automatic tracking.");
 			ImGui::EndTooltip();
 		}
 
 		if (manualMode) {
-			if (m_points.size() > 0 && ImGui::Button("Clear Selection")) m_points.clear();
+			if (m_points.size() > 0 && ImGui::Button("Clear Selection"))
+				m_points.clear();
 			if (m_points.size() % 2 == 0 && m_points.size() > 0) {
 				if (ImGui::Button("Track Features")) {
-					std::vector<uint32_t*> frames;
-					utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
+					std::vector<uint32_t *> frames;
+					utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(),
+								   m_processed_textures[0]->GetHeight(),
+								   m_processed_textures);
 					std::vector<std::vector<cv::Point2f>> tracked_points;
-					manual_widths = FeatureTracker::TrackFeatures(frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-					memcpy(m_point_image, frames[0], m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-					m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-					utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+					m_manual_widths = FeatureTracker::TrackFeatures(
+					    frames, m_points, tracked_points, m_processed_textures[0]->GetWidth(),
+					    m_processed_textures[0]->GetHeight());
+					memcpy(m_point_image, frames[0],
+					       m_processed_textures[0]->GetWidth() *
+						   m_processed_textures[0]->GetHeight() * 4);
+					m_point_texture.Load(frames[0], m_processed_textures[0]->GetWidth(),
+							     m_processed_textures[0]->GetHeight());
+					utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames,
+									   m_processed_textures[0]->GetWidth(),
+									   m_processed_textures[0]->GetHeight());
 					m_last_points = m_points;
+					m_last_tracked_points = tracked_points;
 					m_points.clear();
 				}
 			} else {
-				ImGui::Text("Select two points");
+				ImGui::Text("Select an even number of points");
 			}
 		} else {
 			if (ImGui::Button("Track Widths")) {
-				std::vector<uint32_t*> frames;
-				utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
-				auto polygons = CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-				widths = FeatureTracker::TrackCrackWidthProfiles(polygons); // Assuming m_widths is a member variable
-				utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+				std::vector<uint32_t *> frames;
+				utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(),
+							   m_processed_textures[0]->GetHeight(), m_processed_textures);
+				auto polygons = CrackDetector::DetectCracks(frames, m_processed_textures[0]->GetWidth(),
+									    m_processed_textures[0]->GetHeight());
+				m_widths = FeatureTracker::TrackCrackWidthProfiles(polygons); // Assuming m_widths is a
+											      // member variable
+				utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames,
+								   m_processed_textures[0]->GetWidth(),
+								   m_processed_textures[0]->GetHeight());
 			}
 		}
-		if (manual_widths.size() > 0 && manualMode) {
+		if (m_manual_widths.size() > 0 && manualMode) {
 			if (ImGui::Button("Clear Widths")) {
-				manual_widths.clear();
+				m_manual_widths.clear();
 				m_last_points.clear();
-				uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+				uint32_t *data =
+				    (uint32_t *)malloc(m_textures[0]->GetWidth() * m_textures[0]->GetHeight() * 4);
 				for (int i = 0; i < m_processed_textures.size(); i++) {
 					m_textures[i]->GetData(data);
-					m_processed_textures[i]->Load(data, m_textures[i]->GetWidth(), m_textures[i]->GetHeight());
+					m_processed_textures[i]->Load(data, m_processed_textures[i]->GetWidth(),
+								      m_processed_textures[i]->GetHeight());
 				}
 				free(m_point_image);
-				m_point_image = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-				memcpy(m_point_image, data, m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+				m_point_image = (uint32_t *)malloc(m_processed_textures[0]->GetWidth() *
+								   m_processed_textures[0]->GetHeight() * 4);
+				memcpy(m_point_image, data,
+				       m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
+				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(),
+						     m_processed_textures[0]->GetHeight());
 			}
-			static std::string folder_path;
-			if (ImGui::Button("Choose Folder to Save")) {
-				folder_path = utils::OpenFileDialog(".", "Pick a folder to save widths", true);
-			}
-			static char manual_filename[256] = "";
-			ImGui::InputTextWithHint("Filename", "widths.csv", manual_filename, 256);
-			ImGui::TextWrapped("%s/%s", folder_path.c_str(), manual_filename);
-			if (ImGui::Button("Save Widths")) {
-				write_success = utils::WriteCSV(std::string(folder_path + "/" + manual_filename).c_str(), m_last_points, manual_widths);
+			if (ImGui::Button("Save To")) {
+				auto path = utils::SaveFileDialog(".", "Save Widths CSV", "csv");
+				write_success = io::WriteCSV(path.c_str(), m_widths);
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
-				memset(manual_filename, 0, 256);
-				folder_path = "";
 			}
 			ImGui::Text("Manual Widths:");
-			for (int i = 0; i < manual_widths.size(); i++) {
+			for (int i = 0; i < m_manual_widths.size(); i++) {
 				ImGui::Text("Frame %d:", i);
-				for (int j = 0; j < manual_widths[i].size(); j++) {
-					if (j % 4 != 3) ImGui::SameLine();
-					ImGui::Text("%.2f", manual_widths[i][j]);
+				for (int j = 0; j < m_manual_widths[i].size(); j++) {
+					if (j % 4 != 3)
+						ImGui::SameLine();
+					ImGui::Text("%.2f", m_manual_widths[i][j]);
 				}
 			}
 		}
-		if (widths.size() > 0 && !manualMode) {
+		if (m_widths.size() > 0 && !manualMode) {
 			if (ImGui::Button("Clear Widths")) {
-				widths.clear();
+				m_widths.clear();
 			}
-			static std::string folder_path;
-			if (ImGui::Button("Choose Folder to Save")) {
-				folder_path = utils::OpenFileDialog(".", "Pick a folder to save widths", true);
-			}
-			static char filename[256] = "";
-			ImGui::InputTextWithHint("Filename", "widths.csv", filename, 256);
-			ImGui::TextWrapped("%s/%s", folder_path.c_str(), filename);
-			if (ImGui::Button("Save Widths")) {
-				write_success = utils::WriteCSV(std::string(folder_path + "/" + filename).c_str(), widths);
+			if (ImGui::Button("Save To")) {
+				auto path = utils::SaveFileDialog(".", "Save Widths CSV", "csv");
+				write_success = io::WriteCSV(path.c_str(), m_widths);
 				if (!write_success) {
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
 				}
-				memset(filename, 0, 256);
-				folder_path = "";
 			}
 		}
 		ImGui::EndChild();
@@ -420,25 +698,30 @@ void ImageSet::DisplayFeatureTrackingTab() {
 		ImGui::BeginChild("ImageView", ImVec2(0, 0), true);
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::ImageButton("Processed Image", m_point_texture.GetID(), ImVec2(m_point_texture.GetWidth(), m_point_texture.GetHeight()));
+		ImGui::ImageButton("Processed Image", m_point_texture.GetID(),
+				   ImVec2((float)m_point_texture.GetWidth(), (float)m_point_texture.GetHeight()));
 		ImGui::PopStyleVar(2);
 
 		if (manualMode && ImGui::IsItemActive() && ImGui::IsItemHovered()) {
 			const auto now = std::chrono::system_clock::now();
-			if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count() > 250) {
-				last_time = now;
-				uint coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
-				uint coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
+			if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_last_time).count() > 250) {
+				m_last_time = now;
+				int coordX = (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x);
+				int coordY = (ImGui::GetMousePos().y - ImGui::GetItemRectMin().y);
 				m_points.push_back(cv::Point2f(coordX, coordY));
 
+				// where the user clicks, draw a red dot
 				int size = 3;
 				for (int i = coordX - size; i < coordX + size + 1; i++) {
 					for (int j = coordY - size; j < coordY + size + 1; j++) {
-						if (i < 0 || j < 0 || i >= m_processed_textures[0]->GetWidth() || j >= m_processed_textures[0]->GetHeight()) continue;
+						if (i < 0 || j < 0 || i >= m_processed_textures[0]->GetWidth() ||
+						    j >= m_processed_textures[0]->GetHeight())
+							continue;
 						m_point_image[j * m_processed_textures[0]->GetWidth() + i] = 0xFFFF0000;
 					}
 				}
-				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
+				m_point_texture.Load(m_point_image, m_processed_textures[0]->GetWidth(),
+						     m_processed_textures[0]->GetHeight());
 			}
 		}
 		ImGui::EndChild();
@@ -448,37 +731,320 @@ void ImageSet::DisplayFeatureTrackingTab() {
 }
 
 void ImageSet::DisplayDeformationAnalysisTab() {
-	static bool good = true;
-	static std::vector<ImageTile> tiles;
-	static std::vector<Texture*> tiles_textures;
-	if (ImGui::BeginTabItem("Deformation Analysis")) {
-		if (ImGui::Button("Calculate Deformation")) {
-			std::vector<uint32_t*> frames;
-			utils::GetDataFromTextures(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), m_processed_textures);
-			good = DeformationAnalysisInterface::TestModel(frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight(), 256, 0);
-			utils::LoadDataIntoTexturesAndFree(m_processed_textures, frames, m_processed_textures[0]->GetWidth(), m_processed_textures[0]->GetHeight());
-		}
-		if (!good)
-			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model exited with an error!");
+	static int overlap = 0;
 
-		if (tiles.size() == 0) {
-			uint32_t* data = (uint32_t*)malloc(m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight() * 4);
-			m_processed_textures[0]->GetData(data);
-			cv::Mat image = cv::Mat(m_processed_textures[0]->GetHeight(), m_processed_textures[0]->GetWidth(), CV_8UC4, data);
-			tiles = utils::splitImageIntoTiles(image, 256, 0);
-			for (int i = 0; i < tiles.size(); i++) {
-				Texture* t = new Texture;
-				t->Load((uint32_t*)tiles[i].data.data, tiles[i].size.width, tiles[i].size.height);
-				tiles_textures.push_back(t);
+	if (ImGui::BeginTabItem("Deformation Analysis")) {
+		// full-tab child with menu bar
+		ImGui::BeginChild("DeformTab", ImVec2(0, 0), false, ImGuiWindowFlags_MenuBar);
+
+		// left pane: settings + status
+		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
+
+		// Check if processing is happening
+		bool isProcessing = DeformationAnalysisInterface::IsProcessing();
+
+		if (isProcessing) {
+			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Processing...");
+			float progress = DeformationAnalysisInterface::GetProgress();
+			ImGui::ProgressBar(progress, ImVec2(-1, 0), "");
+		}
+
+		ImGui::SeparatorText("View Settings");
+
+		// View toggle
+		ImGui::BeginDisabled(isProcessing);
+		if (ImGui::Checkbox("Gallery View", &m_show_gallery_view)) {
+			// Toggle between gallery and full image view
+		}
+		ImGui::EndDisabled();
+
+		ImGui::SeparatorText("Tiling Configuration");
+
+		ImGui::BeginDisabled(isProcessing);
+		ImGui::Combo("Tile Type", (int *)&m_tile_config.type, "Cropped\0Blended\0\0");
+		ImGui::SliderInt("Tile Size", &m_tile_size, 156, 512);
+		if (m_tile_config.type == TileType::Cropped) {
+			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 16, 128);
+			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
+		} else if (m_tile_config.type == TileType::Blended) {
+			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
+		}
+		ImGui::EndDisabled();
+
+		// Update tile configuration for previews
+		m_tile_config.tileSize = m_tile_size;
+
+		// Add preview tile button
+		static bool preview_tiles_open = false;
+		ImGui::BeginDisabled(isProcessing);
+		if (ImGui::Button("Preview Tiles")) {
+			preview_tiles_open = true;
+			// Generate preview tiles if they don't exist or if they need to be refreshed
+			if (m_preview_tile_textures.empty() && !m_processed_textures.empty()) {
+				utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0],
+							  m_tile_config);
 			}
-			free(data);
 		}
-		ImGui::NewLine();
-		for (int i = 0; i < tiles_textures.size(); i++) {
-			if (i % 4 != 3) ImGui::SameLine();
-			ImGui::Image(tiles_textures[i]->GetID(), ImVec2(tiles[i].size.width, tiles[i].size.height));
+		ImGui::EndDisabled();
+
+		ImGui::SameLine();
+		ImGui::TextDisabled("(?)");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Preview how the current image will be split into tiles\n"
+					  "before running the full analysis. This helps you\n"
+					  "adjust tile size and other parameters.");
 		}
+
+		// Generate preview tiles if window is open
+		if (preview_tiles_open && !m_processed_textures.empty()) {
+			utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0], m_tile_config);
+		}
+
+		// Use the common UI function to display the tile preview window
+		auto refreshTiles = [this]() {
+			if (!m_processed_textures.empty()) {
+				utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0],
+							  m_tile_config);
+			}
+		};
+
+		ui::DisplayTilePreviewWindow("Tiled Image Preview", preview_tiles_open, m_preview_tile_textures,
+					     refreshTiles);
+
+		ImGui::Separator();
+
+		// Batch Processing Mode
+		ImGui::SeparatorText("Processing Mode");
+
+		static int batch_mode = 0; // 0: Single, 1: Batch Consecutive, 2: Batch Reference
+		static int reference_frame = 0;
+
+		ImGui::BeginDisabled(isProcessing);
+		ImGui::RadioButton("Single Pair Analysis", &batch_mode, 0);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Process a single pair of consecutive frames");
+		}
+
+		ImGui::RadioButton("Batch Process - Consecutive", &batch_mode, 1);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Process all consecutive frame pairs: (0,1), (1,2), (2,3), etc.");
+		}
+
+		ImGui::RadioButton("Batch Process - Reference Frame", &batch_mode, 2);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Process all frames against a reference frame: (ref,0), (ref,1), etc.");
+		}
+
+		// Reference frame selection (only enabled for reference frame mode)
+		if (batch_mode == 2) {
+			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+			ImGui::SliderInt("Reference Frame", &reference_frame, 0,
+					 std::max(0, static_cast<int>(m_processed_textures.size()) - 1));
+		}
+		ImGui::EndDisabled();
+
+		// Run Analysis button
+		ImGui::BeginDisabled(isProcessing || m_processed_textures.size() < 2);
+		if (ImGui::Button("Run Analysis", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+			// gather frames
+			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
+						   m_processed_textures[0]->GetHeight(), m_processed_textures);
+
+			// Clear previous results
+			m_output_tiles.clear();
+			m_output_tile_textures.clear();
+
+			// Create callback function to handle completion
+			auto completionCallback = [this](bool result) {
+				m_model_ok = result;
+				
+				std::cout << "Callback executed with " << m_output_tiles.size() << " output tiles" << std::endl;
+				
+				// Debug print out the first tile info
+				if (!m_output_tiles.empty()) {
+					auto& first_tile = m_output_tiles[0];
+					std::cout << "First tile: " << first_tile.data.cols << "x" << first_tile.data.rows 
+						<< " channels: " << first_tile.data.channels() 
+						<< " data ptr: " << (first_tile.data.data != nullptr ? "valid" : "null") 
+						<< std::endl;
+				}
+				
+				// Create textures for the output tiles
+				for (auto& tile : m_output_tiles) {
+					// Make sure we have valid image data
+					if (tile.data.data && tile.data.cols > 0 && tile.data.rows > 0) {
+						m_output_tile_textures.push_back(std::make_shared<Texture>());
+						m_output_tile_textures.back()->Load((uint32_t*)tile.data.data, tile.data.cols, tile.data.rows);
+					}
+				}
+				
+				// Create full image texture if tiles are available
+				if (!m_output_tiles.empty() && !m_processed_textures.empty()) {
+					m_full_image_texture = std::make_shared<Texture>();
+					
+					// Copy data from the first processed texture
+					uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * 
+								     m_processed_textures[0]->GetHeight()];
+					m_processed_textures[0]->GetData(data);
+					m_full_image_texture->Load(data, m_processed_textures[0]->GetWidth(), 
+								  m_processed_textures[0]->GetHeight());
+					delete[] data;
+				}
+				
+				utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
+							 m_processed_textures[0]->GetWidth(),
+							 m_processed_textures[0]->GetHeight());
+
+				m_processing_frames.clear();
+
+				std::cout << "Created " << m_output_tile_textures.size() << " tile textures" << std::endl;
+			};
+
+			// Run the model asynchronously with the callback
+			auto future = DeformationAnalysisInterface::RunModelBatchAsync(
+				m_processing_frames, 
+				m_processed_textures[0]->GetWidth(), 
+				m_processed_textures[0]->GetHeight(), 
+				m_output_tiles, 
+				m_tile_config, 
+				16, // Batch size of 8
+				completionCallback
+			);
+
+			// Store the future for polling in the next frame
+			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
+
+			m_output_tile_textures.clear();
+		}
+		ImGui::EndDisabled();
+
+		if (!m_model_ok) {
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model error!");
+		}
+
+		ImGui::Separator();
+		ImGui::Text("Tiles: %d", (int)m_output_tiles.size());
+
+		// For full image view, add a tile selector
+		if (!m_show_gallery_view && !m_output_tile_textures.empty()) {
+			ImGui::SliderInt("Current Tile", (int *)&m_current_tile_index, 0,
+					 (int)m_output_tile_textures.size() - 1);
+		}
+
+		ImGui::EndChild();
+
+		ImGui::SameLine();
+
+		// right pane: either tile gallery or full image with overlay
+		ImGui::BeginChild("TileView", ImVec2(0, 0), true);
+
+		if (m_show_gallery_view) {
+			// Gallery view
+			ImGui::Text("Output Tiles");
+
+			if (m_output_tiles.empty()) {
+				ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "No tiles available. Run analysis first.");
+			}
+
+			// Textures are now loaded when processing completes in Display()
+
+			const int cols = 4;
+			for (int i = 0; i < m_output_tile_textures.size(); ++i) {
+				if (i % cols != 0)
+					ImGui::SameLine();
+				ImGui::Image(m_output_tile_textures[i]->GetID(),
+					     ImVec2((float)m_tile_size, (float)m_tile_size));
+
+				// Make the tiles selectable for the full view
+				if (ImGui::IsItemClicked()) {
+					m_current_tile_index = i;
+					m_show_gallery_view = false;
+				}
+			}
+		} else {
+			// Full image view with overlay of selected tile
+			ImGui::Text("Full Image View");
+
+			// Display the full image if available
+			if (m_full_image_texture) {
+				ImVec2 available_space = ImGui::GetContentRegionAvail();
+				float scale_factor =
+				    std::min(available_space.x / (float)m_full_image_texture->GetWidth(),
+					     available_space.y / (float)m_full_image_texture->GetHeight());
+
+				ImVec2 display_size(m_full_image_texture->GetWidth() * scale_factor,
+						    m_full_image_texture->GetHeight() * scale_factor);
+
+				ImGui::Image(m_full_image_texture->GetID(), display_size);
+
+				// Indicate the position of the selected tile on the full image
+				if (!m_output_tiles.empty() && m_current_tile_index < m_output_tiles.size()) {
+					// Draw a rectangle overlay to indicate where the current tile is on the full
+					// image This assumes tiles are stored in row-major order
+					ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
+					ImDrawList *draw_list = ImGui::GetWindowDrawList();
+
+					// Calculate position of selected tile in full image coordinates
+					const int full_width = m_full_image_texture->GetWidth();
+					const int full_height = m_full_image_texture->GetHeight();
+
+					// Get the rows and columns based on full image and tile size
+					int cols_in_full = full_width / m_tile_size;
+					if (cols_in_full == 0)
+						cols_in_full = 1;
+
+					int tile_row = m_current_tile_index / cols_in_full;
+					int tile_col = m_current_tile_index % cols_in_full;
+
+					float rect_x_pos =
+					    cursor_pos.x - display_size.x + (tile_col * m_tile_size * scale_factor);
+					float rect_y_pos =
+					    cursor_pos.y - display_size.y + (tile_row * m_tile_size * scale_factor);
+
+					// Draw the rectangle
+					draw_list->AddRect(ImVec2(rect_x_pos, rect_y_pos),
+							   ImVec2(rect_x_pos + m_tile_size * scale_factor,
+								  rect_y_pos + m_tile_size * scale_factor),
+							   IM_COL32(255, 0, 0, 255), // Red
+							   0.0f,		     // rounding
+							   0,			     // flags
+							   2.0f			     // thickness
+					);
+				}
+
+				// Display the current selected tile in an inset
+				if (!m_output_tile_textures.empty() &&
+				    m_current_tile_index < m_output_tile_textures.size()) {
+					// Draw the selected tile in a corner
+					ImVec2 window_pos = ImGui::GetWindowPos();
+					ImVec2 window_size = ImGui::GetWindowSize();
+
+					// Position for the tile inset (bottom-right corner)
+					float inset_size = m_tile_size / 1.5f; // slightly smaller than the original
+					ImVec2 inset_pos(window_pos.x + window_size.x - inset_size -
+							     20, // 20px padding from edge
+							 window_pos.y + window_size.y - inset_size - 20);
+
+					// Draw a background for the inset
+					ImGui::GetWindowDrawList()->AddRectFilled(
+					    inset_pos, ImVec2(inset_pos.x + inset_size, inset_pos.y + inset_size),
+					    IM_COL32(40, 40, 40, 200) // Dark background with some transparency
+					);
+
+					// Draw the tile
+					ImGui::GetWindowDrawList()->AddImage(
+					    m_output_tile_textures[m_current_tile_index]->GetID(), inset_pos,
+					    ImVec2(inset_pos.x + inset_size, inset_pos.y + inset_size));
+				}
+			} else {
+				ImGui::TextColored(ImVec4(1, 0.5f, 0, 1),
+						   "No full image available. Run analysis first.");
+			}
+		}
+
+		ImGui::EndChild();
+
+		ImGui::EndChild(); // DeformTab
 		ImGui::EndTabItem();
 	}
 }
-

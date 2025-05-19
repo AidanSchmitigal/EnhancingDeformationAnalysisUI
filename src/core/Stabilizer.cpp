@@ -1,7 +1,7 @@
 #include <core/Stabilizer.hpp>
 
-#include <utils.h>
 #include <core/ThreadPool.hpp>
+#include <utils.h>
 
 #include <opencv2/opencv.hpp>
 
@@ -9,15 +9,19 @@
 float Stabilizer::m_progress = 0.0f;
 bool Stabilizer::m_is_processing = false;
 
-bool Stabilizer::Stabilize(std::vector<uint32_t*>& frames, int width, int height) {
+bool Stabilizer::Stabilize(std::vector<uint32_t *> &frames, int width,
+			   int height) {
 	PROFILE_FUNCTION();
 
-	if (frames.empty()) return false;
+	if (frames.empty())
+		return false;
 
 	std::vector<cv::Mat> mats;
-	for (auto& ptr : frames) {
-		cv::Mat img(height, width, CV_8UC4, ptr); // Assuming RGBA format
-		mats.push_back(img.clone()); // Clone to avoid modifying original memory
+	for (auto &ptr : frames) {
+		cv::Mat img(height, width, CV_8UC4,
+			    ptr); // Assuming RGBA format
+		mats.push_back(
+		    img.clone()); // Clone to avoid modifying original memory
 	}
 
 	std::vector<cv::Mat> stabilizedFrames;
@@ -39,7 +43,8 @@ bool Stabilizer::Stabilize(std::vector<uint32_t*>& frames, int width, int height
 			continue; // Skip if no features found
 		}
 
-		cv::calcOpticalFlowPyrLK(refGray, currGray, refPts, currPts, status, err);
+		cv::calcOpticalFlowPyrLK(refGray, currGray, refPts, currPts,
+					 status, err);
 
 		std::vector<cv::Point2f> filteredRef, filteredCurr;
 		for (size_t j = 0; j < status.size(); j++) {
@@ -50,35 +55,46 @@ bool Stabilizer::Stabilize(std::vector<uint32_t*>& frames, int width, int height
 		}
 
 		if (filteredRef.size() >= 4) {
-			transformMatrix = cv::estimateAffinePartial2D(filteredCurr, filteredRef); // Reverse order to align to ref frame
+			transformMatrix = cv::estimateAffinePartial2D(
+			    filteredCurr,
+			    filteredRef); // Reverse order to align to ref frame
 			if (!transformMatrix.empty()) {
-				transformMatrix.convertTo(transformMatrix, CV_64F); // Ensure correct format
+				transformMatrix.convertTo(
+				    transformMatrix,
+				    CV_64F); // Ensure correct format
 			}
 		}
 
 		// Apply transformation
 		cv::Mat stabilized;
-		cv::warpAffine(mats[i], stabilized, transformMatrix, mats[i].size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+		cv::warpAffine(mats[i], stabilized, transformMatrix,
+			       mats[i].size(), cv::INTER_LINEAR,
+			       cv::BORDER_CONSTANT);
 		stabilizedFrames.push_back(stabilized);
-		m_progress = static_cast<float>(i) / mats.size(); // Update progress
+		m_progress =
+		    static_cast<float>(i) / mats.size(); // Update progress
 	}
 
 	for (size_t i = 0; i < frames.size(); i++) {
-		std::memcpy(frames[i], stabilizedFrames[i].data, width * height * 4);
+		std::memcpy(frames[i], stabilizedFrames[i].data,
+			    width * height * 4);
 	}
 	return true;
 }
 
-std::future<bool> Stabilizer::StabilizeAsync(std::vector<uint32_t*>& frames, int width, int height, std::function<void(bool)> callback) {
+std::future<bool>
+Stabilizer::StabilizeAsync(std::vector<uint32_t *> &frames, int width,
+			   int height, std::function<void(bool)> callback) {
 	// Set processing flag
 	m_is_processing = true;
 	m_progress = 0.0f;
 	// Get the thread pool
-	auto& pool = ThreadPool::GetThreadPool();
+	auto &pool = ThreadPool::GetThreadPool();
 	// Submit task to thread pool
 	auto future = pool.enqueue([&frames, width, height, callback]() {
 		bool result = Stabilize(frames, width, height);
-		// When complete, update processing flag and call callback if provided
+		// When complete, update processing flag and call callback if
+		// provided
 		m_is_processing = false;
 		if (callback) {
 			callback(result);
