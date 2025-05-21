@@ -9,14 +9,15 @@ Texture::Texture() { glGenTextures(1, &m_id); }
 Texture::~Texture() { glDeleteTextures(1, &m_id); }
 
 void Texture::Load(const uint32_t *data, int width, int height) {
-	PROFILE_FUNCTION();
-
 	if (m_loaded && m_width == width && m_height == height) {
 		Bind();
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, data);
 		Unbind();
 		return;
 	}
+
+	PROFILE_SCOPE(LoadNonLoaded);
+
 	m_width = width;
 	m_height = height;
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(EnhancingDeformationAnalysisUI VERSION 0.1
+project(EnhancingDeformationAnalysisUI VERSION 0.2
 	DESCRIPTION "UI for the Enhancing Deformation Analysis capstone"
 	LANGUAGES CXX C)
 
@@ -86,13 +86,15 @@ target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
 if (UI_INCLUDE_TENSORFLOW)
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_TENSORFLOW)
 endif()
+
 if (UI_INCLUDE_PYTORCH)
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_PYTORCH)
 endif()
 
 if (UI_PROFILE)
+	message("-- Building in PROFILE mode")
+	message("-- Recommended to release mode to get accurate profiling")
 	target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_PROFILE)
-	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3 -DNDEBUG)
 endif()
 
 if (UI_RELEASE)
@@ -104,16 +106,20 @@ if (UI_RELEASE)
 if (!WIN32)
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O3)
 endif() # !WIN32
-else()
+
+else() # UI_RELEASE
 	message("-- Building in DEBUG mode")
 if (!WIN32)
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -O)
 endif() # !WIN32
 	target_compile_options(EnhancingDeformationAnalysisUI PRIVATE -g)
 endif() # UI_RELEASE
+
 if (UI_INCLUDE_PYTORCH)
 	message("-- Building with PyTorch support")
 endif()
+
 if (UI_INCLUDE_TENSORFLOW)
 	message("-- Building with TensorFlow support")
 endif()
+

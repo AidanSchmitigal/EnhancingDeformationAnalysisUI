@@ -757,9 +757,6 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 	static TileConfig compare_config;
 
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
-		// full-tab child with menu bar
-		ImGui::BeginChild("DeformTab", ImVec2(0, 0), false, ImGuiWindowFlags_MenuBar);
-
 		// left pane: settings + status
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 
@@ -885,13 +882,13 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		ImGui::SameLine();
 
 		// right pane: either tile gallery or full image with overlay
-		ImGui::BeginChild("TileView", ImVec2(0, 0), true);
+		ImGui::BeginChild("TileView", ImVec2(0, 0));
 
 		if (m_show_gallery_view) {
 			// Gallery view
 			ImGui::Text("Output Tiles");
 
-			if (m_output_tiles.empty()) {
+			if (m_output_tile_textures.empty()) {
 				ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "No tiles available. Run analysis first.");
 			}
 
@@ -994,7 +991,6 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 		ImGui::EndChild();
 
-		ImGui::EndChild(); // DeformTab
 		ImGui::EndTabItem();
 	}
 }

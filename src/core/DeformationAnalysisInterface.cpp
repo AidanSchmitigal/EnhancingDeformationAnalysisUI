@@ -167,7 +167,8 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 	}
 
 	for (size_t i = 0; i < images.size() - 1; ++i) {
-		printf("Processing %zu/%zu, progress %.2f\n", i, images.size(), m_progress);
+		PROFILE_SCOPE(DeformationOneFrame);
+
 		m_progress = float(i) / float(images.size() - 1);
 
 		// prepare grayscale tiles for frame i and i+1
@@ -183,7 +184,8 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 		size_t total = tiles1.size();
 
 		for (size_t k = 0; k < total; k += batch_size) {
-			printf("Batch %zu/%zu\n", k / batch_size, total / batch_size);
+			PROFILE_SCOPE(BatchProcessing);
+
 			size_t curr_batch = std::min((size_t)batch_size, total - k);
 
 			// build batch of tensors
@@ -202,10 +204,10 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 			// single forward for the whole batch
 			auto out_batch = model.forward({input_batch}).toTensor().to(torch::kCPU); // shape (B,2,H,W)
 
-			printf("Batch %zu/%zu done\n", k / batch_size, total / batch_size);
 			// unpack each element
 			for (size_t j = 0; j < curr_batch; ++j) {
-				printf("Tile %zu/%zu\n", k + j, total);
+				PROFILE_SCOPE(UnpackBatch);
+
 				auto t = out_batch[j];
 				auto r = t.select(0, 0), g = t.select(0, 1);
 
@@ -228,11 +230,8 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 			}
 		}
 
-		printf("Stitching %zu/%zu\n", i, images.size());
 		auto stitched = Tiler::StitchTiles(outTiles, tile_config, img1.size());
-		printf("Stitching done %zu/%zu\n", i, images.size());
 		memcpy(images[i], stitched.data, width * height * sizeof(uint32_t));
-		printf("Memcpy done %zu/%zu\n", i, images.size());
 	}
 
 	printf("Done %zu/%zu\n", images.size() - 1, images.size());

@@ -9,12 +9,11 @@ std::vector<Tile> Tiler::CreateTiles(const cv::Mat &image, const TileConfig &con
 	return {};
 }
 
-cv::Mat Tiler::StitchTiles(const std::vector<Tile> &tiles, const TileConfig &config, const cv::Size &originalSize,
-			   const bool singleChannel) {
+cv::Mat Tiler::StitchTiles(const std::vector<Tile> &tiles, const TileConfig &config, const cv::Size &originalSize) {
 	if (config.type == TileType::Cropped) {
-		return StitchCroppedTiles(tiles, originalSize, config, singleChannel);
+		return StitchCroppedTiles(tiles, originalSize, config);
 	} else if (config.type == TileType::Blended) {
-		return StitchBlendedTiles(tiles, originalSize, config, singleChannel);
+		return StitchBlendedTiles(tiles, originalSize, config);
 	}
 	return {};
 }
@@ -78,175 +77,184 @@ std::vector<Tile> Tiler::CreateBlendedTiles(const cv::Mat &image, const TileConf
 	return tiles;
 }
 
-cv::Mat Tiler::StitchCroppedTiles(const std::vector<Tile> &tiles, const cv::Size &originalSize,
-				  const TileConfig &config, const bool singleChannel) {
-	int tileSize = config.tileSize;
-	int centerSize = config.centerSize;
-	bool includeOutside = config.includeOutside;
-	int inset = (tileSize - centerSize) / 2;
-	int h = originalSize.height;
-	int w = originalSize.width;
+cv::Mat Tiler::StitchCroppedTiles(const std::vector<Tile> &tiles, const cv::Size &originalSize, const TileConfig &cfg) {
+	if (tiles.empty())
+		return cv::Mat();
 
-	int cvType = singleChannel ? CV_32F : CV_32FC2;
-	cv::Mat result(h, w, cvType, cv::Scalar::all(0));
+	int ts = cfg.tileSize;
+	int cs = cfg.centerSize;
+	int inset = (ts - cs) / 2;
+	int W = originalSize.width;
+	int H = originalSize.height;
 
-	printf("Stitching %zu tiles\n", tiles.size());
+	cv::Mat result(H, W, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+
 	for (auto &tile : tiles) {
-		int x = tile.position.x;
-		int y = tile.position.y;
+		int x = tile.position.x, y = tile.position.y;
 
-		// compute dest bounds
+		// dest rect
 		int cx0 = std::max(x + inset, 0);
 		int cy0 = std::max(y + inset, 0);
-		int cx1 = std::min(x + tileSize - inset, w);
-		int cy1 = std::min(y + tileSize - inset, h);
+		int cx1 = std::min(x + ts - inset, W);
+		int cy1 = std::min(y + ts - inset, H);
 
-		// default src bounds (center region)
-		int tx0 = inset;
-		int ty0 = inset;
-		int tx1 = cx1 - x;
-		int ty1 = cy1 - y;
+		// src rect in tile coords
+		int tx0 = inset, ty0 = inset;
+		int tx1 = cx1 - x, ty1 = cy1 - y;
 
-		printf("Tile: (%d, %d) -> (%d, %d) -> (%d, %d)\n", x, y, cx0, cy0, cx1, cy1);
-		if (!includeOutside) {
-			if (y < centerSize) {
+		if (!cfg.includeOutside) {
+			if (y < inset) {
 				cy0 = 0;
 				ty0 = 0;
 			}
-			if (y + tileSize > h) {
-				cy1 = h;
-				ty1 = std::min(tileSize, h - y);
+			if (y + ts > H) {
+				cy1 = H;
+				ty1 = std::min(ts, H - y);
+				ty0 = 0;
 			}
-			if (x < centerSize) {
+			if (x < inset) {
 				cx0 = 0;
 				tx0 = 0;
 			}
-			if (x + tileSize > w) {
-				cx1 = w;
-				tx1 = std::min(tileSize, w - x);
+			if (x + ts > W) {
+				cx1 = W;
+				tx1 = std::min(ts, W - x);
+				tx0 = 0;
 			}
 		}
 
-		printf("Copy: (%d, %d) -> (%d, %d) -> (%d, %d)\n", tx0, ty0, tx1, ty1, cx0, cy0);
-		if (singleChannel) {
-			int copyW = cx1 - cx0;
-			int copyH = cy1 - cy0;
-			if (copyW <= 0 || copyH <= 0)
-				continue;
+		int w = cx1 - cx0;
+		int h = cy1 - cy0;
+		if (w <= 0 || h <= 0)
+			continue;
 
-			// recompute src offsets for 1ch
-			tx0 = inset + (cx0 - (x + inset));
-			ty0 = inset + (cy0 - (y + inset));
-			tx0 = std::clamp(tx0, 0, tileSize - 1);
-			ty0 = std::clamp(ty0, 0, tileSize - 1);
+		tx0 = std::clamp(tx0, 0, ts - w);
+		ty0 = std::clamp(ty0, 0, ts - h);
 
-			if (tx0 + copyW > tileSize)
-				copyW = tileSize - tx0;
-			if (ty0 + copyH > tileSize)
-				copyH = tileSize - ty0;
-			if (copyW <= 0 || copyH <= 0)
-				continue;
+		cv::Rect srcR(tx0, ty0, w, h), dstR(cx0, cy0, w, h);
+		cv::Mat src = tile.data(srcR);
+		cv::Mat dst = result(dstR);
 
-			cv::Mat srcROI = tile.data(cv::Rect(tx0, ty0, copyW, copyH));
-			cv::Mat dstROI = result(cv::Rect(cx0, cy0, copyW, copyH));
-			srcROI.copyTo(dstROI);
-		} else {
-			printf("Copying %d x %d\n", tx1 - tx0, ty1 - ty0);
-			// two-channel float case
-			cv::Mat srcROI = tile.data(cv::Range(ty0, ty1), cv::Range(tx0, tx1));
-			cv::Mat dstROI = result(cv::Range(cy0, cy1), cv::Range(cx0, cx1));
-			printf("Copying %d x %d\n", dstROI.cols, dstROI.rows);
-			srcROI.copyTo(dstROI);
+		if (src.type() == CV_32F) {
+			// single-channel float → bgra
+			cv::Mat u8, bgra;
+			src.convertTo(u8, CV_8U);
+			cv::cvtColor(u8, bgra, cv::COLOR_GRAY2BGRA);
+			bgra.copyTo(dst);
+		} else if (src.type() == CV_8UC4) {
+			// already bgra
+			src.copyTo(dst);
 		}
+		// else: skip unexpected types
 	}
 
-	printf("Stitching cropped tiles done\n");
 	return result;
 }
 
-cv::Mat Tiler::StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size &originalSize,
-				  const TileConfig &config, const bool singleChannel) {
-	int tileSize = config.tileSize;
-	int overlap = config.overlap;
-	int w = originalSize.width;
-	int h = originalSize.height;
-	int ch = singleChannel ? 1 : (tiles.empty() ? 1 : tiles[0].data.channels());
+cv::Mat Tiler::StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size &originalSize, const TileConfig &cfg) {
+	if (tiles.empty())
+		return cv::Mat();
 
-	cv::Mat result(h, w, CV_MAKETYPE(CV_32F, ch), cv::Scalar::all(0));
-	cv::Mat weights(h, w, CV_32F, cv::Scalar::all(0));
+	int ts = cfg.tileSize;
+	int ov = cfg.overlap;
+	int W = originalSize.width;
+	int H = originalSize.height;
+
+	// determine channel count from first tile
+	int firstType = tiles[0].data.type();
+	int ch = (firstType == CV_32FC1 ? 1 : tiles[0].data.channels());
+
+	// accumulators in float
+	cv::Mat acc(H, W, CV_MAKETYPE(CV_32F, ch), cv::Scalar::all(0));
+	cv::Mat weights(H, W, CV_32F, cv::Scalar::all(0));
 
 	for (auto &tile : tiles) {
-		int x = tile.position.x;
-		int y = tile.position.y;
-		int xEnd = std::min(x + tileSize, w);
-		int yEnd = std::min(y + tileSize, h);
+		int x = tile.position.x, y = tile.position.y;
+		int xEnd = std::min(x + ts, W);
+		int yEnd = std::min(y + ts, H);
 		cv::Rect dstR(x, y, xEnd - x, yEnd - y);
 
+		// src ROI in tile coords
+		cv::Rect srcR(0, 0, dstR.width, dstR.height);
+
+		// extract & convert to float
 		cv::Mat tf;
-		tile.data.convertTo(tf, CV_32F);
+		if (tile.data.type() == CV_8UC4) {
+			cv::Mat tmp = tile.data(srcR);
+			tmp.convertTo(tf, CV_32F);
+		} else { // CV_32FC1
+			tf = tile.data(srcR);
+		}
 
 		// build weight mask
 		cv::Mat wm(dstR.height, dstR.width, CV_32F, 1.0f);
-		if (overlap > 0) {
+		if (ov > 0) {
 			// horizontal ramps
-			cv::Mat rampH(1, overlap, CV_32F);
-			for (int i = 0; i < overlap; ++i)
-				rampH.at<float>(0, i) = overlap > 1 ? i / float(overlap - 1) : 1.f;
-			cv::Mat rampH_rev = 1 - rampH;
-
+			cv::Mat rampH(1, ov, CV_32F), rampH_rev;
+			for (int i = 0; i < ov; ++i)
+				rampH.at<float>(0, i) = ov > 1 ? i / float(ov - 1) : 1;
+			rampH_rev = 1 - rampH;
 			// vertical ramps
-			cv::Mat rampV(overlap, 1, CV_32F);
-			for (int i = 0; i < overlap; ++i)
-				rampV.at<float>(i, 0) = overlap > 1 ? i / float(overlap - 1) : 1.f;
-			cv::Mat rampV_rev = 1 - rampV;
+			cv::Mat rampV(ov, 1, CV_32F), rampV_rev;
+			for (int i = 0; i < ov; ++i)
+				rampV.at<float>(i, 0) = ov > 1 ? i / float(ov - 1) : 1;
+			rampV_rev = 1 - rampV;
 
 			if (x > 0)
-				wm.colRange(0, overlap).mul(cv::repeat(rampH, wm.rows, 1));
-			if (xEnd < w)
-				wm.colRange(wm.cols - overlap, wm.cols).mul(cv::repeat(rampH_rev, wm.rows, 1));
+				wm.colRange(0, ov).mul(cv::repeat(rampH, wm.rows, 1));
+			if (xEnd < W)
+				wm.colRange(wm.cols - ov, wm.cols).mul(cv::repeat(rampH_rev, wm.rows, 1));
 			if (y > 0)
-				wm.rowRange(0, overlap).mul(cv::repeat(rampV.t(), 1, wm.cols));
-			if (yEnd < h)
-				wm.rowRange(wm.rows - overlap, wm.rows).mul(cv::repeat(rampV_rev.t(), 1, wm.cols));
+				wm.rowRange(0, ov).mul(cv::repeat(rampV.t(), 1, wm.cols));
+			if (yEnd < H)
+				wm.rowRange(wm.rows - ov, wm.rows).mul(cv::repeat(rampV_rev.t(), 1, wm.cols));
 
-			// boost border edges
 			if (x == 0) {
-				cv::Mat rampH2 = 0.5f + 0.5f * rampH;
-				wm.colRange(0, overlap).mul(cv::repeat(rampH2, wm.rows, 1));
+				cv::Mat r2 = 0.5f + 0.5f * rampH;
+				wm.colRange(0, ov).mul(cv::repeat(r2, wm.rows, 1));
 			}
 			if (y == 0) {
-				cv::Mat rampV2 = 0.5f + 0.5f * rampV;
-				wm.rowRange(0, overlap).mul(cv::repeat(rampV2.t(), 1, wm.cols));
+				cv::Mat r2 = 0.5f + 0.5f * rampV;
+				wm.rowRange(0, ov).mul(cv::repeat(r2.t(), 1, wm.cols));
 			}
 		}
 
-		// replicate mask across channels if needed
+		// replicate mask for ch>1
 		cv::Mat wmC;
 		if (ch > 1) {
-			std::vector<cv::Mat> vcs(ch, wm);
-			cv::merge(vcs, wmC);
-		} else {
+			std::vector<cv::Mat> v(ch, wm);
+			cv::merge(v, wmC);
+		} else
 			wmC = wm;
-		}
 
-		// blend into result & accumulate weights
-		result(dstR) += tf(cv::Rect(0, 0, dstR.width, dstR.height)).mul(wmC);
+		// blend & accumulate
+		acc(dstR) += tf.mul(wmC);
 		weights(dstR) += wm;
 	}
 
-	// finalize: avoid div by zero
-	cv::Mat zeroMask = (weights == 0);
-	weights.setTo(1, zeroMask);
-
-	// replicate cumulative weights into nch channels
+	// avoid div0
+	weights.setTo(1, weights == 0);
+	// divide per-channel
 	cv::Mat weightsC;
 	if (ch > 1) {
-		std::vector<cv::Mat> wmv(ch, weights);
-		cv::merge(wmv, weightsC);
-	} else {
+		std::vector<cv::Mat> v(ch, weights);
+		cv::merge(v, weightsC);
+	} else
 		weightsC = weights;
-	}
-	cv::divide(result, weightsC, result); // auto-broadcast across channels
+	cv::divide(acc, weightsC, acc);
 
-	return result;
+	// finally map float→uint8 bgra
+	cv::Mat out(H, W, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+	if (ch == 1) {
+		cv::Mat u8;
+		acc.convertTo(u8, CV_8U);
+		cv::cvtColor(u8, out, cv::COLOR_GRAY2BGRA);
+	} else if (ch == 4) {
+		cv::Mat tmp;
+		acc.convertTo(tmp, CV_8UC4);
+		tmp.copyTo(out);
+	}
+	// else: unsupported channels
+
+	return out;
 }
