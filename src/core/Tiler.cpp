@@ -90,6 +90,7 @@ cv::Mat Tiler::StitchCroppedTiles(const std::vector<Tile> &tiles, const cv::Size
 	int cvType = singleChannel ? CV_32F : CV_32FC2;
 	cv::Mat result(h, w, cvType, cv::Scalar::all(0));
 
+	printf("Stitching %zu tiles\n", tiles.size());
 	for (auto &tile : tiles) {
 		int x = tile.position.x;
 		int y = tile.position.y;
@@ -106,6 +107,7 @@ cv::Mat Tiler::StitchCroppedTiles(const std::vector<Tile> &tiles, const cv::Size
 		int tx1 = cx1 - x;
 		int ty1 = cy1 - y;
 
+		printf("Tile: (%d, %d) -> (%d, %d) -> (%d, %d)\n", x, y, cx0, cy0, cx1, cy1);
 		if (!includeOutside) {
 			if (y < centerSize) {
 				cy0 = 0;
@@ -125,6 +127,7 @@ cv::Mat Tiler::StitchCroppedTiles(const std::vector<Tile> &tiles, const cv::Size
 			}
 		}
 
+		printf("Copy: (%d, %d) -> (%d, %d) -> (%d, %d)\n", tx0, ty0, tx1, ty1, cx0, cy0);
 		if (singleChannel) {
 			int copyW = cx1 - cx0;
 			int copyH = cy1 - cy0;
@@ -148,13 +151,16 @@ cv::Mat Tiler::StitchCroppedTiles(const std::vector<Tile> &tiles, const cv::Size
 			cv::Mat dstROI = result(cv::Rect(cx0, cy0, copyW, copyH));
 			srcROI.copyTo(dstROI);
 		} else {
+			printf("Copying %d x %d\n", tx1 - tx0, ty1 - ty0);
 			// two-channel float case
 			cv::Mat srcROI = tile.data(cv::Range(ty0, ty1), cv::Range(tx0, tx1));
 			cv::Mat dstROI = result(cv::Range(cy0, cy1), cv::Range(cx0, cx1));
+			printf("Copying %d x %d\n", dstROI.cols, dstROI.rows);
 			srcROI.copyTo(dstROI);
 		}
 	}
 
+	printf("Stitching cropped tiles done\n");
 	return result;
 }
 

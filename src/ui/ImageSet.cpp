@@ -42,12 +42,35 @@ void ImageSet::Display() {
 	bool isDeformationProcessing = DeformationAnalysisInterface::IsProcessing();
 
 	// Check if an async processing task has completed
-	if (isDeformationProcessing && m_processing_future && m_processing_future->valid()) {
+	if (!isDeformationProcessing && m_processing_future && m_processing_future->valid()) {
 		// Poll the future with zero timeout to check if it's done without blocking
 		auto status = m_processing_future->wait_for(std::chrono::seconds(0));
 		if (status == std::future_status::ready) {
-			// Just get the result - our callback will already have processed everything
-			m_processing_future->get();
+			auto result = m_processing_future->get();
+			m_model_ok = result;
+
+			// Create textures for the output tiles
+			for (auto &tile : m_output_tiles) {
+				// Make sure we have valid image data
+				if (tile.data.data && tile.data.cols > 0 && tile.data.rows > 0) {
+					m_output_tile_textures.push_back(std::make_shared<Texture>());
+					m_output_tile_textures.back()->Load((uint32_t *)tile.data.data, tile.data.cols,
+									    tile.data.rows);
+				}
+			}
+
+			// Create full image texture if tiles are available
+			if (!m_output_tiles.empty() && !m_processed_textures.empty()) {
+				m_full_image_texture = std::make_shared<Texture>();
+				m_full_image_texture->Load(m_processing_frames[0], m_processed_textures[0]->GetWidth(),
+							   m_processed_textures[0]->GetHeight());
+			}
+
+			utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
+							   m_processed_textures[0]->GetWidth(),
+							   m_processed_textures[0]->GetHeight());
+
+			m_processing_frames.clear();
 		}
 	}
 
@@ -56,7 +79,7 @@ void ImageSet::Display() {
 
 	bool changed = false;
 
-	// If processing, only allow the Preprocessing tab
+	// If not processing, show the image comparison tab
 	if (!isPreprocessProcessing && !isDeformationProcessing) {
 		DisplayImageComparisonTab();
 	}
@@ -831,58 +854,11 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			m_output_tiles.clear();
 			m_output_tile_textures.clear();
 
-			// Create callback function to handle completion
-			auto completionCallback = [this](bool result) {
-				m_model_ok = result;
-
-				std::cout << "Callback executed with " << m_output_tiles.size() << " output tiles"
-					  << std::endl;
-
-				// Debug print out the first tile info
-				if (!m_output_tiles.empty()) {
-					auto &first_tile = m_output_tiles[0];
-					std::cout
-					    << "First tile: " << first_tile.data.cols << "x" << first_tile.data.rows
-					    << " channels: " << first_tile.data.channels()
-					    << " data ptr: " << (first_tile.data.data != nullptr ? "valid" : "null")
-					    << std::endl;
-				}
-
-				// Create textures for the output tiles
-				for (auto &tile : m_output_tiles) {
-					// Make sure we have valid image data
-					if (tile.data.data && tile.data.cols > 0 && tile.data.rows > 0) {
-						m_output_tile_textures.push_back(std::make_shared<Texture>());
-						m_output_tile_textures.back()->Load((uint32_t *)tile.data.data,
-										    tile.data.cols, tile.data.rows);
-					}
-				}
-
-				// Create full image texture if tiles are available
-				if (!m_output_tiles.empty() && !m_processed_textures.empty()) {
-					m_full_image_texture = std::make_shared<Texture>();
-
-					// Copy data from the first processed texture
-					uint32_t *data = new uint32_t[m_processed_textures[0]->GetWidth() *
-								      m_processed_textures[0]->GetHeight()];
-					m_processed_textures[0]->GetData(data);
-					m_full_image_texture->Load(data, m_processed_textures[0]->GetWidth(),
-								   m_processed_textures[0]->GetHeight());
-					delete[] data;
-				}
-
-				utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
-								   m_processed_textures[0]->GetWidth(),
-								   m_processed_textures[0]->GetHeight());
-
-				m_processing_frames.clear();
-			};
-
 			// Run the model asynchronously with the callback
 			auto future = DeformationAnalysisInterface::RunModelBatchAsync(
 			    m_processing_frames, m_processed_textures[0]->GetWidth(),
 			    m_processed_textures[0]->GetHeight(), m_output_tiles, m_tile_config, m_batch_size,
-			    completionCallback);
+			    [](bool b) {});
 
 			// Store the future for polling in the next frame
 			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
@@ -969,10 +945,10 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					int tile_row = m_current_tile_index / cols_in_full;
 					int tile_col = m_current_tile_index % cols_in_full;
 
-					float rect_x_pos =
-					    cursor_pos.x - display_size.x + (tile_col * m_tile_config.tileSize * scale_factor);
-					float rect_y_pos =
-					    cursor_pos.y - display_size.y + (tile_row * m_tile_config.tileSize * scale_factor);
+					float rect_x_pos = cursor_pos.x - display_size.x +
+							   (tile_col * m_tile_config.tileSize * scale_factor);
+					float rect_y_pos = cursor_pos.y - display_size.y +
+							   (tile_row * m_tile_config.tileSize * scale_factor);
 
 					// Draw the rectangle
 					draw_list->AddRect(ImVec2(rect_x_pos, rect_y_pos),
@@ -993,7 +969,8 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					ImVec2 window_size = ImGui::GetWindowSize();
 
 					// Position for the tile inset (bottom-right corner)
-					float inset_size = m_tile_config.tileSize / 1.5f; // slightly smaller than the original
+					float inset_size =
+					    m_tile_config.tileSize / 1.5f; // slightly smaller than the original
 					ImVec2 inset_pos(window_pos.x + window_size.x - inset_size -
 							     20, // 20px padding from edge
 							 window_pos.y + window_size.y - inset_size - 20);
