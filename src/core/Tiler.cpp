@@ -161,44 +161,38 @@ cv::Mat Tiler::StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size
 	int H = originalSize.height;
 
 	// determine channel count from first tile
-	int firstType = tiles[0].data.type();
-	int ch = (firstType == CV_32FC1 ? 1 : tiles[0].data.channels());
+	int ch = tiles[0].data.channels();
 
-	// accumulators in float
+	// accumulators
 	cv::Mat acc(H, W, CV_MAKETYPE(CV_32F, ch), cv::Scalar::all(0));
 	cv::Mat weights(H, W, CV_32F, cv::Scalar::all(0));
 
 	for (auto &tile : tiles) {
-		int x = tile.position.x, y = tile.position.y;
+		int x = tile.position.x;
+		int y = tile.position.y;
 		int xEnd = std::min(x + ts, W);
 		int yEnd = std::min(y + ts, H);
 		cv::Rect dstR(x, y, xEnd - x, yEnd - y);
-
-		// src ROI in tile coords
 		cv::Rect srcR(0, 0, dstR.width, dstR.height);
 
-		// extract & convert to float
+		// convert to float (depth only)
 		cv::Mat tf;
-		if (tile.data.type() == CV_8UC4) {
-			cv::Mat tmp = tile.data(srcR);
-			tmp.convertTo(tf, CV_32F);
-		} else { // CV_32FC1
-			tf = tile.data(srcR);
-		}
+		tile.data.convertTo(tf, CV_32F, 1.0 / 255.0);
 
 		// build weight mask
 		cv::Mat wm(dstR.height, dstR.width, CV_32F, 1.0f);
 		if (ov > 0) {
 			// horizontal ramps
-			cv::Mat rampH(1, ov, CV_32F), rampH_rev;
+			cv::Mat rampH(1, ov, CV_32F);
 			for (int i = 0; i < ov; ++i)
-				rampH.at<float>(0, i) = ov > 1 ? i / float(ov - 1) : 1;
-			rampH_rev = 1 - rampH;
+				rampH.at<float>(0, i) = ov > 1 ? i / float(ov - 1) : 1.f;
+			cv::Mat rampH_rev = 1 - rampH;
+
 			// vertical ramps
-			cv::Mat rampV(ov, 1, CV_32F), rampV_rev;
+			cv::Mat rampV(ov, 1, CV_32F);
 			for (int i = 0; i < ov; ++i)
-				rampV.at<float>(i, 0) = ov > 1 ? i / float(ov - 1) : 1;
-			rampV_rev = 1 - rampV;
+				rampV.at<float>(i, 0) = ov > 1 ? i / float(ov - 1) : 1.f;
+			cv::Mat rampV_rev = 1 - rampV;
 
 			if (x > 0)
 				wm.colRange(0, ov).mul(cv::repeat(rampH, wm.rows, 1));
@@ -209,6 +203,7 @@ cv::Mat Tiler::StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size
 			if (yEnd < H)
 				wm.rowRange(wm.rows - ov, wm.rows).mul(cv::repeat(rampV_rev.t(), 1, wm.cols));
 
+			// boost top/left borders
 			if (x == 0) {
 				cv::Mat r2 = 0.5f + 0.5f * rampH;
 				wm.colRange(0, ov).mul(cv::repeat(r2, wm.rows, 1));
@@ -219,42 +214,49 @@ cv::Mat Tiler::StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size
 			}
 		}
 
-		// replicate mask for ch>1
+		// replicate mask across channels if needed
 		cv::Mat wmC;
 		if (ch > 1) {
 			std::vector<cv::Mat> v(ch, wm);
 			cv::merge(v, wmC);
-		} else
+		} else {
 			wmC = wm;
+		}
 
 		// blend & accumulate
-		acc(dstR) += tf.mul(wmC);
+		acc(dstR) += tf(srcR).mul(wmC);
 		weights(dstR) += wm;
 	}
 
-	// avoid div0
+	// avoid division by zero
 	weights.setTo(1, weights == 0);
-	// divide per-channel
-	cv::Mat weightsC;
+
+	// replicate weights per channel
+	cv::Mat wC;
 	if (ch > 1) {
 		std::vector<cv::Mat> v(ch, weights);
-		cv::merge(v, weightsC);
-	} else
-		weightsC = weights;
-	cv::divide(acc, weightsC, acc);
+		cv::merge(v, wC);
+	} else {
+		wC = weights;
+	}
 
-	// finally map float→uint8 bgra
-	cv::Mat out(H, W, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+	// normalize
+	cv::divide(acc, wC, acc);
+
+	// after dividing acc by weights:
+	cv::Mat u8;
+	acc.convertTo(u8, CV_8U, 255.0f); // FLOAT → UINT8
+
+	cv::Mat out(originalSize.height, originalSize.width, CV_8UC4);
+
 	if (ch == 1) {
-		cv::Mat u8;
-		acc.convertTo(u8, CV_8U);
 		cv::cvtColor(u8, out, cv::COLOR_GRAY2BGRA);
 	} else if (ch == 4) {
-		cv::Mat tmp;
-		acc.convertTo(tmp, CV_8UC4);
-		tmp.copyTo(out);
+		// u8 already has 4 channels in BGRA order
+		out = u8;
 	}
-	// else: unsupported channels
 
 	return out;
+
+	return acc;
 }

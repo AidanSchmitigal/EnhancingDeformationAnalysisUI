@@ -61,7 +61,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			}
 		}
 
-		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
+		ImGui::BeginChild("Controls", ImVec2(250, 0));
 
 		// Processing status display
 		if (m_is_processing) {
@@ -82,22 +82,26 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		ImGui::SeparatorText("Crop");
 		static int crop = 60;
 		ImGui::BeginDisabled(m_is_processing);
-		ImGui::SliderInt("Pixels", &crop, 0, 100);
+		ImGui::SliderInt("Pixels", &crop, 1, 100);
 		if (ImGui::Button("Crop Bottom") && !m_is_processing) {
-			if (crop == 0 || crop >= m_processed_textures[0]->GetHeight())
-				return;
-			for (int i = 0; i < m_processed_textures.size(); i++) {
-				uint32_t *data = (uint32_t *)malloc(m_processed_textures[i]->GetWidth() *
-								    m_processed_textures[i]->GetHeight() * 4);
-				m_processed_textures[i]->GetData(data);
-				m_processed_textures[i]->Load(data, m_processed_textures[i]->GetWidth(),
-							      m_processed_textures[i]->GetHeight() - crop);
-				free(data);
+			if (!(crop >= m_processed_textures[0]->GetHeight())) {
+				for (int i = 0; i < m_processed_textures.size(); i++) {
+					uint32_t *data = (uint32_t *)malloc(m_processed_textures[i]->GetWidth() *
+									    m_processed_textures[i]->GetHeight() * 4);
+					m_processed_textures[i]->GetData(data);
+					m_processed_textures[i]->Load(data, m_processed_textures[i]->GetWidth(),
+								      m_processed_textures[i]->GetHeight() - crop);
+					free(data);
+				}
 			}
 		}
 		ImGui::EndDisabled();
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
+
+		if (crop >= m_processed_textures[0]->GetHeight())
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Crop height too large!");
+		
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("Crops bottom of image (default: "
 					  "60px for SEM infobar).");
@@ -340,7 +344,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		ImGui::EndChild();
 
 		ImGui::SameLine();
-		ImGui::BeginChild("ImageView", ImVec2(0, 0), true);
+		ImGui::BeginChild("ImageView", ImVec2(0, 0));
 		if (!m_processed_textures.empty()) {
 			// Add frame navigation controls
 			ImGui::BeginDisabled(m_is_processing);
@@ -349,29 +353,33 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 				ImGui::Text("Frame: %d/%d", m_current_frame + 1, (int)m_processed_textures.size());
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 100);
-				if (ImGui::SliderInt("##FrameSlider", &m_current_frame, 0, m_processed_textures.size() - 1, "")) {
+				if (ImGui::SliderInt("##FrameSlider", &m_current_frame, 0,
+						     m_processed_textures.size() - 1, "")) {
 					// Keep within bounds
-					m_current_frame = std::max(0, std::min(m_current_frame, (int)m_processed_textures.size() - 1));
+					m_current_frame = std::max(
+					    0, std::min(m_current_frame, (int)m_processed_textures.size() - 1));
 				}
-				
+
 				// Navigation buttons
 				ImGui::SameLine();
 				ImGui::BeginDisabled(m_current_frame <= 0);
-				if (ImGui::ArrowButton("##left", ImGuiDir_Left)) m_current_frame--;
+				if (ImGui::ArrowButton("##left", ImGuiDir_Left))
+					m_current_frame--;
 				ImGui::EndDisabled();
-				
+
 				ImGui::SameLine();
 				ImGui::BeginDisabled(m_current_frame >= m_processed_textures.size() - 1);
-				if (ImGui::ArrowButton("##right", ImGuiDir_Right)) m_current_frame++;
+				if (ImGui::ArrowButton("##right", ImGuiDir_Right))
+					m_current_frame++;
 				ImGui::EndDisabled();
-				
+
 				// Play/Pause button
 				ImGui::SameLine();
 				static bool isPlaying = false;
 				if (ImGui::Button(isPlaying ? "Pause" : "Play")) {
 					isPlaying = !isPlaying;
 				}
-				
+
 				// Playback logic
 				if (isPlaying) {
 					// static...
@@ -387,14 +395,14 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 				}
 			}
 			ImGui::EndDisabled();
-			
+
 			// Add a separator between controls and image
 			ImGui::Separator();
-			
+
 			// Display the current frame
 			ImGui::Image((ImTextureID)m_processed_textures[m_current_frame]->GetID(),
-				     ImVec2(m_processed_textures[m_current_frame]->GetWidth(), 
-				            m_processed_textures[m_current_frame]->GetHeight()));
+				     ImVec2(m_processed_textures[m_current_frame]->GetWidth(),
+					    m_processed_textures[m_current_frame]->GetHeight()));
 		}
 		ImGui::EndChild();
 

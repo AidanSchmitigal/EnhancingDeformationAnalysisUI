@@ -15,6 +15,9 @@
 #include <format>
 #include <string>
 
+#define CALC_SLIDER_SIZE(text) \
+	(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(#text).x) - 5
+
 int ImageSet::m_id_counter = 0;
 
 ImageSet::ImageSet(const std::string_view &folder_path) : m_folder_path(folder_path) {
@@ -138,6 +141,7 @@ void ImageSet::LoadImages() {
 
 // TODO: change to incorporate the original images and images from
 // preprocessing, feature tracking, and deformation analysis (all separate)
+// or maybe not?
 void ImageSet::DisplayImageComparisonTab() {
 	static bool isPlaying = false;
 	if (ImGui::BeginTabItem("Image Comparison")) {
@@ -288,7 +292,7 @@ void ImageSet::DisplayImageComparisonTab() {
 		}
 
 		// Create a row of navigation controls
-		float button_width = ImGui::GetContentRegionAvail().x / 3 - 2;
+		float button_width = ImGui::GetContentRegionAvail().x / 3 - 5;
 
 		// Previous frame button
 		ImGui::BeginDisabled(m_current_frame <= 0);
@@ -315,7 +319,7 @@ void ImageSet::DisplayImageComparisonTab() {
 
 		// Speed control
 		static float playback_speed = 10.0f; // frames per second
-		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::SetNextItemWidth(CALC_SLIDER_SIZE(Speed));
 		ImGui::SliderFloat("Speed", &playback_speed, 1.0f, 30.0f, "%.1f fps");
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Frames per second");
@@ -332,7 +336,7 @@ void ImageSet::DisplayImageComparisonTab() {
 
 		// Display scaling slider
 		static float display_scale = 1.5f;
-		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::SetNextItemWidth(CALC_SLIDER_SIZE(Scale));
 		ImGui::SliderFloat("Scale", &display_scale, 1.0f, 3.0f, "%.1fx");
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Adjust image display size");
@@ -352,14 +356,6 @@ void ImageSet::DisplayImageComparisonTab() {
 			}
 			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 			free(data);
-		}
-
-		// View options section
-		ImGui::SeparatorText("View Options");
-		static bool sync_view = true;
-		ImGui::Checkbox("Synchronize View", &sync_view);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Keep original and processed images in sync");
 		}
 
 		// Help section
