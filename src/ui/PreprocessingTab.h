@@ -42,6 +42,12 @@ class PreprocessingTab {
 	private:
 		// Helper methods to update UI after async processing completes
 		void OnProcessingComplete(bool success);
+		
+		// Store which frames were processed for restoration
+		std::vector<int> m_processed_frame_indices;
+		
+		// Helper method to get frames to process based on selection
+		std::vector<int> GetFramesToProcess() const;
 
 		// Our textures
 		std::vector<std::shared_ptr<Texture>> m_textures;
@@ -77,4 +83,7 @@ class PreprocessingTab {
 		
 		// Frame navigation
 		int m_current_frame = 0;
+		
+		// Processing mode
+		bool m_process_selected_only = false;
 };

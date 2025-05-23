@@ -138,7 +138,7 @@ cv::Mat Tiler::StitchCroppedTiles(const std::vector<Tile> &tiles, const cv::Size
 		if (src.type() == CV_32F) {
 			// single-channel float → bgra
 			cv::Mat u8, bgra;
-			src.convertTo(u8, CV_8U);
+			src.convertTo(u8, CV_8U, 255.0f);
 			cv::cvtColor(u8, bgra, cv::COLOR_GRAY2BGRA);
 			bgra.copyTo(dst);
 		} else if (src.type() == CV_8UC4) {
@@ -177,7 +177,12 @@ cv::Mat Tiler::StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size
 
 		// convert to float (depth only)
 		cv::Mat tf;
-		tile.data.convertTo(tf, CV_32F, 1.0 / 255.0);
+		if (tile.data.type() == CV_8UC4) {
+			tile.data.convertTo(tf, CV_32F, 1.0 / 255.0);
+		}
+		else if (tile.data.type() == CV_32F) {
+			tf = tile.data;
+		}
 
 		// build weight mask
 		cv::Mat wm(dstR.height, dstR.width, CV_32F, 1.0f);
@@ -257,6 +262,4 @@ cv::Mat Tiler::StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size
 	}
 
 	return out;
-
-	return acc;
 }

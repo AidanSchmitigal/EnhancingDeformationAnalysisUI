@@ -234,8 +234,6 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 		memcpy(images[i], stitched.data, width * height * sizeof(uint32_t));
 	}
 
-	printf("Done %zu/%zu\n", images.size() - 1, images.size());
-
 	m_progress = 1.0f;
 	m_processing = false;
 	return true;
