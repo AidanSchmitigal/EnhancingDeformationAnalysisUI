@@ -17,6 +17,12 @@ struct TileConfig {
 		   bool includeOutside = false)
 	    : type(type), tileSize(tileSize), overlap(overlap), centerSize(centerSize), includeOutside(includeOutside) {
 	}
+
+	bool operator==(const TileConfig &other) const {
+		return type == other.type && tileSize == other.tileSize && overlap == other.overlap &&
+		       centerSize == other.centerSize && includeOutside == other.includeOutside;
+	}
+
 	TileType type;
 	int tileSize;
 	int overlap;
@@ -28,13 +34,13 @@ class Tiler {
       public:
 	static std::vector<Tile> CreateTiles(const cv::Mat &image, const TileConfig &config);
 	static cv::Mat StitchTiles(const std::vector<Tile> &tiles, const TileConfig &config,
-				   const cv::Size &originalSize, const bool singleChannel = false);
+				   const cv::Size &originalSize);
 
       private:
 	static std::vector<Tile> CreateCroppedTiles(const cv::Mat &image, const TileConfig &config);
 	static std::vector<Tile> CreateBlendedTiles(const cv::Mat &image, const TileConfig &config);
 	static cv::Mat StitchCroppedTiles(const std::vector<Tile> &tiles, const cv::Size &originalSize,
-							const TileConfig &config, const bool singleChannel);
+					  const TileConfig &config);
 	static cv::Mat StitchBlendedTiles(const std::vector<Tile> &tiles, const cv::Size &originalSize,
-					  const TileConfig &config, const bool singleChannel);
+					  const TileConfig &config);
 };

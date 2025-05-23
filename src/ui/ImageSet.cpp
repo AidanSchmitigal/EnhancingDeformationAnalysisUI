@@ -12,8 +12,12 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <algorithm>
 #include <format>
 #include <string>
+
+#define CALC_SLIDER_SIZE(text) \
+	(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(#text).x) - 5
 
 int ImageSet::m_id_counter = 0;
 
@@ -42,12 +46,35 @@ void ImageSet::Display() {
 	bool isDeformationProcessing = DeformationAnalysisInterface::IsProcessing();
 
 	// Check if an async processing task has completed
-	if (isDeformationProcessing && m_processing_future && m_processing_future->valid()) {
+	if (!isDeformationProcessing && m_processing_future && m_processing_future->valid()) {
 		// Poll the future with zero timeout to check if it's done without blocking
 		auto status = m_processing_future->wait_for(std::chrono::seconds(0));
 		if (status == std::future_status::ready) {
-			// Just get the result - our callback will already have processed everything
-			m_processing_future->get();
+			auto result = m_processing_future->get();
+			m_model_ok = result;
+
+			// Create textures for the output tiles
+			for (auto &tile : m_output_tiles) {
+				// Make sure we have valid image data
+				if (tile.data.data && tile.data.cols > 0 && tile.data.rows > 0) {
+					m_output_tile_textures.push_back(std::make_shared<Texture>());
+					m_output_tile_textures.back()->Load((uint32_t *)tile.data.data, tile.data.cols,
+									    tile.data.rows);
+				}
+			}
+
+			// Create full image texture if tiles are available
+			if (!m_output_tiles.empty() && !m_processed_textures.empty()) {
+				m_full_image_texture = std::make_shared<Texture>();
+				m_full_image_texture->Load(m_processing_frames[0], m_processed_textures[0]->GetWidth(),
+							   m_processed_textures[0]->GetHeight());
+			}
+
+			utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
+							   m_processed_textures[0]->GetWidth(),
+							   m_processed_textures[0]->GetHeight());
+
+			m_processing_frames.clear();
 		}
 	}
 
@@ -56,7 +83,7 @@ void ImageSet::Display() {
 
 	bool changed = false;
 
-	// If processing, only allow the Preprocessing tab
+	// If not processing, show the image comparison tab
 	if (!isPreprocessProcessing && !isDeformationProcessing) {
 		DisplayImageComparisonTab();
 	}
@@ -115,6 +142,7 @@ void ImageSet::LoadImages() {
 
 // TODO: change to incorporate the original images and images from
 // preprocessing, feature tracking, and deformation analysis (all separate)
+// or maybe not?
 void ImageSet::DisplayImageComparisonTab() {
 	static bool isPlaying = false;
 	if (ImGui::BeginTabItem("Image Comparison")) {
@@ -265,7 +293,7 @@ void ImageSet::DisplayImageComparisonTab() {
 		}
 
 		// Create a row of navigation controls
-		float button_width = ImGui::GetContentRegionAvail().x / 3 - 2;
+		float button_width = ImGui::GetContentRegionAvail().x / 3 - 5;
 
 		// Previous frame button
 		ImGui::BeginDisabled(m_current_frame <= 0);
@@ -292,7 +320,7 @@ void ImageSet::DisplayImageComparisonTab() {
 
 		// Speed control
 		static float playback_speed = 10.0f; // frames per second
-		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::SetNextItemWidth(CALC_SLIDER_SIZE(Speed));
 		ImGui::SliderFloat("Speed", &playback_speed, 1.0f, 30.0f, "%.1f fps");
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Frames per second");
@@ -309,7 +337,7 @@ void ImageSet::DisplayImageComparisonTab() {
 
 		// Display scaling slider
 		static float display_scale = 1.5f;
-		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::SetNextItemWidth(CALC_SLIDER_SIZE(Scale));
 		ImGui::SliderFloat("Scale", &display_scale, 1.0f, 3.0f, "%.1fx");
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Adjust image display size");
@@ -329,14 +357,6 @@ void ImageSet::DisplayImageComparisonTab() {
 			}
 			m_preprocessing_tab.SetProcessedTextures(m_processed_textures);
 			free(data);
-		}
-
-		// View options section
-		ImGui::SeparatorText("View Options");
-		static bool sync_view = true;
-		ImGui::Checkbox("Synchronize View", &sync_view);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Keep original and processed images in sync");
 		}
 
 		// Help section
@@ -483,6 +503,10 @@ void ImageSet::DisplayImageAnalysisTab() {
 			ImGui::EndTabItem();
 			return;
 		}
+		
+		// Ensure current frame is within bounds
+		m_analysis_current_frame = std::clamp(m_analysis_current_frame, 0, (int)m_processed_textures.size() - 1);
+		
 		if (s_comparison_image == nullptr ||
 		    s_ref_image_width * s_ref_image_height !=
 			m_processed_textures[0]->GetWidth() * m_processed_textures[0]->GetHeight()) {
@@ -518,28 +542,160 @@ void ImageSet::DisplayImageAnalysisTab() {
 			}
 		}
 
-		ImGui::SeparatorText("Write Analysis to CSV");
-		if (ImGui::Button("Save To")) {
-			auto path = utils::SaveFileDialog(".", "Save Analysis CSV", "csv");
-			write_success = io::SaveAnalysisCsv(path.c_str(), histograms, avg_histogram, snrs, avg_snr);
+		// Create layout with image on left, controls and histogram on right
+		ImGui::BeginChild("AnalysisControls", ImVec2(250, 0));
+		
+		ImGui::SeparatorText("Frame Navigation");
+		if (m_processed_textures.size() > 1) {
+			// Frame slider with text showing current/total frames
+			ImGui::Text("Frame: %d/%d", m_analysis_current_frame + 1, (int)m_processed_textures.size());
+			ImGui::SetNextItemWidth(220);
+			if (ImGui::SliderInt("##AnalysisFrameSlider", &m_analysis_current_frame, 0,
+					     m_processed_textures.size() - 1, "")) {
+				// Keep within bounds
+				m_analysis_current_frame = std::max(
+				    0, std::min(m_analysis_current_frame, (int)m_processed_textures.size() - 1));
+			}
+
+			// Navigation buttons
+			ImGui::BeginDisabled(m_analysis_current_frame <= 0);
+			if (ImGui::ArrowButton("##analysis_left", ImGuiDir_Left))
+				m_analysis_current_frame--;
+			ImGui::EndDisabled();
+
+			ImGui::SameLine();
+			ImGui::BeginDisabled(m_analysis_current_frame >= m_processed_textures.size() - 1);
+			if (ImGui::ArrowButton("##analysis_right", ImGuiDir_Right))
+				m_analysis_current_frame++;
+			ImGui::EndDisabled();
 		}
-		if (!write_success) {
-			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving widths!");
+
+		ImGui::SeparatorText("Frame Analysis");
+		if (!histograms.empty() && m_analysis_current_frame < histograms.size()) {
+			ImGui::Text("SNR: %.2f", snrs[m_analysis_current_frame]);
+			auto size = ImVec2(220, 200);
+			char label[256];
+			sprintf(label, "Frame %d Histogram", m_analysis_current_frame);
+			ImGui::PlotHistogram(label, &histograms[m_analysis_current_frame][0], 256, 0, NULL, 0.0f, 1.0f, size);
+		}
+
+		ImGui::SeparatorText("Region Analysis");
+		if (ImGui::Button(m_region_selection_active ? "Cancel Selection" : "Select Region")) {
+			m_region_selection_active = !m_region_selection_active;
+			if (!m_region_selection_active) {
+				m_region_selected = false;
+			}
+		}
+		
+		if (m_region_selected) {
+			ImVec2 region_size = ImVec2(abs(m_region_end.x - m_region_start.x), abs(m_region_end.y - m_region_start.y));
+			ImGui::Text("Region: %.0fx%.0f pixels", region_size.x, region_size.y);
+			ImGui::Text("Region SNR: %.2f", m_region_snr);
+			
+			if (!m_region_histogram.empty()) {
+				auto size = ImVec2(220, 150);
+				ImGui::PlotHistogram("Region Histogram", &m_region_histogram[0], 256, 0, NULL, 0.0f, 1.0f, size);
+			}
+			
+			if (ImGui::Button("Clear Region")) {
+				m_region_selected = false;
+				m_region_selection_active = false;
+			}
+		} else if (m_region_selection_active) {
+			ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Click and drag on image");
 		}
 
 		ImGui::SeparatorText("Average Analysis");
 		ImGui::Text("Average SNR: %.2f", avg_snr);
-		auto size = ImGui::GetIO().DisplaySize;
-		size.x = size.x / 1.3f;
-		ImGui::PlotHistogram("Average Histogram", &avg_histogram[0], 256, 0, NULL, 0.0f, 1.0f,
-				     ImVec2(size.x, 300));
-		ImGui::SeparatorText("Frame Analysis");
-		for (int i = 0; i < histograms.size(); i++) {
-			char label[256];
-			sprintf(label, "Frame %d", i);
-			ImGui::PlotHistogram(label, &histograms[i][0], 256, 0, NULL, 0.0f, 1.0f, ImVec2(size.x, 300));
-			ImGui::Text("SNR: %.2f", snrs[i]);
+		if (!avg_histogram.empty()) {
+			auto size = ImVec2(220, 200);
+			ImGui::PlotHistogram("Average Histogram", &avg_histogram[0], 256, 0, NULL, 0.0f, 1.0f, size);
 		}
+
+		ImGui::SeparatorText("Export");
+		if (ImGui::Button("Save Analysis CSV")) {
+			auto path = utils::SaveFileDialog(".", "Save Analysis CSV", "csv");
+			write_success = io::SaveAnalysisCsv(path.c_str(), histograms, avg_histogram, snrs, avg_snr);
+		}
+		if (!write_success) {
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error saving analysis!");
+		}
+
+		ImGui::EndChild();
+
+		ImGui::SameLine();
+		ImGui::BeginChild("ImageView", ImVec2(0, 0));
+		
+		// Display the current frame
+		ImGui::Text("Current Frame: %d", m_analysis_current_frame);
+		ImGui::Separator();
+		
+		// Get image dimensions and position
+		auto image_size = ImVec2(m_processed_textures[m_analysis_current_frame]->GetWidth(),
+					 m_processed_textures[m_analysis_current_frame]->GetHeight());
+		ImVec2 image_pos = ImGui::GetCursorScreenPos();
+		
+		// Display the image
+		ImGui::Image((ImTextureID)m_processed_textures[m_analysis_current_frame]->GetID(), image_size);
+		
+		// Handle region selection on the image
+		if (m_region_selection_active && ImGui::IsItemHovered()) {
+			ImGuiIO& io = ImGui::GetIO();
+			ImVec2 mouse_pos = ImVec2(io.MousePos.x - image_pos.x, io.MousePos.y - image_pos.y);
+			
+			// Clamp mouse position to image bounds
+			mouse_pos.x = std::max(0.0f, std::min(mouse_pos.x, image_size.x));
+			mouse_pos.y = std::max(0.0f, std::min(mouse_pos.y, image_size.y));
+			
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+				m_region_start = mouse_pos;
+				m_region_end = mouse_pos;
+			}
+			
+			if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+				m_region_end = mouse_pos;
+			}
+			
+			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+				m_region_selection_active = false;
+				m_region_selected = true;
+				
+				// Calculate region analysis
+				ImVec2 roi_min = ImVec2(std::min(m_region_start.x, m_region_end.x), 
+						       std::min(m_region_start.y, m_region_end.y));
+				ImVec2 roi_max = ImVec2(std::max(m_region_start.x, m_region_end.x), 
+						       std::max(m_region_start.y, m_region_end.y));
+				
+				int roi_width = std::max(1.0f, roi_max.x - roi_min.x);
+				int roi_height = std::max(1.0f, roi_max.y - roi_min.y);
+				
+				// Get current frame data
+				uint32_t* frame_data = (uint32_t*)malloc(image_size.x * image_size.y * 4);
+				m_processed_textures[m_analysis_current_frame]->GetData(frame_data);
+				
+				// Analyze the selected region
+				ImageAnalysis::AnalyzeRegion(frame_data, image_size.x, image_size.y,
+							    roi_min.x, roi_min.y, roi_width, roi_height,
+							    m_region_histogram, m_region_snr);
+				
+				free(frame_data);
+			}
+		}
+		
+		// Draw selection rectangle
+		if (m_region_selection_active || m_region_selected) {
+			ImDrawList* draw_list = ImGui::GetWindowDrawList();
+			ImVec2 rect_min = ImVec2(image_pos.x + std::min(m_region_start.x, m_region_end.x),
+						 image_pos.y + std::min(m_region_start.y, m_region_end.y));
+			ImVec2 rect_max = ImVec2(image_pos.x + std::max(m_region_start.x, m_region_end.x),
+						 image_pos.y + std::max(m_region_start.y, m_region_end.y));
+			
+			ImU32 color = m_region_selected ? IM_COL32(0, 255, 0, 255) : IM_COL32(255, 255, 0, 255);
+			draw_list->AddRect(rect_min, rect_max, color, 0.0f, 0, 2.0f);
+		}
+		
+		ImGui::EndChild();
+		
 		ImGui::EndTabItem();
 	}
 }
@@ -731,12 +887,9 @@ void ImageSet::DisplayFeatureTrackingTab() {
 }
 
 void ImageSet::DisplayDeformationAnalysisTab() {
-	static int overlap = 0;
+	static TileConfig compare_config;
 
 	if (ImGui::BeginTabItem("Deformation Analysis")) {
-		// full-tab child with menu bar
-		ImGui::BeginChild("DeformTab", ImVec2(0, 0), false, ImGuiWindowFlags_MenuBar);
-
 		// left pane: settings + status
 		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
 
@@ -753,26 +906,29 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 		// View toggle
 		ImGui::BeginDisabled(isProcessing);
-		if (ImGui::Checkbox("Gallery View", &m_show_gallery_view)) {
-			// Toggle between gallery and full image view
-		}
+
+		ImGui::Checkbox("Gallery View", &m_show_gallery_view);
+
 		ImGui::EndDisabled();
 
 		ImGui::SeparatorText("Tiling Configuration");
 
 		ImGui::BeginDisabled(isProcessing);
 		ImGui::Combo("Tile Type", (int *)&m_tile_config.type, "Cropped\0Blended\0\0");
-		ImGui::SliderInt("Tile Size", &m_tile_size, 156, 512);
+		ImGui::SliderInt("Tile Size", &m_tile_config.tileSize, 156, 512);
 		if (m_tile_config.type == TileType::Cropped) {
 			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 16, 128);
 			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		} else if (m_tile_config.type == TileType::Blended) {
 			ImGui::SliderInt("Overlap", &m_tile_config.overlap, 0, 128);
 		}
+
 		ImGui::EndDisabled();
 
-		// Update tile configuration for previews
-		m_tile_config.tileSize = m_tile_size;
+		if (m_tile_config != compare_config)
+			m_tile_need_refresh = true;
+
+		compare_config = m_tile_config;
 
 		// Add preview tile button
 		static bool preview_tiles_open = false;
@@ -795,16 +951,13 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					  "adjust tile size and other parameters.");
 		}
 
-		// Generate preview tiles if window is open
-		if (preview_tiles_open && !m_processed_textures.empty()) {
-			utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0], m_tile_config);
-		}
-
 		// Use the common UI function to display the tile preview window
 		auto refreshTiles = [this]() {
-			if (!m_processed_textures.empty()) {
-				utils::CreateTileTextures(m_preview_tile_textures, m_processed_textures[0],
+			if (!m_processed_textures.empty() && m_tile_need_refresh) {
+				m_preview_tile_textures.clear();
+				utils::UpdateTileTextures(m_preview_tile_textures, m_processed_textures[0],
 							  m_tile_config);
+				m_tile_need_refresh = false;
 			}
 		};
 
@@ -813,38 +966,15 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 		ImGui::Separator();
 
-		// Batch Processing Mode
-		ImGui::SeparatorText("Processing Mode");
-
-		static int batch_mode = 0; // 0: Single, 1: Batch Consecutive, 2: Batch Reference
-		static int reference_frame = 0;
-
-		ImGui::BeginDisabled(isProcessing);
-		ImGui::RadioButton("Single Pair Analysis", &batch_mode, 0);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Process a single pair of consecutive frames");
-		}
-
-		ImGui::RadioButton("Batch Process - Consecutive", &batch_mode, 1);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Process all consecutive frame pairs: (0,1), (1,2), (2,3), etc.");
-		}
-
-		ImGui::RadioButton("Batch Process - Reference Frame", &batch_mode, 2);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Process all frames against a reference frame: (ref,0), (ref,1), etc.");
-		}
-
-		// Reference frame selection (only enabled for reference frame mode)
-		if (batch_mode == 2) {
-			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-			ImGui::SliderInt("Reference Frame", &reference_frame, 0,
-					 std::max(0, static_cast<int>(m_processed_textures.size()) - 1));
-		}
-		ImGui::EndDisabled();
-
 		// Run Analysis button
 		ImGui::BeginDisabled(isProcessing || m_processed_textures.size() < 2);
+
+		ImGui::SliderInt("Batch Size", &m_batch_size, 1, 32);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Number of tiles to process in parallel.\nHigher values may improve "
+					  "performance but require more memory.");
+		}
+
 		if (ImGui::Button("Run Analysis", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 			// gather frames
 			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
@@ -854,62 +984,11 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 			m_output_tiles.clear();
 			m_output_tile_textures.clear();
 
-			// Create callback function to handle completion
-			auto completionCallback = [this](bool result) {
-				m_model_ok = result;
-				
-				std::cout << "Callback executed with " << m_output_tiles.size() << " output tiles" << std::endl;
-				
-				// Debug print out the first tile info
-				if (!m_output_tiles.empty()) {
-					auto& first_tile = m_output_tiles[0];
-					std::cout << "First tile: " << first_tile.data.cols << "x" << first_tile.data.rows 
-						<< " channels: " << first_tile.data.channels() 
-						<< " data ptr: " << (first_tile.data.data != nullptr ? "valid" : "null") 
-						<< std::endl;
-				}
-				
-				// Create textures for the output tiles
-				for (auto& tile : m_output_tiles) {
-					// Make sure we have valid image data
-					if (tile.data.data && tile.data.cols > 0 && tile.data.rows > 0) {
-						m_output_tile_textures.push_back(std::make_shared<Texture>());
-						m_output_tile_textures.back()->Load((uint32_t*)tile.data.data, tile.data.cols, tile.data.rows);
-					}
-				}
-				
-				// Create full image texture if tiles are available
-				if (!m_output_tiles.empty() && !m_processed_textures.empty()) {
-					m_full_image_texture = std::make_shared<Texture>();
-					
-					// Copy data from the first processed texture
-					uint32_t* data = new uint32_t[m_processed_textures[0]->GetWidth() * 
-								     m_processed_textures[0]->GetHeight()];
-					m_processed_textures[0]->GetData(data);
-					m_full_image_texture->Load(data, m_processed_textures[0]->GetWidth(), 
-								  m_processed_textures[0]->GetHeight());
-					delete[] data;
-				}
-				
-				utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
-							 m_processed_textures[0]->GetWidth(),
-							 m_processed_textures[0]->GetHeight());
-
-				m_processing_frames.clear();
-
-				std::cout << "Created " << m_output_tile_textures.size() << " tile textures" << std::endl;
-			};
-
 			// Run the model asynchronously with the callback
 			auto future = DeformationAnalysisInterface::RunModelBatchAsync(
-				m_processing_frames, 
-				m_processed_textures[0]->GetWidth(), 
-				m_processed_textures[0]->GetHeight(), 
-				m_output_tiles, 
-				m_tile_config, 
-				16, // Batch size of 8
-				completionCallback
-			);
+			    m_processing_frames, m_processed_textures[0]->GetWidth(),
+			    m_processed_textures[0]->GetHeight(), m_output_tiles, m_tile_config, m_batch_size,
+			    [](bool b) {});
 
 			// Store the future for polling in the next frame
 			m_processing_future = std::make_shared<std::future<bool>>(std::move(future));
@@ -936,13 +1015,13 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 		ImGui::SameLine();
 
 		// right pane: either tile gallery or full image with overlay
-		ImGui::BeginChild("TileView", ImVec2(0, 0), true);
+		ImGui::BeginChild("TileView", ImVec2(0, 0));
 
 		if (m_show_gallery_view) {
 			// Gallery view
 			ImGui::Text("Output Tiles");
 
-			if (m_output_tiles.empty()) {
+			if (m_output_tile_textures.empty()) {
 				ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "No tiles available. Run analysis first.");
 			}
 
@@ -953,7 +1032,7 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 				if (i % cols != 0)
 					ImGui::SameLine();
 				ImGui::Image(m_output_tile_textures[i]->GetID(),
-					     ImVec2((float)m_tile_size, (float)m_tile_size));
+					     ImVec2((float)m_tile_config.tileSize, (float)m_tile_config.tileSize));
 
 				// Make the tiles selectable for the full view
 				if (ImGui::IsItemClicked()) {
@@ -989,22 +1068,22 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					const int full_height = m_full_image_texture->GetHeight();
 
 					// Get the rows and columns based on full image and tile size
-					int cols_in_full = full_width / m_tile_size;
+					int cols_in_full = full_width / m_tile_config.tileSize;
 					if (cols_in_full == 0)
 						cols_in_full = 1;
 
 					int tile_row = m_current_tile_index / cols_in_full;
 					int tile_col = m_current_tile_index % cols_in_full;
 
-					float rect_x_pos =
-					    cursor_pos.x - display_size.x + (tile_col * m_tile_size * scale_factor);
-					float rect_y_pos =
-					    cursor_pos.y - display_size.y + (tile_row * m_tile_size * scale_factor);
+					float rect_x_pos = cursor_pos.x - display_size.x +
+							   (tile_col * m_tile_config.tileSize * scale_factor);
+					float rect_y_pos = cursor_pos.y - display_size.y +
+							   (tile_row * m_tile_config.tileSize * scale_factor);
 
 					// Draw the rectangle
 					draw_list->AddRect(ImVec2(rect_x_pos, rect_y_pos),
-							   ImVec2(rect_x_pos + m_tile_size * scale_factor,
-								  rect_y_pos + m_tile_size * scale_factor),
+							   ImVec2(rect_x_pos + m_tile_config.tileSize * scale_factor,
+								  rect_y_pos + m_tile_config.tileSize * scale_factor),
 							   IM_COL32(255, 0, 0, 255), // Red
 							   0.0f,		     // rounding
 							   0,			     // flags
@@ -1020,7 +1099,8 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 					ImVec2 window_size = ImGui::GetWindowSize();
 
 					// Position for the tile inset (bottom-right corner)
-					float inset_size = m_tile_size / 1.5f; // slightly smaller than the original
+					float inset_size =
+					    m_tile_config.tileSize / 1.5f; // slightly smaller than the original
 					ImVec2 inset_pos(window_pos.x + window_size.x - inset_size -
 							     20, // 20px padding from edge
 							 window_pos.y + window_size.y - inset_size - 20);
@@ -1044,7 +1124,6 @@ void ImageSet::DisplayDeformationAnalysisTab() {
 
 		ImGui::EndChild();
 
-		ImGui::EndChild(); // DeformTab
 		ImGui::EndTabItem();
 	}
 }

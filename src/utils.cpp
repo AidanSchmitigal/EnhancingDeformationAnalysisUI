@@ -191,6 +191,36 @@ void CreateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures,
 	delete[] data;
 }
 
+void UpdateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures, const std::shared_ptr<Texture> &source_texture, const TileConfig &tile_config) {
+	PROFILE_FUNCTION();
+
+	// Get the image data from the source texture
+	uint32_t *data = new uint32_t[source_texture->GetWidth() * source_texture->GetHeight()];
+	source_texture->GetData(data);
+
+	// Convert to OpenCV format
+	cv::Mat img = cv::Mat(source_texture->GetHeight(), source_texture->GetWidth(), CV_8UC4, data);
+
+	// Create tiles
+	auto tiles = Tiler::CreateTiles(img, tile_config);
+
+	if (tile_textures.size() != tiles.size()) {
+		tile_textures.clear();
+		for (auto &tile : tiles) {
+			auto texture = std::make_shared<Texture>();
+			texture->Load((uint32_t *)tile.data.data, tile.data.cols, tile.data.rows);
+			tile_textures.push_back(texture);
+		}
+	} else {
+		for (int i = 0; i < tile_textures.size(); i++) {
+			tile_textures[i]->Load((uint32_t *)tiles[i].data.data, tiles[i].data.cols, tiles[i].data.rows);
+		}
+	}
+
+	// Clean up
+	delete[] data;
+}
+
 bool DirectoryContainsTiff(const std::filesystem::path &path) {
 	for (auto &it : std::filesystem::directory_iterator(path))
 		if (it.path().string().find(".tif") != std::string::npos)
@@ -220,11 +250,9 @@ void DisplayTilePreviewWindow(const char *window_title, bool &is_open,
 		// Count of tiles
 		ImGui::Text("Tiles: %d", (int)tile_textures.size());
 
-		// Refresh button if callback provided
+		// Refresh if callback provided
 		if (refresh_callback) {
-			if (ImGui::Button("Refresh Tiles")) {
-				refresh_callback();
-			}
+			refresh_callback();
 		}
 
 		ImGui::Separator();

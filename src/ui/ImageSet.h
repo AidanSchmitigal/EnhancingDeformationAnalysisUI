@@ -12,6 +12,8 @@
 #include <core/FeatureTracker.hpp>
 #include <core/DeformationAnalysisInterface.hpp>
 
+#include <imgui.h>
+
 class ImageSet {
       public:
 	ImageSet(const std::string_view &folder_path);
@@ -58,6 +60,15 @@ class ImageSet {
 	std::vector<float> snrs;
 	float avg_snr = 0.0f;
 	bool write_success = true;
+	int m_analysis_current_frame = 0;
+	
+	// region selection for analysis
+	bool m_region_selection_active = false;
+	bool m_region_selected = false;
+	ImVec2 m_region_start = ImVec2(0, 0);
+	ImVec2 m_region_end = ImVec2(0, 0);
+	std::vector<float> m_region_histogram;
+	float m_region_snr = 0.0f;
 
 	// feature tracking
 	std::vector<std::vector<std::vector<float>>> m_widths;
@@ -73,8 +84,9 @@ class ImageSet {
 	std::shared_ptr<Texture> m_full_image_texture;
 	std::vector<uint32_t*> m_processing_frames;
 	bool m_model_ok = true;
-	int m_tile_size = 256;
+	int m_batch_size = 8;
 	uint32_t m_current_tile_index = 0;
+	bool m_tile_need_refresh = false;
 	
 	// Async processing
 	std::shared_ptr<std::future<bool>> m_processing_future;

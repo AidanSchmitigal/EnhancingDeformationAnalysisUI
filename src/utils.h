@@ -40,6 +40,10 @@ void CreateTileTextures(
     std::vector<std::shared_ptr<Texture>> &tile_textures,
     const std::shared_ptr<Texture> &source_texture,
     const TileConfig &tile_config);
+void UpdateTileTextures(
+    std::vector<std::shared_ptr<Texture>> &tile_textures,
+    const std::shared_ptr<Texture> &source_texture,
+    const TileConfig &tile_config);
 
 bool DirectoryContainsTiff(const std::filesystem::path &path);
 } // namespace utils

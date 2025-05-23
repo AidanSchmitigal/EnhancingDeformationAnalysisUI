@@ -21,14 +21,47 @@ PreprocessingTab::PreprocessingTab(std::vector<std::shared_ptr<Texture>> &textur
 	m_processed_textures = processed_textures;
 }
 
+std::vector<int> PreprocessingTab::GetFramesToProcess() const {
+	std::vector<int> frames_to_process;
+	
+	if (m_process_selected_only && !m_selected_textures_map.empty()) {
+		// Process only selected frames
+		for (const auto& pair : m_selected_textures_map) {
+			frames_to_process.push_back(pair.first);
+		}
+		std::sort(frames_to_process.begin(), frames_to_process.end());
+	} else {
+		// Process all frames
+		for (int i = 0; i < m_processed_textures.size(); i++) {
+			frames_to_process.push_back(i);
+		}
+	}
+	
+	return frames_to_process;
+}
+
 void PreprocessingTab::OnProcessingComplete(bool success) {
 	m_last_result = success;
 
 	if (success && !m_processing_frames.empty()) {
-		// Load the processed data back into textures
-		utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
-						   m_processed_textures[0]->GetWidth(),
-						   m_processed_textures[0]->GetHeight());
+		// Load the processed data back into specific textures
+		if (m_processed_frame_indices.size() == m_processing_frames.size() && !m_processed_frame_indices.empty()) {
+			// Load processed data back to specific frames
+			for (size_t i = 0; i < m_processing_frames.size(); i++) {
+				int frame_idx = m_processed_frame_indices[i];
+				if (frame_idx >= 0 && frame_idx < m_processed_textures.size()) {
+					m_processed_textures[frame_idx]->Load(m_processing_frames[i],
+						m_processed_textures[frame_idx]->GetWidth(),
+						m_processed_textures[frame_idx]->GetHeight());
+				}
+				free(m_processing_frames[i]);
+			}
+		} else {
+			// Fallback to original behavior (process all frames)
+			utils::LoadDataIntoTexturesAndFree(m_processed_textures, m_processing_frames,
+							   m_processed_textures[0]->GetWidth(),
+							   m_processed_textures[0]->GetHeight());
+		}
 	} else {
 		// Free any allocated memory in case of failure
 		for (auto frame : m_processing_frames) {
@@ -37,10 +70,12 @@ void PreprocessingTab::OnProcessingComplete(bool success) {
 	}
 
 	m_processing_frames.clear();
+	m_processed_frame_indices.clear();
 	m_is_processing = false;
 }
 
 void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
+	static TileConfig compare_config;
 	if (ImGui::BeginTabItem("Preprocessing")) {
 		if (m_processed_textures.size() == 0) {
 			ImGui::Text("No images loaded");
@@ -60,7 +95,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			}
 		}
 
-		ImGui::BeginChild("Controls", ImVec2(250, 0), true);
+		ImGui::BeginChild("Controls", ImVec2(250, 0));
 
 		// Processing status display
 		if (m_is_processing) {
@@ -81,22 +116,27 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		ImGui::SeparatorText("Crop");
 		static int crop = 60;
 		ImGui::BeginDisabled(m_is_processing);
-		ImGui::SliderInt("Pixels", &crop, 0, 100);
+		ImGui::SliderInt("Pixels", &crop, 1, 100);
 		if (ImGui::Button("Crop Bottom") && !m_is_processing) {
-			if (crop == 0 || crop >= m_processed_textures[0]->GetHeight())
-				return;
-			for (int i = 0; i < m_processed_textures.size(); i++) {
-				uint32_t *data = (uint32_t *)malloc(m_processed_textures[i]->GetWidth() *
-								    m_processed_textures[i]->GetHeight() * 4);
-				m_processed_textures[i]->GetData(data);
-				m_processed_textures[i]->Load(data, m_processed_textures[i]->GetWidth(),
-							      m_processed_textures[i]->GetHeight() - crop);
-				free(data);
+			if (!(crop >= m_processed_textures[0]->GetHeight())) {
+				auto frames_to_process = GetFramesToProcess();
+				for (int frame_idx : frames_to_process) {
+					uint32_t *data = (uint32_t *)malloc(m_processed_textures[frame_idx]->GetWidth() *
+									    m_processed_textures[frame_idx]->GetHeight() * 4);
+					m_processed_textures[frame_idx]->GetData(data);
+					m_processed_textures[frame_idx]->Load(data, m_processed_textures[frame_idx]->GetWidth(),
+								      m_processed_textures[frame_idx]->GetHeight() - crop);
+					free(data);
+				}
 			}
 		}
 		ImGui::EndDisabled();
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
+
+		if (crop >= m_processed_textures[0]->GetHeight())
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "Crop height too large!");
+		
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("Crops bottom of image (default: "
 					  "60px for SEM infobar).");
@@ -107,10 +147,18 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		if (ImGui::Button("Stabilize")) {
 			m_is_processing = true;
 
-			// Copy image data
+			// Get frames to process
+			auto frames_to_process = GetFramesToProcess();
+			m_processed_frame_indices = frames_to_process;
+			
+			// Copy image data for selected frames only
 			m_processing_frames.clear();
-			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
-						   m_processed_textures[0]->GetHeight(), m_processed_textures);
+			for (int frame_idx : frames_to_process) {
+				uint32_t* frame_data = (uint32_t*)malloc(m_processed_textures[frame_idx]->GetWidth() *
+														 m_processed_textures[frame_idx]->GetHeight() * 4);
+				utils::GetDataFromTexture(frame_data, m_processed_textures[frame_idx]);
+				m_processing_frames.push_back(frame_data);
+			}
 
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
@@ -148,6 +196,14 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 			m_selected_textures_map.clear();
 		};
 
+		// Add processing controls for selected frames
+		if (!m_selected_textures_map.empty()) {
+			ImGui::Text("Selected: %d frames", (int)m_selected_textures_map.size());
+			ImGui::Checkbox("Process Selected Only", &m_process_selected_only);
+		} else {
+			m_process_selected_only = false; // Reset if no frames selected
+		}
+
 		// Use the common UI function to display the frame selection window
 		ui::DisplayFrameSelectionWindow("Frame Selection", choose_frames_open, m_processed_textures,
 						m_selected_textures_map, removeSelectedFrames);
@@ -165,10 +221,18 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		if (ImGui::Button("Blur")) {
 			m_is_processing = true;
 
-			// Copy image data
+			// Get frames to process
+			auto frames_to_process = GetFramesToProcess();
+			m_processed_frame_indices = frames_to_process;
+			
+			// Copy image data for selected frames only
 			m_processing_frames.clear();
-			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
-						   m_processed_textures[0]->GetHeight(), m_processed_textures);
+			for (int frame_idx : frames_to_process) {
+				uint32_t* frame_data = (uint32_t*)malloc(m_processed_textures[frame_idx]->GetWidth() *
+														 m_processed_textures[frame_idx]->GetHeight() * 4);
+				utils::GetDataFromTexture(frame_data, m_processed_textures[frame_idx]);
+				m_processing_frames.push_back(frame_data);
+			}
 
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
@@ -191,8 +255,6 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		}
 
 #ifdef UI_INCLUDE_TENSORFLOW
-		// TODO: optimize and fix, if there are no textures...
-		utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
 
 		ImGui::SeparatorText("AI Denoising");
 		ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Model").x);
@@ -214,10 +276,15 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 						  "different results.");
 		} else if (m_tile_config.type == TileType::Cropped) {
 			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Center Size").x);
-			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 16, 256);
+			ImGui::SliderInt("Center Size", &m_tile_config.centerSize, 16, 128);
 			ImGui::SetNextItemWidth(235 - ImGui::CalcTextSize("Include Outside").x);
 			ImGui::Checkbox("Include Outside", &m_tile_config.includeOutside);
 		}
+
+		if (m_tile_config != compare_config)
+			m_tile_need_refresh = true;
+
+		compare_config = m_tile_config;
 
 		static bool show_tiled_image_open = false;
 		if (ImGui::Button("Show One Tiled Image")) {
@@ -235,10 +302,10 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 
 		// Create a refresh callback
 		auto refreshTiles = [this]() {
-			printf("Refreshing tiles...\n");
-			m_split_textures.clear();
-			if (!m_processed_textures.empty()) {
-				utils::CreateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
+			if (!m_processed_textures.empty() && m_tile_need_refresh) {
+				m_split_textures.clear();
+				utils::UpdateTileTextures(m_split_textures, m_processed_textures[0], m_tile_config);
+				m_tile_need_refresh = false;
 			}
 		};
 
@@ -249,10 +316,18 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		if (ImGui::Button("Denoise")) {
 			m_is_processing = true;
 
-			// Copy image data
+			// Get frames to process
+			auto frames_to_process = GetFramesToProcess();
+			m_processed_frame_indices = frames_to_process;
+			
+			// Copy image data for selected frames only
 			m_processing_frames.clear();
-			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
-						   m_processed_textures[0]->GetHeight(), m_processed_textures);
+			for (int frame_idx : frames_to_process) {
+				uint32_t* frame_data = (uint32_t*)malloc(m_processed_textures[frame_idx]->GetWidth() *
+														 m_processed_textures[frame_idx]->GetHeight() * 4);
+				utils::GetDataFromTexture(frame_data, m_processed_textures[frame_idx]);
+				m_processing_frames.push_back(frame_data);
+			}
 
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
@@ -298,10 +373,18 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		if (ImGui::Button("Detect Cracks")) {
 			m_is_processing = true;
 
-			// Copy image data
+			// Get frames to process
+			auto frames_to_process = GetFramesToProcess();
+			m_processed_frame_indices = frames_to_process;
+			
+			// Copy image data for selected frames only
 			m_processing_frames.clear();
-			utils::GetDataFromTextures(m_processing_frames, m_processed_textures[0]->GetWidth(),
-						   m_processed_textures[0]->GetHeight(), m_processed_textures);
+			for (int frame_idx : frames_to_process) {
+				uint32_t* frame_data = (uint32_t*)malloc(m_processed_textures[frame_idx]->GetWidth() *
+														 m_processed_textures[frame_idx]->GetHeight() * 4);
+				utils::GetDataFromTexture(frame_data, m_processed_textures[frame_idx]);
+				m_processing_frames.push_back(frame_data);
+			}
 
 			// Process asynchronously
 			auto width = m_processed_textures[0]->GetWidth();
@@ -336,7 +419,7 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 		ImGui::EndChild();
 
 		ImGui::SameLine();
-		ImGui::BeginChild("ImageView", ImVec2(0, 0), true);
+		ImGui::BeginChild("ImageView", ImVec2(0, 0));
 		if (!m_processed_textures.empty()) {
 			// Add frame navigation controls
 			ImGui::BeginDisabled(m_is_processing);
@@ -345,29 +428,33 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 				ImGui::Text("Frame: %d/%d", m_current_frame + 1, (int)m_processed_textures.size());
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 100);
-				if (ImGui::SliderInt("##FrameSlider", &m_current_frame, 0, m_processed_textures.size() - 1, "")) {
+				if (ImGui::SliderInt("##FrameSlider", &m_current_frame, 0,
+						     m_processed_textures.size() - 1, "")) {
 					// Keep within bounds
-					m_current_frame = std::max(0, std::min(m_current_frame, (int)m_processed_textures.size() - 1));
+					m_current_frame = std::max(
+					    0, std::min(m_current_frame, (int)m_processed_textures.size() - 1));
 				}
-				
+
 				// Navigation buttons
 				ImGui::SameLine();
 				ImGui::BeginDisabled(m_current_frame <= 0);
-				if (ImGui::ArrowButton("##left", ImGuiDir_Left)) m_current_frame--;
+				if (ImGui::ArrowButton("##left", ImGuiDir_Left))
+					m_current_frame--;
 				ImGui::EndDisabled();
-				
+
 				ImGui::SameLine();
 				ImGui::BeginDisabled(m_current_frame >= m_processed_textures.size() - 1);
-				if (ImGui::ArrowButton("##right", ImGuiDir_Right)) m_current_frame++;
+				if (ImGui::ArrowButton("##right", ImGuiDir_Right))
+					m_current_frame++;
 				ImGui::EndDisabled();
-				
+
 				// Play/Pause button
 				ImGui::SameLine();
 				static bool isPlaying = false;
 				if (ImGui::Button(isPlaying ? "Pause" : "Play")) {
 					isPlaying = !isPlaying;
 				}
-				
+
 				// Playback logic
 				if (isPlaying) {
 					// static...
@@ -383,14 +470,14 @@ void PreprocessingTab::DisplayPreprocessingTab(bool &changed) {
 				}
 			}
 			ImGui::EndDisabled();
-			
+
 			// Add a separator between controls and image
 			ImGui::Separator();
-			
+
 			// Display the current frame
 			ImGui::Image((ImTextureID)m_processed_textures[m_current_frame]->GetID(),
-				     ImVec2(m_processed_textures[m_current_frame]->GetWidth(), 
-				            m_processed_textures[m_current_frame]->GetHeight()));
+				     ImVec2(m_processed_textures[m_current_frame]->GetWidth(),
+					    m_processed_textures[m_current_frame]->GetHeight()));
 		}
 		ImGui::EndChild();
 

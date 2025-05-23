@@ -83,13 +83,30 @@ Launch the application without any command-line arguments to use the GUI:
    - Export analysis data as CSV for further processing
    - Generate statistics on image features, crack properties, and deformation metrics
 
-4. **Feature Tracking**:
+4. **Export Options**:
+   The Image Comparison tab provides comprehensive export functionality:
+   
+   **Single Frame Export**:
+   - Export current frame from original sequence as TIFF
+   - Export current frame from processed sequence as TIFF
+   
+   **Batch Export**:
+   - Export all original frames as individual TIFF files
+   - Export all processed frames as individual TIFF files
+   - Export processed sequence as animated GIF (with configurable playback speed)
+   
+   **Analysis Data Export**:
+   - Export histogram and SNR analysis data as CSV files
+   - Export crack width measurements and feature tracking data as CSV
+   - Export strain analysis results for quantitative research
+
+5. **Feature Tracking**:
    - Track points manually by selecting features of interest
    - Track automatically using detected cracks or structural features
    - Measure deformation over time with displacement vectors
    - Calculate strain fields between image frames
 
-5. **Strain Analysis**:
+6. **Strain Analysis**:
    - Generate strain maps to visualize deformation patterns
    - Calculate local and global strain metrics
    - Export strain data for quantitative analysis

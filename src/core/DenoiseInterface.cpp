@@ -63,9 +63,7 @@ bool DenoiseInterface::Denoise(std::vector<uint32_t *> &images, int width, int h
 			tiles[j].data = output_image;
 		}
 
-		cv::Mat reconstructed = Tiler::StitchTiles(tiles, config, image.size(), true);
-		reconstructed.convertTo(reconstructed, CV_8UC1, 255.0);
-		cv::cvtColor(reconstructed, reconstructed, cv::COLOR_GRAY2BGRA);
+		cv::Mat reconstructed = Tiler::StitchTiles(tiles, config, image.size());
 		memcpy(images[i], reconstructed.data, width * height * 4);
 	}
 
@@ -116,7 +114,6 @@ bool DenoiseInterface::Blur(std::vector<uint32_t *> &images, int width, int heig
 		cv::Mat output_image;
 		cv::GaussianBlur(image, output_image, cv::Size(kernel_size, kernel_size), sigma);
 		output_image.copyTo(image);
-		cv::cvtColor(image, image, cv::COLOR_RGBA2BGRA);
 		memcpy(images[i], image.data, width * height * 4);
 	}
 

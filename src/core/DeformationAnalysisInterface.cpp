@@ -1,5 +1,7 @@
 #include "DeformationAnalysisInterface.hpp"
 
+#include <core/ThreadPool.hpp>
+
 #include <torch/types.h>
 #include <utils.h>
 
@@ -143,6 +145,7 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 						 const int batch_size) // ← new adjustable batch size
 {
 	PROFILE_FUNCTION();
+
 	m_processing = true;
 	m_progress = 0.0f;
 
@@ -164,6 +167,8 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 	}
 
 	for (size_t i = 0; i < images.size() - 1; ++i) {
+		PROFILE_SCOPE(DeformationOneFrame);
+
 		m_progress = float(i) / float(images.size() - 1);
 
 		// prepare grayscale tiles for frame i and i+1
@@ -179,6 +184,8 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 		size_t total = tiles1.size();
 
 		for (size_t k = 0; k < total; k += batch_size) {
+			PROFILE_SCOPE(BatchProcessing);
+
 			size_t curr_batch = std::min((size_t)batch_size, total - k);
 
 			// build batch of tensors
@@ -189,16 +196,18 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 				auto t1 = to_tensor(tiles2[k + j].data);
 				batch_inputs.push_back(torch::cat({t0, t1}, 1));
 			}
-			
+
 			auto raw = torch::stack(batch_inputs, 0);
-			auto squeezed = raw.squeeze(1); // shape (B,2,H,W)
+			auto squeezed = raw.squeeze(1);			  // shape (B,2,H,W)
 			auto input_batch = squeezed.contiguous().to(dev); // shape (B,2,H,W)
-			
+
 			// single forward for the whole batch
 			auto out_batch = model.forward({input_batch}).toTensor().to(torch::kCPU); // shape (B,2,H,W)
 
 			// unpack each element
 			for (size_t j = 0; j < curr_batch; ++j) {
+				PROFILE_SCOPE(UnpackBatch);
+
 				auto t = out_batch[j];
 				auto r = t.select(0, 0), g = t.select(0, 1);
 
@@ -234,26 +243,30 @@ bool DeformationAnalysisInterface::RunModelBatch(std::vector<uint32_t *> &images
 #endif
 }
 
-std::future<bool> DeformationAnalysisInterface::RunModelBatchAsync(std::vector<uint32_t *> &images, int width, int height,
-						 std::vector<Tile> &output_tiles, const TileConfig &tile_config,
-						 const int batch_size, std::function<void(bool)> callback) {
+std::future<bool> DeformationAnalysisInterface::RunModelBatchAsync(std::vector<uint32_t *> &images, int width,
+								   int height, std::vector<Tile> &output_tiles,
+								   const TileConfig &tile_config, const int batch_size,
+								   std::function<void(bool)> callback) {
+	// Set processing flag
 	m_processing = true;
 	m_progress = 0.0f;
 
-	auto task = [=, &images, &output_tiles]() mutable {
-		// Clear the output tiles
-		output_tiles.clear();
-		
-		bool result = RunModelBatch(images, width, height, output_tiles, tile_config, batch_size);
-		
-		// Print diagnostic info
-		std::cout << "RunModelBatch completed with result: " << (result ? "success" : "failure") << std::endl;
-		std::cout << "Generated " << output_tiles.size() << " tiles" << std::endl;
-		
-		// Execute callback with the result
-		callback(result);
-		return result;
-	};
+	// Get the thread pool
+	auto &pool = ThreadPool::GetThreadPool();
 
-	return std::async(std::launch::async, task);
+	// Submit task to thread pool
+	auto future = pool.enqueue([&images, width, height, &output_tiles, tile_config, batch_size, callback]() {
+		bool result = RunModelBatch(images, width, height, output_tiles, tile_config, batch_size);
+
+		// When complete, update processing flag and call callback
+		// if provided
+		m_processing = false;
+		if (callback) {
+			callback(result);
+		}
+
+		return result;
+	});
+
+	return future;
 }
