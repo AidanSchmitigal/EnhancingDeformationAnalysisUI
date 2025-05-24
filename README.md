@@ -31,9 +31,9 @@ This program uses [tk_r_em](https://github.com/Ivanlh20/tk_r_em)'s models for de
 ### Prerequisites
 - CMake 3.5 or higher
 - OpenCV ~4.0.0 or higher with the OpenCV_DIR environment variable set to the path of the OpenCVConfig.cmake file
-- [Tensorflow C API](https://www.tensorflow.org/install/lang_c) installed on system path (findable by CMake)
-- On Windows: CUDA 11 & cuDNN 8.x.x installed to PATH
-- On Linux: CUDA 12.x & cuDNN 9.x.x installed to PATH, Zenity for file browsing operations
+- [Tensorflow C API](https://www.tensorflow.org/install/lang_c) installed on system path both the lib and the bin directories (findable by CMake)
+- On Windows: [CUDA 11](https://developer.nvidia.com/cuda-11-8-0-download-archive) with the include and bin directories & [cuDNN 8.x.x](https://developer.nvidia.com/rdp/cudnn-archive) installed to PATH 
+- On Linux: [CUDA 12.x](https://developer.nvidia.com/cuda-downloads?target_os=Windows) & [cuDNN 9.x.x](https://developer.nvidia.com/cudnn-downloads) installed to PATH, Zenity for file browsing operations
 
 ### Compilation
 
@@ -51,7 +51,7 @@ export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
 
 #### Windows
 1. Use the setup script `setup.py` to set up the project and install OpenCV and TensorFlow
-2. Make sure to set the environment variables as instructed
+2. Make sure to set the environment variables as instructed in Prerequisites
 3. Open the folder using Visual Studio (assuming Desktop C++ package installed)
 4. Select the correct startup item from the dropdown: `EnhancingDeformationAnalysisUI.exe`
 5. Use F5 to build and run
