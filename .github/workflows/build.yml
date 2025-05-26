@@ -1,0 +1,84 @@
+name: Build and Package App
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install CMake, Ninja, and dependencies
+        uses: lukka/get-cmake@latest
+
+      - name: Install vcpkg and dependencies
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg install opencv4
+        shell: bash
+
+      - name: Cache vcpkg
+        uses: actions/cache@v3
+        with:
+          path: vcpkg/installed
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/CMakeLists.txt') }}
+
+      - name: Download TensorFlow C API
+        run: |
+          mkdir -p libs/tensorflow
+
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            curl -L https://storage.googleapis.com/tensorflow/versions/2.18.0/libtensorflow-cpu-linux-x86_64.tar.gz | tar xz -C libs/tensorflow
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            curl -L https://storage.googleapis.com/tensorflow/versions/2.18.0/libtensorflow-cpu-darwin-arm64.tar.gz | tar xz -C libs/tensorflow
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            curl -LO https://storage.googleapis.com/tensorflow/versions/2.18.1/libtensorflow-cpu-windows-x86_64.zip
+            unzip libtensorflow-cpu-windows-x86_64.zip -d libs/tensorflow
+          fi
+        shell: bash
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DUI_INCLUDE_TENSORFLOW=ON
+          -DUI_INCLUDE_PYTORCH=OFF
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package executable
+        run: |
+          mkdir -p dist
+          cp build/EnhancingDeformationAnalysisUI* dist/
+          cp -r assets dist/
+
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            7z a release.zip ./dist/*
+          else
+            tar czvf release.tar.gz -C dist .
+          fi
+        shell: bash
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release.zip
+            release.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
