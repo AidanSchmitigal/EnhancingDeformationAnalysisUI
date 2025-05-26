@@ -60,7 +60,7 @@ jobs:
 
       - name: Download and setup TensorFlow
         run: |
-          ${{ matrix.config.python_exe }} scripts/setup_tensorflow.py ${{ matrix.config.os_name }} ${{ matrix.config.arch }}
+          ${{ matrix.config.python_exe }} setup_tensorflow.py ${{ matrix.config.os_name }} ${{ matrix.config.arch }}
           # Add --gpu if you want GPU version for specific configs.
           # e.g., if: matrix.config.os_name == 'linux' && matrix.config.gpu_build == 'true' ... then add --gpu
 
