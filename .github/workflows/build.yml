@@ -1,85 +1,105 @@
-name: Build and Package App
+name: Build and Package Application
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
+  push:
+    tags:
+      - "v*" # Trigger on tags like v0.1, v1.2.3
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    name: Build for ${{ matrix.config.os_name }} (${{ matrix.config.arch }})
+    runs-on: ${{ matrix.config.os_runner }}
     strategy:
+      fail-fast: false # Allow other jobs to continue if one fails
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        config:
+          - os_name: windows
+            os_runner: windows-latest
+            arch: x86_64
+            python_exe: python # On Windows, python.exe should be in PATH
+            opencv_setup_cmd: |
+              choco install opencv --version=4.8.0 --yes --force # Ensure this version exists or use a flexible one
+              echo "OpenCV_DIR=C:/tools/opencv/build" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          - os_name: macos
+            os_runner: macos-12 # For x86_64; macos-latest is often this.
+            arch: x86_64
+            python_exe: python3
+            opencv_setup_cmd: |
+              brew install opencv@4
+              echo "OpenCV_DIR=$(brew --prefix opencv@4)/lib/cmake/opencv4" | tee -a $GITHUB_ENV
+          - os_name: macos
+            os_runner: macos-14 # For arm64 (M1/M2); macos-14 is ARM.
+            arch: arm64
+            python_exe: python3
+            opencv_setup_cmd: |
+              brew install opencv@4
+              echo "OpenCV_DIR=$(brew --prefix opencv@4)/lib/cmake/opencv4" | tee -a $GITHUB_ENV
+          - os_name: linux
+            os_runner: ubuntu-latest
+            arch: x86_64
+            python_exe: python3
+            opencv_setup_cmd: |
+              sudo apt-get update
+              sudo apt-get install -y libopencv-dev
+              # OpenCV_DIR should be found automatically by CMake on Linux
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: "recursive" # If you use submodules for libs like cppflow
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.10" # Specify a version
 
-      - name: Install CMake, Ninja, and dependencies
-        uses: lukka/get-cmake@latest
+      - name: Install Python dependencies
+        run: ${{ matrix.config.python_exe }} -m pip install requests tqdm
 
-      - name: Install vcpkg and dependencies
+      - name: Download and setup TensorFlow
         run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          ./vcpkg/bootstrap-vcpkg.sh
-          ./vcpkg/vcpkg install opencv4
-        shell: bash
+          ${{ matrix.config.python_exe }} scripts/setup_tensorflow.py ${{ matrix.config.os_name }} ${{ matrix.config.arch }}
+          # Add --gpu if you want GPU version for specific configs.
+          # e.g., if: matrix.config.os_name == 'linux' && matrix.config.gpu_build == 'true' ... then add --gpu
 
-      - name: Cache vcpkg
-        uses: actions/cache@v3
-        with:
-          path: vcpkg/installed
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/CMakeLists.txt') }}
-
-      - name: Download TensorFlow C API
+      - name: Setup OpenCV
+        shell: bash # pwsh for windows if needed
         run: |
-          mkdir -p libs/tensorflow
-
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            curl -L https://storage.googleapis.com/tensorflow/versions/2.18.0/libtensorflow-cpu-linux-x86_64.tar.gz | tar xz -C libs/tensorflow
-          elif [[ "${{ runner.os }}" == "macOS" ]]; then
-            curl -L https://storage.googleapis.com/tensorflow/versions/2.18.0/libtensorflow-cpu-darwin-arm64.tar.gz | tar xz -C libs/tensorflow
-          elif [[ "${{ runner.os }}" == "Windows" ]]; then
-            curl -LO https://storage.googleapis.com/tensorflow/versions/2.18.1/libtensorflow-cpu-windows-x86_64.zip
-            unzip libtensorflow-cpu-windows-x86_64.zip -d libs/tensorflow
-          fi
-        shell: bash
+          ${{ matrix.config.opencv_setup_cmd }}
 
       - name: Configure CMake
-        run: >
-          cmake -S . -B build
-          -DCMAKE_BUILD_TYPE=Release
-          -DUI_INCLUDE_TENSORFLOW=ON
-          -DUI_INCLUDE_PYTORCH=OFF
-          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-
-      - name: Build
-        run: cmake --build build --config Release
-
-      - name: Package executable
         run: |
-          mkdir -p dist
-          cp build/EnhancingDeformationAnalysisUI* dist/
-          cp -r assets dist/
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DUI_INCLUDE_TENSORFLOW=ON `
+            ${{ env.OpenCV_DIR && format('-DOpenCV_DIR="{0}"', env.OpenCV_DIR) || '' }}`
+            ${{ matrix.config.os_name == 'windows' && '-G "Visual Studio 17 2022" -A x64' || '' }}
+            # For macOS arm64, CMake should pick up the arch automatically on macos-14 runner.
+            # For other specific CMake options, add them here.
 
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            7z a release.zip ./dist/*
-          else
-            tar czvf release.tar.gz -C dist .
-          fi
-        shell: bash
+      - name: Build with CMake
+        run: cmake --build build --config Release --parallel # Uses default parallel jobs
 
-      - name: Upload release asset
-        uses: softprops/action-gh-release@v2
+      - name: Package with CPack
+        working-directory: build
+        run: cpack -C Release --verbose # Add --verbose for more logs if needed
+
+      - name: Upload build artifact (package)
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            release.zip
-            release.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ matrix.config.os_name }}-${{ matrix.config.arch }}-package
+          path: build/*.{zip,tar.gz,dmg,deb,rpm} # CPack generates these based on CPACK_GENERATOR
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/*.${{ (matrix.config.os_name == 'windows' && 'zip') || (matrix.config.os_name == 'macos' && 'dmg') || 'tar.gz' }} # Adjust primary extension
+          asset_name: ${{ github.event.repository.name }}-${{ github.ref_name }}-${{ matrix.config.os_name }}-${{ matrix.config.arch }}.${{ (matrix.config.os_name == 'windows' && 'zip') || (matrix.config.os_name == 'macos' && 'dmg') || 'tar.gz' }}
+          tag: ${{ github.ref }}
+          overwrite: true
+          # For multiple CPack generators (e.g. ZIP and NSIS for Windows), you might want to upload multiple files.
+          # Use file_glob: true and a pattern for 'file:'.
+          # file_glob: true
+          # file: build/*.*
