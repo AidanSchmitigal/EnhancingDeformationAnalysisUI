@@ -141,9 +141,13 @@ target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
 
 set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
 
+message(STATUS "OpenCV version: ${OpenCV_VERSION} at ${OpenCV_DIR}")
+
 # Add OpenCV lib dir to BUNDLE_SEARCH_PATHS if needed for bundling
 if(WIN32 AND OpenCV_DIR)
   list(APPEND BUNDLE_SEARCH_PATHS "${OpenCV_DIR}/bin")
+  list(APPEND BUNDLE_SEARCH_PATHS "${OpenCV_DIR}/build")
+  list(APPEND BUNDLE_SEARCH_PATHS "${OpenCV_DIR}/x64/vc16/bin")
 endif()
 
 # --- UI_PROFILE Definition ---
@@ -162,17 +166,19 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
   if(APPLE)
     set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
       MACOSX_BUNDLE TRUE
-      MACOSX_BUNDLE_ICON_FILE "EnhancedUIIcons.icns"
-      MACOSX_BUNDLE_NAME "Enhancing Deformation Analysis UI"
+      MACOSX_BUNDLE_ICON_FILE "EnhancingDeformationAnalysisUI.icns"
+      MACOSX_BUNDLE_NAME "EnhancingDeformationAnalysisUI"
       MACOSX_BUNDLE_VERSION ${PROJECT_VERSION}
-      # MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
-      # MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
-      # MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist.in"
+      MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+      MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
+      MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist"
       XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
       XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
       # XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
     )
-    set_source_files_properties(${CMAKE_SOURCE_DIR}/assets/EnhancedUIIcons.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    install(FILES ${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns DESTINATION "${PROJECT_NAME}.app/Contents/Resources" COMPONENT applications)
+    install(FILES ${CMAKE_SOURCE_DIR}/assets/Info.plist DESTINATION "${PROJECT_NAME}.app/Contents" COMPONENT applications)
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
     install(TARGETS EnhancingDeformationAnalysisUI
       BUNDLE DESTINATION .
@@ -202,6 +208,15 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       TARGETS EnhancingDeformationAnalysisUI
       RUNTIME_DEPENDENCIES
       DIRECTORIES ${BUNDLE_SEARCH_PATHS}
+      DESTINATION bin
+      POST_EXCLUDE_REGEXES
+      "api-ms-win-.*\\.dll"
+      "ext-ms-.*\\.dll"
+      "ucrtbase\\.dll"
+      "vcruntime[0-9]+\\.dll"
+      "msvcp[0-9]+\\.dll"
+      "HvsiFileTrust\\.dll"
+      "wpaxholder\\.dll"
     )
   elseif(APPLE)
     # Apple code

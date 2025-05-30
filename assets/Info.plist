@@ -4,15 +4,15 @@
 <plist>
   <dict>
     <key>CFBundleExecutable</key>
-    <string>myui</string>
+    <string>EnhancingDeformationAnalysisUI</string>
     <key>CFBundleIconFile</key>
-    <string>@MACOSX_BUNDLE_ICON_FILE@</string>
+    <string>EnhancingDeformationAnalysisUI.icns</string>
     <key>CFBundleIdentifier</key>
-    <string>org.my-ui.gui</string>
+    <string>com.enhancingdeformationanalysis.ui</string>
     <key>CFBundleName</key>
-    <string>my-ui</string>
+    <string>EnhancingDeformationAnalysisUI</string>
     <key>CFBundleDisplayName</key>
-    <string>Archimedes</string>
+    <string>Enhancing Deformation Analysis UI</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
@@ -22,7 +22,7 @@
     <key>CFBundleVersion</key>
     <string>@GUI_VERSION@</string>
     <key>NSHumanReadableCopyright</key>
-    <string>Open MyUI</string>
+    <string>Copyright (c) 2025 OSU Enhancing Deformation Analysis Capstone Team</string>
     <key>NSHighResolutionCapable</key>
     <true/>
   </dict>
