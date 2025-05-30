@@ -1,9 +1,9 @@
 #include <ui/Application.h>
 
 // glad must be above glfw, includes opengl header itself
-#include <GLFW/glfw3.h>
-#undef __gl_h_
 #include <glad/glad.h>
+//
+#include <GLFW/glfw3.h>
 #include <imgui.h>
 
 #include <ImGuiImpl.h>

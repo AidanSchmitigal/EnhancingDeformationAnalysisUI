@@ -158,7 +158,17 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
       MACOSX_BUNDLE TRUE
       MACOSX_BUNDLE_ICON_FILE "EnhancedUIIcons.icns"
+      MACOSX_BUNDLE_NAME "Enhancing Deformation Analysis UI"
+      MACOSX_BUNDLE_VERSION ${PROJECT_VERSION}
+      MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+      MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
+      MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist.in"
+      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
+      XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
+      XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
     )
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/assets/EnhancedUIIcons.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
     install(TARGETS EnhancingDeformationAnalysisUI
       BUNDLE DESTINATION .
       COMPONENT applications
@@ -169,6 +179,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       COMPONENT applications
       FILES_MATCHING PATTERN "*"
     )
+
+
   else() # Windows & Linux
     install(TARGETS EnhancingDeformationAnalysisUI
       RUNTIME DESTINATION bin COMPONENT applications

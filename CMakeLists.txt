@@ -39,7 +39,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CPACK_GENERATOR "DragNDrop")
     # For a .app bundle, ensure MACOSX_BUNDLE is set on the target in src/CMakeLists.txt
     # And install the target using BUNDLE DESTINATION.
-    # set(CPACK_DMG_ também_BACKGROUND_IMAGE "${CMAKE_SOURCE_DIR}/assets/img/dmg-background.png") # Example background
+    set(CPACK_DMG_BACKGROUND_IMAGE "${CMAKE_SOURCE_DIR}/assets/img/dmg-background.png") # Example background
   else() # Linux
     set(CPACK_GENERATOR "TGZ;DEB")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Your Name <your.email@example.com>")

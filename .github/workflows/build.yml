@@ -87,7 +87,7 @@ jobs:
       - name: Package with CPack
         working-directory: build
         run: |
-          cpack -C Release --verbose
+          cpack -C Release
           ls -R
 
       - name: Upload build artifact (package)
