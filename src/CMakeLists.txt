@@ -216,8 +216,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       TARGETS EnhancingDeformationAnalysisUI
       RUNTIME_DEPENDENCIES
       DIRECTORIES ${BUNDLE_SEARCH_PATHS}
-      PRE_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-win-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$"
-      POST_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-win-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$"
+      PRE_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$" "^ucrtbase\\.dll$" "^vcruntime[0-9]+\\.dll$" "^msvcp[0-9]+\\.dll$"
+      POST_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$" "^ucrtbase\\.dll$" "^vcruntime[0-9]+\\.dll$" "^msvcp[0-9]+\\.dll$"
       DESTINATION bin
       COMPONENT applications
     )
