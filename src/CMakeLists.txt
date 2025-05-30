@@ -1,12 +1,12 @@
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS *.cpp *.hpp *.h)
 
-file(GLOB IMGUI_LIB_SOURCES CONFIGURE_DEPENDS 
-    "${CMAKE_SOURCE_DIR}/libs/imgui/*.cpp" 
+file(GLOB IMGUI_LIB_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/libs/imgui/*.cpp"
     "${CMAKE_SOURCE_DIR}/libs/imgui/*.h"
 )
 
-add_executable(EnhancingDeformationAnalysisUI 
-    ${SOURCES} 
+add_executable(EnhancingDeformationAnalysisUI
+    ${SOURCES}
     ../libs/glad/src/glad.c
     ${IMGUI_LIB_SOURCES}
 )
@@ -30,7 +30,7 @@ target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
 
 # --- Options for Subdirectory Libraries (Set BEFORE add_subdirectory) ---
 # GLFW
-if (!WIN32)
+if(!WIN32)
     SET(GLFW_BUILD_X11 ON CACHE BOOL "Build GLFW for X11" FORCE)
     SET(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build GLFW for Wayland" FORCE)
 endif()
@@ -57,7 +57,7 @@ target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE glfw)
 add_subdirectory(${CMAKE_SOURCE_DIR}/libs/libtiff ${CMAKE_BINARY_DIR}/libs/libtiff)
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE tiff)
 
-if (UI_INCLUDE_TENSORFLOW)
+if(UI_INCLUDE_TENSORFLOW)
     message(STATUS "Including TensorFlow with cppflow")
 
     # TF_PLATFORM logic matches the setup_tensorflow.py script's output directory name
@@ -85,9 +85,9 @@ if (UI_INCLUDE_TENSORFLOW)
     find_library(TF_C_LIB NAMES tensorflow tensorflow.lib PATHS "${TF_LIB_DIR}" REQUIRED)
     find_library(TF_FRAMEWORK_LIB NAMES tensorflow_framework tensorflow_framework.lib PATHS "${TF_LIB_DIR}" REQUIRED)
     target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_C_LIB} ${TF_FRAMEWORK_LIB})
-    
+
     target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_C_LIB} ${TF_FRAMEWORK_LIB})
-    
+
     # Define for conditional compilation in C++ code
     target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_TENSORFLOW)
     list(APPEND BUNDLE_SEARCH_PATHS "${TF_LIB_DIR}") # For install(RUNTIME_DEPENDENCIES)
@@ -97,13 +97,13 @@ if (UI_INCLUDE_TENSORFLOW)
 endif()
 
 # --- PyTorch (LibTorch) ---
-if (UI_INCLUDE_PYTORCH)
+if(UI_INCLUDE_PYTORCH)
     message(STATUS "Including PyTorch (LibTorch)")
-    
+
     # LibTorch discovery:
     # Option 1: User sets Torch_DIR environment variable or -DTorch_DIR=<path_to_libtorch_cmake_config_dir>
     # Option 2: We define a default path based on where our setup_pytorch.py script places it.
-    
+
     # Construct a potential default path for Torch_DIR based on a convention for setup_pytorch.py
     # This PT_PLATFORM_SUBDIR would be set by the setup_pytorch.py or in CI
     # Example: "libtorch-cpu-linux-x86_64" or "libtorch-cpu-macos-x86_64" etc.
@@ -127,16 +127,16 @@ if (UI_INCLUDE_PYTORCH)
     endif()
 
     if(Torch_DIR_INTERNAL)
-      find_package(Torch REQUIRED PATHS "${Torch_DIR_INTERNAL}" NO_DEFAULT_PATH)
+        find_package(Torch REQUIRED PATHS "${Torch_DIR_INTERNAL}" NO_DEFAULT_PATH)
     else()
-      find_package(Torch REQUIRED) # Try system paths if no specific path given
+        find_package(Torch REQUIRED) # Try system paths if no specific path given
     endif()
-    
+
     if(Torch_FOUND)
         target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TORCH_LIBRARIES})
         target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${TORCH_INCLUDE_DIRS})
         target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_PYTORCH)
-        
+
         # For bundling, TORCH_INSTALL_PREFIX/lib is usually where shared libs are.
         if(EXISTS "${TORCH_INSTALL_PREFIX}/lib")
             list(APPEND BUNDLE_SEARCH_PATHS "${TORCH_INSTALL_PREFIX}/lib")
@@ -154,24 +154,29 @@ target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLU
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
 
 # --- UI_PROFILE Definition ---
-if (UI_PROFILE)
+if(UI_PROFILE)
     message(STATUS "-- Building in PROFILE mode (UI_PROFILE defined)")
     target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_PROFILE)
 endif()
 
 # --- Installation ---
 if(APPLE)
-  set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
-    MACOSX_BUNDLE TRUE
-    # MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist" # Create and specify your Info.plist
-    # MACOSX_BUNDLE_ICON_FILE "myapp.icns" # Create and specify your app icon
-  )
-  install(TARGETS EnhancingDeformationAnalysisUI BUNDLE DESTINATION . COMPONENT applications)
+    set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+        MACOSX_BUNDLE TRUE
+        # MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist" # Create and specify your Info.plist
+        # MACOSX_BUNDLE_ICON_FILE "myapp.icns" # Create and specify your app icon
+    )
+    install(TARGETS EnhancingDeformationAnalysisUI BUNDLE DESTINATION . COMPONENT applications)
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
+        DESTINATION "${PROJECT_NAME}.app/Contents/MacOS/assets"
+        COMPONENT applications
+        FILES_MATCHING PATTERN "*"
+    )
 else()
-  install(TARGETS EnhancingDeformationAnalysisUI RUNTIME DESTINATION bin)
+    install(TARGETS EnhancingDeformationAnalysisUI RUNTIME DESTINATION bin)
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets)
 endif()
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets)
 
 # Bundling dependencies (requires CMake 3.21+)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
@@ -184,7 +189,7 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
             DESTINATION bin # DLLs next to exe
             # DIRECTORIES ${BUNDLE_SEARCH_PATHS}
         )
-    elseif (APPLE)
+    elseif(APPLE)
         # Apple code
     else() # Linux
         install(
@@ -196,7 +201,7 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
 
         set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-        set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES 
+        set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
             INSTALL_RPATH "$ORIGIN/../lib"
             BUILD_RPATH "$ORIGIN/../lib") # For finding them during build if necessary
     endif()
@@ -210,7 +215,7 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
             message(WARNING "Could not determine Homebrew GCC library path for bundling libgcc. This might lead to issues.")
         endif()
 
-        if (EXISTS "/opt/homebrew/lib")
+        if(EXISTS "/opt/homebrew/lib")
             message(STATUS "Adding Homebrew lib dir to bundle search paths: ${HOMEBREW_LIB_DIR}")
             list(APPEND BUNDLE_SEARCH_PATHS "/opt/homebrew/lib")
         else()
@@ -224,11 +229,25 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
             message(STATUS \"FixupBundle: App - \${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\")
             message(STATUS \"FixupBundle: Dirs - ${BUNDLE_SEARCH_PATHS_MACOS_STR}\")
             fixup_bundle(
-                \"\${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\" # app
-                \"\"                                           # plugins
-                \"${BUNDLE_SEARCH_PATHS_MACOS_STR}\"            # libs_path
+                \"\${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\"
+                \"\"
+                \"${BUNDLE_SEARCH_PATHS_MACOS_STR}\"
             )
-        " COMPONENT applications)
+        "            COMPONENT applications)
+        install(CODE "
+            message(STATUS \"Ad-hoc signing the application bundle: \${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\")
+            execute_process(
+                COMMAND codesign --force --deep --sign - \"\${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\"
+                RESULT_VARIABLE sign_result
+                OUTPUT_VARIABLE sign_output
+                ERROR_VARIABLE sign_error
+            )
+            if(NOT sign_result EQUAL 0)
+                message(FATAL_ERROR \"Failed to ad-hoc sign the bundle: \${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app. Output: \${sign_output}. Error: \${sign_error}\")
+            else()
+                message(STATUS \"Bundle ad-hoc signed successfully: \${sign_output}\")
+            endif()
+        "            COMPONENT applications)
     endif()
 
 else()
@@ -236,7 +255,7 @@ else()
     # Minimal manual bundling for TF (already partially there from my previous suggestion)
     # Manual bundling for PyTorch and OpenCV would be very complex here and error-prone.
     # Strongly recommend ensuring CMake 3.21+ in all build environments.
-    if (UI_INCLUDE_TENSORFLOW AND EXISTS "${TF_LIB_DIR}")
+    if(UI_INCLUDE_TENSORFLOW AND EXISTS "${TF_LIB_DIR}")
         if(WIN32)
             if(EXISTS "${TF_ROOT}/tensorflow.dll")
                 install(FILES "${TF_ROOT}/tensorflow.dll" DESTINATION bin COMPONENT Runtime)
