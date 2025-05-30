@@ -172,8 +172,10 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
       MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
       MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist"
-      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
-      XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
+      XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "5A3B2E3C3E"
+      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Developer ID Application"
+      XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual"
+      # XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
       # XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
     )
     install(FILES ${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns DESTINATION "${PROJECT_NAME}.app/Contents/Resources" COMPONENT applications)
@@ -209,14 +211,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       RUNTIME_DEPENDENCIES
       DIRECTORIES ${BUNDLE_SEARCH_PATHS}
       DESTINATION bin
-      POST_EXCLUDE_REGEXES
-      "api-ms-win-.*\\.dll"
-      "ext-ms-.*\\.dll"
-      "ucrtbase\\.dll"
-      "vcruntime[0-9]+\\.dll"
-      "msvcp[0-9]+\\.dll"
-      "HvsiFileTrust\\.dll"
-      "wpaxholder\\.dll"
+      POST_EXCLUDE_REGEXES "api-ms-win-.*\\.dll" "ext-ms-.*\\.dll" "ucrtbase\\.dll" "vcruntime[0-9]+\\.dll" "msvcp[0-9]+\\.dll" "HvsiFileTrust\\.dll" "wpaxholder\\.dll"
     )
   elseif(APPLE)
     # Apple code
