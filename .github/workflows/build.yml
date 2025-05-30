@@ -24,8 +24,7 @@ jobs:
             cmake_platform_arch: "x64" # Specifies 64-bit for VS generator
             opencv_setup_cmd: |
               choco install opencv --version=4.8.0 --yes --force
-              ls -R "C:/tools/"
-              OPENCV_INSTALLED_PATH="C:/tools/opencv/build" # Verify this path
+              OPENCV_INSTALLED_PATH="C:/tools/opencv/build"
               if [ -d "$OPENCV_INSTALLED_PATH" ]; then
                 echo "OpenCV_DIR=${OPENCV_INSTALLED_PATH}" >> $GITHUB_ENV
                 echo "Successfully set OpenCV_DIR to ${OPENCV_INSTALLED_PATH}"
@@ -35,28 +34,28 @@ jobs:
                 ls -R /c/ProgramData/chocolatey/lib
                 exit 1
               fi
-          # - os_name: macos
-          #   os_runner: macos-14 # For arm64 (M1/M2); macos-14 is ARM.
-          #   arch: arm64
-          #   python_exe: python3
-          #   os_package_extension: dmg
-          #   cmake_generator: ""
-          #   cmake_toolset: ""
-          #   cmake_platform_arch: ""
-          #   opencv_setup_cmd: |
-          #     brew install opencv@4
-          #     echo "OpenCV_DIR=$(brew --prefix opencv@4)/lib/cmake/opencv4" | tee -a $GITHUB_ENV
-          # - os_name: linux
-          #   os_runner: ubuntu-latest
-          #   arch: x86_64
-          #   python_exe: python3
-          #   os_package_extension: tar.gz
-          #   cmake_generator: ""
-          #   cmake_toolset: ""
-          #   cmake_platform_arch: ""
-          #   opencv_setup_cmd: |
-          #     sudo apt-get update
-          #     sudo apt-get install -y libopencv-dev build-essential libjpeg-dev libpng-dev xorg-dev libwayland-dev libxkbcommon-dev libopencv-dev wayland-protocols extra-cmake-modules
+          - os_name: macos
+            os_runner: macos-14 # For arm64 (M1/M2); macos-14 is ARM.
+            arch: arm64
+            python_exe: python3
+            os_package_extension: dmg
+            cmake_generator: ""
+            cmake_toolset: ""
+            cmake_platform_arch: ""
+            opencv_setup_cmd: |
+              brew install opencv@4
+              echo "OpenCV_DIR=$(brew --prefix opencv@4)/lib/cmake/opencv4" | tee -a $GITHUB_ENV
+          - os_name: linux
+            os_runner: ubuntu-latest
+            arch: x86_64
+            python_exe: python3
+            os_package_extension: tar.gz
+            cmake_generator: ""
+            cmake_toolset: ""
+            cmake_platform_arch: ""
+            opencv_setup_cmd: |
+              sudo apt-get update
+              sudo apt-get install -y libopencv-dev build-essential libjpeg-dev libpng-dev xorg-dev libwayland-dev libxkbcommon-dev libopencv-dev wayland-protocols extra-cmake-modules
 
     steps:
       - name: Checkout repository
