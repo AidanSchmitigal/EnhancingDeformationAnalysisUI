@@ -4,3 +4,4 @@ build/
 /CMakeSettings.json
 **/imgui.ini
 libs/
+.DS_Store

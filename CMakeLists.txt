@@ -1,13 +1,13 @@
-cmake_minimum_required(VERSION 3.21) # Consider 3.21 for install(RUNTIME_DEPENDENCIES)
+cmake_minimum_required(VERSION 3.21)
 project(EnhancingDeformationAnalysisUI VERSION 0.2 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH}) # Add local cmake modules path
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_SOURCE_DIR}/libs/cppflow/cmake/modules ${CMAKE_MODULE_PATH})
 
 option(UI_INCLUDE_TENSORFLOW "Include TensorFlow in the project" ON)
-option(UI_INCLUDE_PYTORCH "Include PyTorch in the project" OFF) # Unused in this context
-option(UI_PROFILE "Build the project in profile mode" OFF) # Unused in this context
+option(UI_INCLUDE_PYTORCH "Include PyTorch in the project" ON)
+option(UI_PROFILE "Build the project in profile mode" OFF)
 
 add_subdirectory(src)
 
@@ -15,9 +15,12 @@ add_subdirectory(src)
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Enhancing Deformation Analysis UI Application")
-set(CPACK_PACKAGE_VENDOR "Your Organization") # Replace with your info
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE.txt") # Create a LICENSE.txt
-set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/README.md")
+set(CPACK_PACKAGE_VENDOR "OSU Capstone Project")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE.txt")
+
+file(READ "${CMAKE_SOURCE_DIR}/README.md" README_MD)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/README.txt" "${README_MD}")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_BINARY_DIR}/README.txt")
 
 if(WIN32)
     set(CPACK_GENERATOR "ZIP;NSIS")
@@ -27,13 +30,13 @@ if(WIN32)
     # set(CPACK_NSIS_MUI_FINISHPAGE_RUN "${PROJECT_NAME}.exe")
     # set(CPACK_NSIS_MUI_WELCOMEFINISHPAGE)
 elseif(APPLE)
-    set(CPACK_GENERATOR "DMG")
+    set(CPACK_GENERATOR "DragNDrop")
     # For a .app bundle, ensure MACOSX_BUNDLE is set on the target in src/CMakeLists.txt
     # And install the target using BUNDLE DESTINATION.
     # set(CPACK_DMG_ também_BACKGROUND_IMAGE "${CMAKE_SOURCE_DIR}/assets/img/dmg-background.png") # Example background
 else() # Linux
-    set(CPACK_GENERATOR "TGZ;DEB") # You might want to choose one, or provide both
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Your Name <your.email@example.com>") # Replace
+    set(CPACK_GENERATOR "TGZ;DEB")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Your Name <your.email@example.com>")
     set(CPACK_RPM_PACKAGE_RELEASE "1")
     set(CPACK_RPM_PACKAGE_GROUP "Applications/Science")
 endif()

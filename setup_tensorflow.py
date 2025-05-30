@@ -21,32 +21,25 @@ TF_PACKAGES = {
 
 def get_tf_package_info(target_os, target_arch, use_gpu=False):
     key = None
-    cmake_platform_suffix = None  # This will be part of the path: libs/tensorflow/<suffix>
 
     match (target_os, target_arch, use_gpu):
         case ("linux", "x86_64", False):
             key = "linux_x86_64_cpu"
-            cmake_platform_suffix = "linux"
         case ("linux", "x86_64", True):
             key = "linux_x86_64_gpu"
-            cmake_platform_suffix = "linux"
         case ("macos", "x86_64", False):
             key = "macos_x86_64_cpu"
-            cmake_platform_suffix = "macos-x86"
         case ("macos", "arm64", False):
             key = "macos_arm64_cpu"
-            cmake_platform_suffix = "macos-arm64"
         case ("windows", "x86_64", False):
             key = "windows_x86_64_cpu"
-            cmake_platform_suffix = "windows"
         case ("windows", "x86_64", True):
             key = "windows_x86_64_gpu"
-            cmake_platform_suffix = "windows"
         case _:
             raise ValueError(f"Unsupported OS/architecture combination: {target_os}/{target_arch} (GPU: {use_gpu})")
 
     version, url = TF_PACKAGES[key]
-    return version, url, cmake_platform_suffix
+    return version, url
 
 
 def download_file(url, dest_path):
@@ -121,14 +114,14 @@ if __name__ == "__main__":
     use_gpu = "--gpu" in sys.argv
 
     try:
-        tf_version, tf_url, tf_cmake_platform = get_tf_package_info(target_os, target_arch, use_gpu)
+        tf_version, tf_url = get_tf_package_info(target_os, target_arch, use_gpu)
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
 
     project_root = os.path.dirname(os.path.abspath(__file__))
     print(f"Project root: {project_root}")
-    tf_root_dir = os.path.join(project_root, "libs", "tensorflow", tf_cmake_platform)
+    tf_root_dir = os.path.join(project_root, "libs", "tensorflow")
 
     archive_name = os.path.basename(tf_url)
     download_dir = os.path.join(project_root, "temp_downloads")
