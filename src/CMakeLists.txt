@@ -72,10 +72,15 @@ if(UI_INCLUDE_TENSORFLOW)
 
   target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${CMAKE_SOURCE_DIR}/libs/cppflow/include)
   target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${TF_INCLUDE_DIR})
-  find_library(TF_C_LIB NAMES tensorflow tensorflow.lib PATHS "${TF_LIB_DIR}" REQUIRED)
-  find_library(TF_FRAMEWORK_LIB NAMES tensorflow_framework tensorflow_framework.lib PATHS "${TF_LIB_DIR}" REQUIRED)
 
-  target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_C_LIB} ${TF_FRAMEWORK_LIB})
+  find_library(TF_C_LIB NAMES tensorflow tensorflow.lib PATHS "${TF_LIB_DIR}" REQUIRED)
+  if(NOT WIN32)
+    find_library(TF_FRAMEWORK_LIB NAMES tensorflow_framework tensorflow_framework.lib PATHS "${TF_LIB_DIR}" REQUIRED)
+    target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_FRAMEWORK_LIB})
+  endif()
+
+
+  target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_C_LIB})
 
   # Define for conditional compilation in C++ code
   target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_TENSORFLOW)

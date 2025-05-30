@@ -2,9 +2,7 @@
 
 // glad must be above glfw, includes opengl header itself
 #include <GLFW/glfw3.h>
-#ifdef __APPLE__
 #undef __gl_h_
-#endif
 #include <glad/glad.h>
 #include <imgui.h>
 
