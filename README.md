@@ -14,12 +14,15 @@ A comprehensive tool for material scientists and researchers to analyze SEM (Sca
 ## Installation
 
 To clone this repo:
+
 ```bash
 git clone --recursive git@github.com:OSU-Enhancing-Deformation-Analysis/EnhancingDeformationAnalysisUI
 ```
+
 Don't miss the `--recursive` part of that command to get all required submodules!
 
 If you missed that part, initialize the submodules with:
+
 ```bash
 git submodule update --init
 ```
@@ -29,27 +32,37 @@ This program uses [tk_r_em](https://github.com/Ivanlh20/tk_r_em)'s models for de
 ## Building
 
 ### Prerequisites
+
 - CMake 3.5 or higher
 - OpenCV ~4.0.0 or higher with the OpenCV_DIR environment variable set to the path of the OpenCVConfig.cmake file
 - [Tensorflow C API](https://www.tensorflow.org/install/lang_c) installed on system path both the lib and the bin directories (findable by CMake)
-- On Windows: [CUDA 11](https://developer.nvidia.com/cuda-11-8-0-download-archive) with the include and bin directories & [cuDNN 8.x.x](https://developer.nvidia.com/rdp/cudnn-archive) installed to PATH 
+- On Windows: [CUDA 11](https://developer.nvidia.com/cuda-11-8-0-download-archive) with the include and bin directories & [cuDNN 8.x.x](https://developer.nvidia.com/rdp/cudnn-archive) installed to PATH
 - On Linux: [CUDA 12.x](https://developer.nvidia.com/cuda-downloads?target_os=Windows) & [cuDNN 9.x.x](https://developer.nvidia.com/cudnn-downloads) installed to PATH, Zenity for file browsing operations
 
 ### Compilation
 
 #### Linux (maybe macOS?)
+
 ```bash
 cd EnhancingDeformationAnalysisUI && mkdir build
 cd build && cmake ..
 make -j4  # or however many cores you want to use
 ```
 
+> Debug
+> cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug; cmake --build build --config Debug
+
+> Release
+> cmake -S . -B build -DCMAKE_BUILD_TYPE=Release; cmake --build build --target package --config Release
+
 For CUDA support on Linux:
+
 ```bash
 export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
 ```
 
 #### Windows
+
 1. Use the setup script `setup.py` to set up the project and install OpenCV and TensorFlow
 2. Make sure to set the environment variables as instructed in Prerequisites
 3. Open the folder using Visual Studio (assuming Desktop C++ package installed)
@@ -62,12 +75,14 @@ export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
 
 Launch the application without any command-line arguments to use the GUI:
 
-1. **Loading Images**: 
+1. **Loading Images**:
+
    - Click "Select Folder" to choose a directory containing TIFF images
    - Each image set opens in its own tab
    - Supports time-series SEM image sequences
 
 2. **Preprocessing**:
+
    - Crop images to remove unneeded parts (scale bars, timestamps, etc.)
    - Stabilize image sequence to reduce movement and vibration artifacts
    - Remove/filter specific frames with artifacts or focus issues
@@ -78,6 +93,7 @@ Launch the application without any command-line arguments to use the GUI:
    - Detect cracks with adjustable parameters for sensitivity and minimum size
 
 3. **Image Analysis**:
+
    - View histograms for each image to analyze intensity distributions
    - Compare images visually with synchronized navigation
    - Export analysis data as CSV for further processing
@@ -85,22 +101,26 @@ Launch the application without any command-line arguments to use the GUI:
 
 4. **Export Options**:
    The Image Comparison tab provides comprehensive export functionality:
-   
+
    **Single Frame Export**:
+
    - Export current frame from original sequence as TIFF
    - Export current frame from processed sequence as TIFF
-   
+
    **Batch Export**:
+
    - Export all original frames as individual TIFF files
    - Export all processed frames as individual TIFF files
    - Export processed sequence as animated GIF (with configurable playback speed)
-   
+
    **Analysis Data Export**:
+
    - Export histogram and SNR analysis data as CSV files
    - Export crack width measurements and feature tracking data as CSV
    - Export strain analysis results for quantitative research
 
 5. **Feature Tracking**:
+
    - Track points manually by selecting features of interest
    - Track automatically using detected cracks or structural features
    - Measure deformation over time with displacement vectors
@@ -121,6 +141,7 @@ For batch processing or integration into automated workflows, use the CLI mode:
 ```
 
 Options:
+
 - `--folder <path>`: Directory containing TIFF images (required)
 - `--crop <pixels>`: Remove specified number of pixels from image bottom
 - `--denoise <filter>`: Apply denoising filter (options: blur, sfr_hrsem, sfr_lrsem, etc.)
@@ -141,8 +162,10 @@ The application is built with a modular architecture:
 ## Common Use Cases
 
 ### Material Testing Analysis
+
 Process image sequences from material testing experiments to quantify:
-- Crack initiation and propagation 
+
+- Crack initiation and propagation
 - Strain localization patterns
 - Material failure mechanisms
 
@@ -151,19 +174,21 @@ Process image sequences from material testing experiments to quantify:
 ### Common Issues
 
 - **Image Loading Failures**: Ensure TIFF files are standard format without compression artifacts
-- **GPU Acceleration Issues**: 
+- **GPU Acceleration Issues**:
   - Verify CUDA and cuDNN versions match requirements
   - On Linux, make sure XLA_FLAGS is set correctly
-- **Slow Performance**: 
+- **Slow Performance**:
   - Enable profiling with `UI_PROFILE=ON` in CMake to identify bottlenecks
   - Consider using smaller image subsets for initial analysis
 
 ### Error Reporting
 
 For bugs or feature requests, please submit an issue on the GitHub repository with:
+
 - Description of the problem
 - Steps to reproduce
 - Sample images (if possible)
 
 ## Credits
+
 - [tk_r_em](https://github.com/Ivanlh20/tk_r_em) for the AI models used for denoising

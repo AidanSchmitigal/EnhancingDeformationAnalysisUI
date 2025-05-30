@@ -17,7 +17,6 @@ target_include_directories(EnhancingDeformationAnalysisUI PRIVATE
     ${CMAKE_SOURCE_DIR}/libs/glad/include
     ${CMAKE_SOURCE_DIR}/libs/imgui
     ${CMAKE_SOURCE_DIR}/libs/gif-h
-    ${CMAKE_SOURCE_DIR}/libs/cppflow/include
 )
 
 message("-- Source dir: ${CMAKE_SOURCE_DIR}")
@@ -27,27 +26,30 @@ target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE IMGUI_IMPL_OPE
 
 # Set C++ standard to 20
 target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
+if(APPLE)
+    target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE "-framework CoreFoundation")
+endif()
 
 # --- Options for Subdirectory Libraries (Set BEFORE add_subdirectory) ---
 # GLFW
 if(!WIN32)
-    SET(GLFW_BUILD_X11 ON CACHE BOOL "Build GLFW for X11" FORCE)
-    SET(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build GLFW for Wayland" FORCE)
+    set(GLFW_BUILD_X11 ON CACHE BOOL "Build GLFW for X11" FORCE)
+    set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build GLFW for Wayland" FORCE)
 endif()
-SET(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW docs" FORCE)
-SET(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build GLFW examples" FORCE)
-SET(GLFW_BUILD_TESTS OFF CACHE BOOL "Build GLFW tests" FORCE)
-SET(GLFW_INSTALL OFF CACHE BOOL "Install GLFW separately" FORCE) # We bundle it
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW docs" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build GLFW examples" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build GLFW tests" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "Install GLFW separately" FORCE) # We bundle it
 
 # LibTIFF
-SET(tiff-tools OFF CACHE BOOL "Build libtiff tools" FORCE)
-SET(tiff-tests OFF CACHE BOOL "Build libtiff tests" FORCE)
-SET(tiff-contrib OFF CACHE BOOL "Build libtiff contrib" FORCE)
-SET(tiff-docs OFF CACHE BOOL "Build libtiff docs" FORCE)
-# SET(tiff-install OFF CACHE BOOL "Install libtiff separately" FORCE) # Let our app install it
+set(tiff-tools OFF CACHE BOOL "Build libtiff tools" FORCE)
+set(tiff-tests OFF CACHE BOOL "Build libtiff tests" FORCE)
+set(tiff-contrib OFF CACHE BOOL "Build libtiff contrib" FORCE)
+set(tiff-docs OFF CACHE BOOL "Build libtiff docs" FORCE)
+# set(tiff-install OFF CACHE BOOL "Install libtiff separately" FORCE) # Let our app install it
 
 # cppflow (if it has options to disable examples/tests)
-SET(BUILD_EXAMPLES OFF CACHE BOOL "Build cppflow examples" FORCE) # Common option name for subprojects
+set(BUILD_EXAMPLES OFF CACHE BOOL "Build cppflow examples" FORCE) # Common option name for subprojects
 
 # GLFW (assuming it's built as a library)
 add_subdirectory(${CMAKE_SOURCE_DIR}/libs/glfw ${CMAKE_BINARY_DIR}/libs/glfw)
@@ -81,16 +83,17 @@ if(UI_INCLUDE_TENSORFLOW)
         message(FATAL_ERROR "TensorFlow C API headers not found at ${TF_INCLUDE_DIR}. Run setup_tensorflow.py.")
     endif()
 
+    target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${CMAKE_SOURCE_DIR}/libs/cppflow/include)
     target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${TF_INCLUDE_DIR})
     find_library(TF_C_LIB NAMES tensorflow tensorflow.lib PATHS "${TF_LIB_DIR}" REQUIRED)
     find_library(TF_FRAMEWORK_LIB NAMES tensorflow_framework tensorflow_framework.lib PATHS "${TF_LIB_DIR}" REQUIRED)
-    target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_C_LIB} ${TF_FRAMEWORK_LIB})
 
     target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_C_LIB} ${TF_FRAMEWORK_LIB})
 
     # Define for conditional compilation in C++ code
     target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_TENSORFLOW)
-    list(APPEND BUNDLE_SEARCH_PATHS "${TF_LIB_DIR}") # For install(RUNTIME_DEPENDENCIES)
+    list(APPEND BUNDLE_SEARCH_PATHS "${TF_LIB_DIR}")
+
     if(WIN32 AND EXISTS "${TF_ROOT}") # For tensorflow.dll often in root of TF package on Windows
         list(APPEND BUNDLE_SEARCH_PATHS "${TF_ROOT}")
     endif()
@@ -149,9 +152,13 @@ if(UI_INCLUDE_PYTORCH)
 endif()
 
 # OpenCV
-find_package(OpenCV REQUIRED) # OpenCV_DIR might be set by CI script
+find_package(OpenCV REQUIRED)
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
+# Add OpenCV lib dir to BUNDLE_SEARCH_PATHS if needed for bundling
+if(WIN32 AND OpenCV_DIR)
+    list(APPEND BUNDLE_SEARCH_PATHS "${OpenCV_DIR}/bin")
+endif()
 
 # --- UI_PROFILE Definition ---
 if(UI_PROFILE)
@@ -159,60 +166,61 @@ if(UI_PROFILE)
     target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_PROFILE)
 endif()
 
-# --- Installation ---
-if(APPLE)
-    set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
-        MACOSX_BUNDLE TRUE
-        # MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist" # Create and specify your Info.plist
-        # MACOSX_BUNDLE_ICON_FILE "myapp.icns" # Create and specify your app icon
-    )
-    install(TARGETS EnhancingDeformationAnalysisUI BUNDLE DESTINATION . COMPONENT applications)
-    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
-        DESTINATION "${PROJECT_NAME}.app/Contents/MacOS/assets"
-        COMPONENT applications
-        FILES_MATCHING PATTERN "*"
-    )
-else()
-    install(TARGETS EnhancingDeformationAnalysisUI RUNTIME DESTINATION bin)
-    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets)
-endif()
+# ==================================================================================
+# --- Installation, Bundling, and Signing (Conditional on APP_BUILD_MODE) ---
+# ==================================================================================
+# Define a component for our application specific installations
+set(APP_COMPONENT "applications")
 
+if(APP_BUILD_MODE STREQUAL "STAGING" OR APP_BUILD_MODE STREQUAL "PACKAGE")
+    message(STATUS "Configuring for STAGING or PACKAGE mode: Will install and bundle.")
 
-# Bundling dependencies (requires CMake 3.21+)
-if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
+    if(APPLE)
+        set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+            MACOSX_BUNDLE TRUE
+            # MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist" # TODO: Create and specify your Info.plist
+            # MACOSX_BUNDLE_ICON_FILE "myapp.icns" # TODO: Create and specify your app icon
+        )
+        install(TARGETS EnhancingDeformationAnalysisUI
+            BUNDLE DESTINATION .
+            COMPONENT ${APP_COMPONENT}
+        )
+
+        install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
+            DESTINATION "${PROJECT_NAME}.app/Contents/MacOS/assets"
+            COMPONENT ${APP_COMPONENT}
+            FILES_MATCHING PATTERN "*"
+        )
+    else() # Windows & Linux
+        install(TARGETS EnhancingDeformationAnalysisUI
+            RUNTIME DESTINATION bin COMPONENT ${APP_COMPONENT}
+            LIBRARY DESTINATION lib COMPONENT ${APP_COMPONENT}
+            ARCHIVE DESTINATION lib COMPONENT ${APP_COMPONENT}
+        )
+        install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT ${APP_COMPONENT})
+    endif()
+
     message(STATUS "Using CMake ${CMAKE_VERSION} with install(RUNTIME_DEPENDENCIES)")
 
     if(WIN32)
         install(
             TARGETS EnhancingDeformationAnalysisUI
             RUNTIME_DEPENDENCIES
-            DESTINATION bin # DLLs next to exe
+            DESTINATION bin COMPONENT ${APP_COMPONENT}
             # DIRECTORIES ${BUNDLE_SEARCH_PATHS}
         )
     elseif(APPLE)
         # Apple code
-    else() # Linux
-        install(
-            TARGETS EnhancingDeformationAnalysisUI
-            RUNTIME_DEPENDENCIES
-            DESTINATION lib # Shared libraries in lib/
-            # DIRECTORIES ${BUNDLE_SEARCH_PATHS}
-        )
-
-        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-        set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
-            INSTALL_RPATH "$ORIGIN/../lib"
-            BUILD_RPATH "$ORIGIN/../lib") # For finding them during build if necessary
-    endif()
-
-    if(APPLE)
 
         if(EXISTS "/opt/homebrew/lib/gcc/current")
             message(STATUS "Adding Homebrew GCC lib dir to bundle search paths: ${HOMEBREW_GCC_LIB_DIR}")
             list(APPEND BUNDLE_SEARCH_PATHS "/opt/homebrew/lib/gcc/current")
         else()
             message(WARNING "Could not determine Homebrew GCC library path for bundling libgcc. This might lead to issues.")
+        endif()
+
+        if(BUNDLE_SEARCH_PATHS)
+            list(REMOVE_DUPLICATES BUNDLE_SEARCH_PATHS)
         endif()
 
         if(EXISTS "/opt/homebrew/lib")
@@ -233,7 +241,7 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
                 \"\"
                 \"${BUNDLE_SEARCH_PATHS_MACOS_STR}\"
             )
-        "            COMPONENT applications)
+        "            COMPONENT ${APP_COMPONENT})
         install(CODE "
             message(STATUS \"Ad-hoc signing the application bundle: \${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\")
             execute_process(
@@ -247,25 +255,69 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
             else()
                 message(STATUS \"Bundle ad-hoc signed successfully: \${sign_output}\")
             endif()
-        "            COMPONENT applications)
+        "            COMPONENT ${APP_COMPONENT})
+    elseif(UNIX) # Linux
+        install(
+            TARGETS EnhancingDeformationAnalysisUI
+            RUNTIME_DEPENDENCIES
+            DESTINATION lib COMPONENT ${APP_COMPONENT}
+            # DIRECTORIES ${BUNDLE_SEARCH_PATHS}
+        )
+
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+        set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+            INSTALL_RPATH "$ORIGIN/../lib"
+            BUILD_RPATH "$ORIGIN/../lib")
+    endif()
+else() # APP_BUILD_MODE == "DEVELOPMENT"
+    message(STATUS "DEVELOPMENT mode: Skipping installation, bundling, and CPack steps for src target.")
+    # In development mode, the executable is just in ${CMAKE_BINARY_DIR}/src/
+    # Users run it from there. RPATHs set by CMake for the build tree should handle finding
+    # libraries from other build subdirectories (like glfw, libtiff) or system paths.
+    # For pre-downloaded TF/PyTorch, you might need to ensure their lib dirs are in
+    # the RPATH of the development executable or in DYLD_LIBRARY_PATH/LD_LIBRARY_PATH
+    # or PATH (for Windows DLLs) when running.
+
+    # Set RPATHs for development build to find libs downloaded by setup scripts
+    # This helps run directly from the build tree without installing
+    set(DEV_RPATH_DIRS "")
+    if(UI_INCLUDE_TENSORFLOW AND TF_LIB_DIR AND EXISTS "${TF_LIB_DIR}")
+        list(APPEND DEV_RPATH_DIRS "${TF_LIB_DIR}")
+    endif()
+    if(UI_INCLUDE_PYTORCH AND Torch_FOUND AND TORCH_INSTALL_PREFIX AND EXISTS "${TORCH_INSTALL_PREFIX}/lib")
+        list(APPEND DEV_RPATH_DIRS "${TORCH_INSTALL_PREFIX}/lib")
     endif()
 
-else()
-    message(WARNING "CMake version is ${CMAKE_VERSION}. CMake 3.21+ is required for robust install(RUNTIME_DEPENDENCIES). Manual bundling of shared libraries will be attempted but may be incomplete.")
-    # Minimal manual bundling for TF (already partially there from my previous suggestion)
-    # Manual bundling for PyTorch and OpenCV would be very complex here and error-prone.
-    # Strongly recommend ensuring CMake 3.21+ in all build environments.
-    if(UI_INCLUDE_TENSORFLOW AND EXISTS "${TF_LIB_DIR}")
-        if(WIN32)
-            if(EXISTS "${TF_ROOT}/tensorflow.dll")
-                install(FILES "${TF_ROOT}/tensorflow.dll" DESTINATION bin COMPONENT Runtime)
-            endif()
-            # You might need to glob for other TF related DLLs if any.
-        elseif(APPLE) # Non-bundle scenario; .app bundle handled by fixup_bundle
-            install(DIRECTORY "${TF_LIB_DIR}/" DESTINATION lib COMPONENT Runtime FILES_MATCHING PATTERN "libtensorflow*.dylib")
-        else() # Linux
-            install(DIRECTORY "${TF_LIB_DIR}/" DESTINATION lib COMPONENT Runtime FILES_MATCHING PATTERN "libtensorflow*.so*")
+    # Also add paths to compiled subproject libraries (glfw, libtiff)
+    # These are usually handled by CMake's default RPATH settings for build tree,
+    # but being explicit doesn't hurt if issues arise.
+    # list(APPEND DEV_RPATH_DIRS "${CMAKE_BINARY_DIR}/libs/glfw") # Example, if glfw lib is there
+    # list(APPEND DEV_RPATH_DIRS "${CMAKE_BINARY_DIR}/libs/libtiff")
+
+    if(DEV_RPATH_DIRS)
+        if(APPLE)
+            set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+                BUILD_WITH_INSTALL_RPATH ON # Uses INSTALL_RPATH also for build tree
+                INSTALL_RPATH "${DEV_RPATH_DIRS}"
+            )
+        else() # Linux - $ORIGIN is useful
+            # Convert DEV_RPATH_DIRS to $ORIGIN-relative if possible, or absolute paths
+            string(REPLACE ";" "$ORIGIN/../lib${CMAKE_DIR_SEPARATOR}" RPATH_LINKS "${DEV_RPATH_DIRS}") # Simplistic
+            set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+                BUILD_RPATH "${RPATH_LINKS}"
+            )
         endif()
     endif()
-    # Add similar manual install for PyTorch and OpenCV if CMake < 3.21, which is non-trivial.
+
+    # For finding assets in DEVELOPMENT mode:
+    # Your C++ code needs a way to find assets.
+    # For example, if executable is build/src/YourApp and assets are YourProject/assets/
+    # it might need to go up (../../assets) or use a path relative to CMAKE_SOURCE_DIR
+    # during development. The getResourcesPath() needs a robust fallback for this.
+    # Example: define a preprocessor macro with asset path for dev.
+    target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE
+        "APP_DEVELOPMENT_ASSET_PATH=\"${CMAKE_SOURCE_DIR}/assets\""
+    )
+
 endif()
