@@ -133,10 +133,13 @@ if(UI_INCLUDE_PYTORCH)
 endif()
 
 # OpenCV
-set(OpenCV_STATIC OFF CACHE INTERNAL "Hint to find_package(OpenCV) to prefer shared libs" FORCE)
+set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "Hint to find_package(OpenCV) to prefer shared libs" FORCE)
 find_package(OpenCV REQUIRED)
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
+
+set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
 
 # Add OpenCV lib dir to BUNDLE_SEARCH_PATHS if needed for bundling
 if(WIN32 AND OpenCV_DIR)
