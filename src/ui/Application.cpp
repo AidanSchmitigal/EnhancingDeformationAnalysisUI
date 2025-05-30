@@ -2,7 +2,9 @@
 
 // glad must be above glfw, includes opengl header itself
 #include <GLFW/glfw3.h>
+#ifdef __APPLE__
 #undef __gl_h_
+#endif
 #include <glad/glad.h>
 #include <imgui.h>
 
@@ -222,16 +224,19 @@ void Application::RenderWelcomeScreen() {
 	ImGui::Spacing();
 }
 
+char image_folder_buffer[1024];
 void Application::RenderFolderSelector() {
 #ifdef __APPLE__
-	ImGui::InputTextWithHint("##image_folder", "Enter image folder path", nullptr, 0);
+	ImGui::InputTextWithHint("##image_folder", "Enter image folder path", image_folder_buffer, 1024);
+
+	// String from image_folder_buffer
+	std::string image_folder(image_folder_buffer);
+
 	if (ImGui::Button("Load Images")) {
-		// const char *folder_path =
-		//     ImGui::GetInputTextState("##image_folder")->Text;
-		// if (std::filesystem::is_directory(folder_path)) {
-		// 	m_imageSets.emplace_back(
-		// 	    std::make_unique<ImageSet>(folder_path));
-		// }
+		if (!image_folder.empty() && std::filesystem::is_directory(image_folder) &&
+		    utils::DirectoryContainsTiff(image_folder)) {
+			m_imageSets.emplace_back(std::make_unique<ImageSet>(image_folder));
+		}
 	}
 #else
 	// Make the folder selector button more prominent
