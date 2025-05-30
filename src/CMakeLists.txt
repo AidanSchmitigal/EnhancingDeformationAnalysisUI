@@ -202,7 +202,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       TARGETS EnhancingDeformationAnalysisUI
       RUNTIME_DEPENDENCIES
       DESTINATION bin COMPONENT applications
-      # DIRECTORIES ${BUNDLE_SEARCH_PATHS}
+      DIRECTORIES ${BUNDLE_SEARCH_PATHS}
     )
   elseif(APPLE)
     # Apple code
@@ -256,7 +256,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       TARGETS EnhancingDeformationAnalysisUI
       RUNTIME_DEPENDENCIES
       DESTINATION lib COMPONENT applications
-      # DIRECTORIES ${BUNDLE_SEARCH_PATHS}
     )
 
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)

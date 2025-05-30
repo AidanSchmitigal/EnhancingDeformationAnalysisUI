@@ -97,7 +97,6 @@ jobs:
         working-directory: build
         run: |
           cpack -C Release
-          ls -R
 
       - name: Upload build artifact (package)
         uses: actions/upload-artifact@v4
