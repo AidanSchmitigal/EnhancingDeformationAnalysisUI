@@ -90,7 +90,11 @@ void Application::InitializeImGui() {
 	}
 
 	// Enable docking
-	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	ImGuiIO &io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
+
+	// io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleFonts;
 }
 
 void Application::Run() {

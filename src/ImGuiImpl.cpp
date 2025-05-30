@@ -4,6 +4,8 @@
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_opengl3.h>
 
+#include <stdio.h>
+
 void SetImGuiColors();
 
 void ImGuiInit(GLFWwindow *window, bool set_colors, bool set_fonts) {
@@ -17,11 +19,15 @@ void ImGuiInit(GLFWwindow *window, bool set_colors, bool set_fonts) {
 	ImGui_ImplOpenGL3_Init();
 #endif
 
-	if (set_fonts)
-		ImGui::GetIO().Fonts->AddFontFromFileTTF("assets/fonts/CascadiaCodeNF-Regular.ttf", 15.0f);
+	if (set_fonts) {
+		ImFontConfig config;
+		config.RasterizerDensity = 2.0f;
+		ImGui::GetIO().Fonts->AddFontFromFileTTF("assets/fonts/CascadiaCodeNF-Regular.ttf", 14.0f, &config);
+	}
 
-	if (set_colors)
+	if (set_colors) {
 		SetImGuiColors();
+	}
 }
 
 void ImGuiShutdown() {
