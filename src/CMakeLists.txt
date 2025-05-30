@@ -157,7 +157,7 @@ endif()
 # ==================================================================================
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-  message(STATUS "Configuring for STAGING or PACKAGE mode: Will install and bundle.")
+  message(STATUS "Configuring for Release. Will compile and bundle.")
 
   if(APPLE)
     set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
@@ -201,7 +201,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     install(
       TARGETS EnhancingDeformationAnalysisUI
       RUNTIME_DEPENDENCIES
-      DESTINATION bin COMPONENT applications
       DIRECTORIES ${BUNDLE_SEARCH_PATHS}
     )
   elseif(APPLE)
