@@ -133,9 +133,11 @@ if(UI_INCLUDE_PYTORCH)
 endif()
 
 # OpenCV
+set(OpenCV_STATIC OFF CACHE INTERNAL "Hint to find_package(OpenCV) to prefer shared libs" FORCE)
 find_package(OpenCV REQUIRED)
 target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${OpenCV_LIBS})
+
 # Add OpenCV lib dir to BUNDLE_SEARCH_PATHS if needed for bundling
 if(WIN32 AND OpenCV_DIR)
   list(APPEND BUNDLE_SEARCH_PATHS "${OpenCV_DIR}/bin")
@@ -160,12 +162,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       MACOSX_BUNDLE_ICON_FILE "EnhancedUIIcons.icns"
       MACOSX_BUNDLE_NAME "Enhancing Deformation Analysis UI"
       MACOSX_BUNDLE_VERSION ${PROJECT_VERSION}
-      MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
-      MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
-      MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist.in"
+      # MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+      # MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
+      # MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist.in"
       XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
       XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
-      XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
+      # XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
     )
     set_source_files_properties(${CMAKE_SOURCE_DIR}/assets/EnhancedUIIcons.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
