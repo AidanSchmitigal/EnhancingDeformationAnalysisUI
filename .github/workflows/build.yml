@@ -19,6 +19,8 @@ jobs:
             arch: x86_64
             python_exe: python # On Windows, python.exe should be in PATH
             os_package_extension: zip
+            cmake_generator: "Visual Studio 17 2022" # Matches VS 2022
+            cmake_platform_arch: "x64" # Specifies 64-bit for VS generator
             opencv_setup_cmd: |
               choco install opencv --version=4.8.0 --yes --force
               OPENCV_INSTALLED_PATH="C:/tools/opencv/build" # Verify this path
@@ -36,6 +38,8 @@ jobs:
             arch: arm64
             python_exe: python3
             os_package_extension: dmg
+            cmake_generator: ""
+            cmake_platform_arch: ""
             opencv_setup_cmd: |
               brew install opencv@4
               echo "OpenCV_DIR=$(brew --prefix opencv@4)/lib/cmake/opencv4" | tee -a $GITHUB_ENV
@@ -44,6 +48,8 @@ jobs:
             arch: x86_64
             python_exe: python3
             os_package_extension: tar.gz
+            cmake_generator: ""
+            cmake_platform_arch: ""
             opencv_setup_cmd: |
               sudo apt-get update
               sudo apt-get install -y libopencv-dev build-essential libjpeg-dev libpng-dev xorg-dev libwayland-dev libxkbcommon-dev libopencv-dev wayland-protocols extra-cmake-modules
@@ -78,7 +84,7 @@ jobs:
       - name: Configure CMake
         run: |
           mkdir build
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUI_INCLUDE_TENSORFLOW=ON -DUI_INCLUDE_PYTORCH=ON -DUI_RELEASE=ON -DUI_PROFILE=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUI_INCLUDE_TENSORFLOW=ON -DUI_INCLUDE_PYTORCH=ON -DUI_RELEASE=ON -DUI_PROFILE=OFF ${{ matrix.config.cmake_generator && format('-G "{0}"', matrix.config.cmake_generator) || '' }} ${{ matrix.config.cmake_platform_arch && format('-A {0}', matrix.config.cmake_platform_arch) || '' }}
 
       - name: Build with CMake
         working-directory: build
