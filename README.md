@@ -49,17 +49,49 @@ cd build && cmake ..
 make -j4  # or however many cores you want to use
 ```
 
+<!-- > cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug; cmake --build build --config Debug -->
+
 > Debug
-> cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug; cmake --build build --config Debug
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --config Debug
+```
+
+Run the application with:
+
+```bash
+cd build
+./src/EnhancingDeformationAnalysisUI
+```
 
 > Release
-> cmake -S . -B build -DCMAKE_BUILD_TYPE=Release; cmake --build build --target package --config Release
+
+```bash
+cmake -S . -B release -DCMAKE_BUILD_TYPE=Release
+cmake --build release --config Release
+cd release
+cpack -C Release
+```
+
+> Package
+
+````bash
+
+> cmake -S . -B build
+> cmake --build build
+
+> Release
+> cmake -S . -B build -DAPP_BUILD_MODE=PACKAGE -DCMAKE_BUILD_TYPE=Release
+> cmake --build build
+> cd build
+> cpack -C Release
 
 For CUDA support on Linux:
 
 ```bash
 export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
-```
+````
 
 #### Windows
 

@@ -191,7 +191,8 @@ void CreateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures,
 	delete[] data;
 }
 
-void UpdateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures, const std::shared_ptr<Texture> &source_texture, const TileConfig &tile_config) {
+void UpdateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures,
+			const std::shared_ptr<Texture> &source_texture, const TileConfig &tile_config) {
 	PROFILE_FUNCTION();
 
 	// Get the image data from the source texture

@@ -5,31 +5,19 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_SOURCE_DIR}/libs/cppflow/cmake/modules ${CMAKE_MODULE_PATH})
 
-# --- Build Mode Configuration ---
-set(APP_BUILD_MODES DEVELOPMENT STAGING PACKAGE)
-set(APP_BUILD_MODE "DEVELOPMENT" CACHE STRING "Application build mode: ${APP_BUILD_MODES}")
-set_property(CACHE APP_BUILD_MODE PROPERTY STRINGS ${APP_BUILD_MODES})
-message(STATUS "Application Build Mode: ${APP_BUILD_MODE}")
-
-if(NOT CMAKE_BUILD_TYPE AND NOT APP_BUILD_MODE STREQUAL "DEVELOPMENT")
-  message(STATUS "No CMAKE_BUILD_TYPE specified, defaulting to Release for STAGING/PACKAGE modes.")
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build (Debug, Release, RelWithDebInfo, MinSizeRel)." FORCE)
-elseif(NOT CMAKE_BUILD_TYPE AND APP_BUILD_MODE STREQUAL "DEVELOPMENT")
-  message(STATUS "No CMAKE_BUILD_TYPE specified, defaulting to Debug for DEVELOPMENT mode.")
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build (Debug, Release, RelWithDebInfo, MinSizeRel)." FORCE)
-endif()
 message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
-
 
 option(UI_INCLUDE_TENSORFLOW "Include TensorFlow in the project" ON)
 option(UI_INCLUDE_PYTORCH "Include PyTorch in the project" ON)
+option(UI_RELEASE "Build the project in release mode" ON)
 option(UI_PROFILE "Build the project in profile mode" OFF)
 
 add_subdirectory(src)
 
-# --- CPack configuration (Only relevant for APP_BUILD_MODE = PACKAGE) ---
-if(APP_BUILD_MODE STREQUAL "PACKAGE")
+# --- CPack configuration ---
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
   message(STATUS "Configuring CPack for packaging.")
+
   set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
   set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
   set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Enhancing Deformation Analysis UI Application")
@@ -60,7 +48,7 @@ if(APP_BUILD_MODE STREQUAL "PACKAGE")
   endif()
 
   set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
-  set(CPACK_INSTALL_CMAKE_PROJECTS "${CMAKE_BINARY_DIR};${PROJECT_NAME};ALL;${CMAKE_INSTALL_PREFIX}")
+  set(CPACK_INSTALL_CMAKE_PROJECTS "${CMAKE_BINARY_DIR};${PROJECT_NAME};ALL;/")
 
   include(CPack)
 else()
