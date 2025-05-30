@@ -71,24 +71,24 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DUI_INCLUDE_TENSORFLOW=ON `
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release`
             ${{ env.OpenCV_DIR && format('-DOpenCV_DIR="{0}"', env.OpenCV_DIR) || '' }}`
             ${{ matrix.config.os_name == 'windows' && '-G "Visual Studio 17 2022" -A x64' || '' }}
             # For macOS arm64, CMake should pick up the arch automatically on macos-14 runner.
             # For other specific CMake options, add them here.
 
       - name: Build with CMake
-        run: cmake --build build --config Release --parallel # Uses default parallel jobs
+        run: cmake --build build --config Release --parallel
 
       - name: Package with CPack
         working-directory: build
-        run: cpack -C Release --verbose # Add --verbose for more logs if needed
+        run: cpack -C Release --verbose
 
       - name: Upload build artifact (package)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.config.os_name }}-${{ matrix.config.arch }}-package
-          path: build/*.{zip,tar.gz,dmg,deb,rpm} # CPack generates these based on CPACK_GENERATOR
+          path: build/*.{zip,tar.gz,dmg,deb,rpm}
 
       - name: Upload to Release
         if: startsWith(github.ref, 'refs/tags/v')
