@@ -23,9 +23,10 @@ jobs:
             cmake_platform_arch: "x64" # Specifies 64-bit for VS generator
             opencv_setup_cmd: |
               choco install opencv --version=4.8.0 --yes --force
+              cat C:\ProgramData\chocolatey\logs\chocolatey.log
               choco info opencv
-              ls -R "C:/Program Files/opencv"
               ls -R "C:/Program Files/chocolatey"
+              ls -R "C:/tools/"
               OPENCV_INSTALLED_PATH="C:/tools/opencv/build" # Verify this path
               if [ -d "$OPENCV_INSTALLED_PATH" ]; then
                 echo "OpenCV_DIR=${OPENCV_INSTALLED_PATH}" >> $GITHUB_ENV
