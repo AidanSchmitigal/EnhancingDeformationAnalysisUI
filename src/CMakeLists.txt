@@ -172,12 +172,18 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
       MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
       MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist"
-      XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "5A3B2E3C3E"
+      XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "XVAD456636"
       XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Developer ID Application"
       XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual"
-      # XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
-      # XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
+      XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED TRUE
+      XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS "--timestamp=http://timestamp.apple.com/ts01  --options=runtime,library"
+      XCODE_ATTRIBUTE_CODE_SIGN_INJECT_BASE_ENTITLEMENTS "NO"
     )
+    set(CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "XVAD456636")
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Developer ID Application")
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual")
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED TRUE)
+
     install(FILES ${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns DESTINATION "${PROJECT_NAME}.app/Contents/Resources" COMPONENT applications)
     install(FILES ${CMAKE_SOURCE_DIR}/assets/Info.plist DESTINATION "${PROJECT_NAME}.app/Contents" COMPONENT applications)
     set_source_files_properties(${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
@@ -210,6 +216,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       TARGETS EnhancingDeformationAnalysisUI
       RUNTIME_DEPENDENCIES
       DIRECTORIES ${BUNDLE_SEARCH_PATHS}
+      PRE_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-win-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$"
       POST_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-win-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$"
       DESTINATION bin
       COMPONENT applications
