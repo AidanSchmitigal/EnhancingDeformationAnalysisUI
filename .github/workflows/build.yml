@@ -75,13 +75,10 @@ jobs:
         run: |
           ${{ matrix.config.opencv_setup_cmd }}
 
-      - name: Make build directory
-        run: mkdir build
-
       - name: Configure CMake
         run: |
-          cmake .. -DCMAKE_BUILD_TYPE=Release \
-          -DUI_INCLUDE_TENSORFLOW=ON -DUI_INCLUDE_PYTORCH=ON -DUI_RELEASE=ON -DUI_PROFILE=OFF
+          mkdir build
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUI_INCLUDE_TENSORFLOW=ON -DUI_INCLUDE_PYTORCH=ON -DUI_RELEASE=ON -DUI_PROFILE=OFF
 
       - name: Build with CMake
         working-directory: build
