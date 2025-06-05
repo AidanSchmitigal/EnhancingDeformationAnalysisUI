@@ -98,6 +98,31 @@ jobs:
         run: |
           cpack -C Release
 
+      # ----- macOS specific Signing, Notarization, and Stapling -----
+
+      - name: macOS - Notarize .dmg
+        if: matrix.config.os_name == 'macos'
+        run: |
+          DMG_PATH="$(find release -name '*.dmg' | head -n 1)"
+          echo "Submitting for notarization: $DMG_PATH"
+
+          xcrun notarytool store-credentials "EnhancingDeformationAnalysisUI" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$TEAM_ID" \
+            --password "$APP_PASSWORD"
+
+          xcrun notarytool submit "$DMG_PATH" --keychain-profile "EnhancingDeformationAnalysisUI" --wait
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+
+      - name: macOS - Staple notarization ticket
+        if: matrix.config.os_name == 'macos'
+        run: |
+          DMG_PATH="$(find build -name '*.dmg' | head -n 1)"
+          xcrun stapler staple "$DMG_PATH"
+
       - name: Upload build artifact (package)
         uses: actions/upload-artifact@v4
         with:

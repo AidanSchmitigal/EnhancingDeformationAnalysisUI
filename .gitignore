@@ -6,3 +6,4 @@ release/
 **/imgui.ini
 libs/
 .DS_Store
+temp_downloads/
