@@ -134,7 +134,7 @@ jobs:
       - name: macOS - Notarize .dmg
         if: matrix.config.os_name == 'macos'
         run: |
-          DMG_PATH="$(find release -name '*.dmg' | head -n 1)"
+          DMG_PATH="$(find build -name '*.dmg' | head -n 1)"
           echo "Submitting for notarization: $DMG_PATH"
 
           xcrun notarytool store-credentials "EnhancingDeformationAnalysisUI" \
