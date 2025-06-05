@@ -176,6 +176,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
             ARCHIVE DESTINATION lib COMPONENT applications
         )
         install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT applications)
+        set(CMAKE_RUNTIME_DEPENDENCY_RESOLUTION_SKIP_MISSING TRUE)
         install(
             TARGETS EnhancingDeformationAnalysisUI
             RUNTIME_DEPENDENCIES

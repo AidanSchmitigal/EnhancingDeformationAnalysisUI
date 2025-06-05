@@ -84,22 +84,6 @@ jobs:
         run: |
           ${{ matrix.config.opencv_setup_cmd }}
 
-      - name: Configure CMake
-        run: |
-          mkdir build
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUI_INCLUDE_TENSORFLOW=ON -DUI_INCLUDE_PYTORCH=ON -DUI_RELEASE=ON -DUI_PROFILE=OFF ${{ matrix.config.cmake_generator && format('-G "{0}"', matrix.config.cmake_generator) || '' }} ${{ matrix.config.cmake_toolset && format('-T "{0}"', matrix.config.cmake_toolset) || '' }} ${{ matrix.config.cmake_platform_arch && format('-A {0}', matrix.config.cmake_platform_arch) || '' }}
-
-      - name: Build with CMake
-        working-directory: build
-        run: cmake --build . --config Release --parallel
-
-      - name: Package with CPack
-        working-directory: build
-        run: |
-          cpack -C Release
-
-      # ----- macOS specific Signing, Notarization, and Stapling -----
-
       - name: Install the Apple certificate and provisioning profile
         if: matrix.config.os_name == 'macos'
         env:
@@ -130,6 +114,22 @@ jobs:
           # apply provisioning profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUI_INCLUDE_TENSORFLOW=ON -DUI_INCLUDE_PYTORCH=ON -DUI_RELEASE=ON -DUI_PROFILE=OFF ${{ matrix.config.cmake_generator && format('-G "{0}"', matrix.config.cmake_generator) || '' }} ${{ matrix.config.cmake_toolset && format('-T "{0}"', matrix.config.cmake_toolset) || '' }} ${{ matrix.config.cmake_platform_arch && format('-A {0}', matrix.config.cmake_platform_arch) || '' }}
+
+      - name: Build with CMake
+        working-directory: build
+        run: cmake --build . --config Release --parallel
+
+      - name: Package with CPack
+        working-directory: build
+        run: |
+          cpack -C Release
+
+      # ----- macOS specific Signing, Notarization, and Stapling -----
 
       - name: macOS - Notarize .dmg
         if: matrix.config.os_name == 'macos'
