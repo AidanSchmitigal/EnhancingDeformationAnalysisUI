@@ -180,7 +180,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
             TARGETS EnhancingDeformationAnalysisUI
             RUNTIME_DEPENDENCIES
             DIRECTORIES ${BUNDLE_SEARCH_PATHS}
-            PRE_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$" "^ucrtbase\\.dll$" "^vcruntime[0-9]+\\.dll$" "^msvcp[0-9]+\\.dll$"
+            PRE_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^HvsiFileTrust.*$" "HvsiFileTrust\\.dll" "^wpaxholder\\.dll$" "^ucrtbase\\.dll$" "^vcruntime[0-9]+\\.dll$" "^msvcp[0-9]+\\.dll$"
             POST_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$" "^ucrtbase\\.dll$" "^vcruntime[0-9]+\\.dll$" "^msvcp[0-9]+\\.dll$"
             DESTINATION bin
             COMPONENT applications
@@ -275,34 +275,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
                 message(STATUS \"App signed successfully: \${sign_output}\")
             endif()
         "            COMPONENT applications)
-        install(CODE "
-            message(STATUS \"Notarizing app\")
-            execute_process(
-                COMMAND xcrun notarytool submit \"\${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\" --keychain-profile \"EnhancingDeformationAnalysisUI\" --wait
-                RESULT_VARIABLE sign_result
-                OUTPUT_VARIABLE sign_output
-                ERROR_VARIABLE sign_error
-            )
-            if(NOT sign_result EQUAL 0)
-                message(FATAL_ERROR \"Notarization failed: \${sign_error}\")
-            else()
-                message(STATUS \"App notarized successfully: \${sign_output}\")
-            endif()
-        ")
-        install(CODE "
-            message(STATUS \"Stapling app\")
-            execute_process(
-                COMMAND xcrun stapler staple \"\${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\"
-                RESULT_VARIABLE sign_result
-                OUTPUT_VARIABLE sign_output
-                ERROR_VARIABLE sign_error
-            )
-            if(NOT sign_result EQUAL 0)
-                message(FATAL_ERROR \"Stapling failed: \${sign_error}\")
-            else()
-                message(STATUS \"App stapled successfully: \${sign_output}\")
-            endif()
-        ")
 
         # ----------------------------------------------------
         #       Linux specific
