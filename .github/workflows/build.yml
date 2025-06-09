@@ -18,7 +18,7 @@ jobs:
             os_runner: windows-latest
             arch: x86_64
             python_exe: python
-            os_package_extension: exe
+            find_package_cmd: find build -maxdepth 1 -name '*.exe' | head -n 1
             cmake_generator: "Visual Studio 17 2022"
             cmake_toolset: "v142,host=x64"
             cmake_platform_arch: "x64"
@@ -38,7 +38,7 @@ jobs:
             os_runner: macos-14
             arch: arm64
             python_exe: python3
-            os_package_extension: dmg
+            find_package_cmd: find build -maxdepth 1 -name '*.dmg' | head -n 1
             cmake_generator: ""
             cmake_toolset: ""
             cmake_platform_arch: ""
@@ -49,7 +49,7 @@ jobs:
             os_runner: ubuntu-latest
             arch: x86_64
             python_exe: python3
-            os_package_extension: deb
+            find_package_cmd: find build -maxdepth 1 -name '*.deb' | head -n 1
             cmake_generator: ""
             cmake_toolset: ""
             cmake_platform_arch: ""
@@ -130,8 +130,9 @@ jobs:
           cpack -C Release
 
       - name: Find package file
+        shell: bash
         run: |
-          PACKAGE_FINAL_PATH=$(find build -name '*.${{ matrix.config.os_package_extension }}' -depth 1 | head -n 1)
+          PACKAGE_FINAL_PATH=$(${{ matrix.config.find_package_cmd }})
           echo "PACKAGE_FINAL_PATH=$PACKAGE_FINAL_PATH" >> $GITHUB_ENV
 
       # ----- macOS specific Signing, Notarization, and Stapling -----
