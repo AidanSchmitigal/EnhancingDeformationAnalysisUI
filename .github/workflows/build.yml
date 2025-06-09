@@ -162,6 +162,7 @@ jobs:
           find build -name '*.dmg'
           find build -name '*.deb'
           find build -name '*.rpm'
+          find build -name '*.exe'
 
       - name: Upload build artifact (package)
         uses: actions/upload-artifact@v4
@@ -173,6 +174,7 @@ jobs:
             build/*.dmg
             build/*.deb
             build/*.rpm
+            build/*.exe
           if-no-files-found: error
 
       - name: Upload to Release
