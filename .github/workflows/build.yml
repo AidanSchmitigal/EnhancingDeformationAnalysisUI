@@ -18,7 +18,7 @@ jobs:
             os_runner: windows-latest
             arch: x86_64
             python_exe: python
-            os_package_extension: zip
+            os_package_extension: exe
             cmake_generator: "Visual Studio 17 2022"
             cmake_toolset: "v142,host=x64"
             cmake_platform_arch: "x64"
@@ -49,7 +49,7 @@ jobs:
             os_runner: ubuntu-latest
             arch: x86_64
             python_exe: python3
-            os_package_extension: tar.gz
+            os_package_extension: deb
             cmake_generator: ""
             cmake_toolset: ""
             cmake_platform_arch: ""
@@ -129,13 +129,17 @@ jobs:
         run: |
           cpack -C Release
 
+      - name: Find package file
+        run: |
+          PACKAGE_FINAL_PATH=find build -name '*.${{ matrix.config.os_package_extension }}' -depth 1 | head -n 1
+          echo "PACKAGE_FINAL_PATH=$PACKAGE_FINAL_PATH" >> $GITHUB_ENV
+
       # ----- macOS specific Signing, Notarization, and Stapling -----
 
       - name: macOS - Notarize .dmg
         if: matrix.config.os_name == 'macos'
         run: |
-          find build -name '*.dmg'
-          DMG_PATH="$(find build -name '*.dmg' | perl -lne 'print tr:/::, " $_"' | sort -n | cut -d' ' -f2 | head -n 1)"
+          DMG_PATH="$PACKAGE_FINAL_PATH"
           echo "Submitting for notarization: $DMG_PATH"
 
           xcrun notarytool store-credentials "EnhancingDeformationAnalysisUI" \
@@ -152,29 +156,14 @@ jobs:
       - name: macOS - Staple notarization ticket
         if: matrix.config.os_name == 'macos'
         run: |
-          DMG_PATH="$(find build -name '*.dmg' | perl -lne 'print tr:/::, " $_"' | sort -n | cut -d' ' -f2 | head -n 1)"
+          DMG_PATH="$PACKAGE_FINAL_PATH"
           xcrun stapler staple "$DMG_PATH"
-
-      - name: List all possible artifact files in the repository
-        run: |
-          find build -name '*.zip'
-          find build -name '*.tar.gz'
-          find build -name '*.dmg'
-          find build -name '*.deb'
-          find build -name '*.rpm'
-          find build -name '*.exe'
 
       - name: Upload build artifact (package)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.config.os_name }}-${{ matrix.config.arch }}-package
-          path: |
-            build/*.zip
-            build/*.tar.gz
-            build/*.dmg
-            build/*.deb
-            build/*.rpm
-            build/*.exe
+          path: ${{ env.PACKAGE_FINAL_PATH }}
           if-no-files-found: error
 
       - name: Upload to Release
@@ -182,7 +171,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/*.${{ matrix.config.os_package_extension }}
+          file: ${{ env.PACKAGE_FINAL_PATH }}
           asset_name: ${{ github.event.repository.name }}-${{ github.ref_name }}-${{ matrix.config.os_name }}-${{ matrix.config.arch }}.${{ (matrix.config.os_name == 'windows' && 'zip') || (matrix.config.os_name == 'macos' && 'dmg') || 'tar.gz' }}
           tag: ${{ github.ref }}
           overwrite: true
