@@ -152,7 +152,7 @@ jobs:
       - name: macOS - Staple notarization ticket
         if: matrix.config.os_name == 'macos'
         run: |
-          DMG_PATH="$(find build -name '*.dmg' | head -n 1)"
+          DMG_PATH="$(find build -name '*.dmg' | perl -lne 'print tr:/::, " $_"' | sort -n | cut -d' ' -f2 | head -n 1)"
           xcrun stapler staple "$DMG_PATH"
 
       - name: Upload build artifact (package)
