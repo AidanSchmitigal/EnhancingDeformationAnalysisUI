@@ -3,25 +3,25 @@ name: Build and Package Application
 on:
   push:
     tags:
-      - "v*" # Trigger on tags like v0.1, v1.2.3
-  workflow_dispatch: # Allow manual trigger
+      - "v*"
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build for ${{ matrix.config.os_name }} (${{ matrix.config.arch }})
     runs-on: ${{ matrix.config.os_runner }}
     strategy:
-      fail-fast: false # Allow other jobs to continue if one fails
+      fail-fast: false
       matrix:
         config:
           - os_name: windows
             os_runner: windows-latest
             arch: x86_64
-            python_exe: python # On Windows, python.exe should be in PATH
+            python_exe: python
             os_package_extension: zip
-            cmake_generator: "Visual Studio 17 2022" # Matches VS 2022
+            cmake_generator: "Visual Studio 17 2022"
             cmake_toolset: "v142,host=x64"
-            cmake_platform_arch: "x64" # Specifies 64-bit for VS generator
+            cmake_platform_arch: "x64"
             opencv_setup_cmd: |
               choco install opencv --version=4.8.0 --yes --force
               OPENCV_INSTALLED_PATH="C:/tools/opencv/build"
@@ -35,7 +35,7 @@ jobs:
                 exit 1
               fi
           - os_name: macos
-            os_runner: macos-14 # For arm64 (M1/M2); macos-14 is ARM.
+            os_runner: macos-14
             arch: arm64
             python_exe: python3
             os_package_extension: dmg
@@ -61,12 +61,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: "recursive" # If you use submodules for libs like cppflow
+          submodules: "recursive"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10" # Specify a version
+          python-version: "3.10"
 
       - name: Install Python dependencies
         run: ${{ matrix.config.python_exe }} -m pip install requests tqdm
@@ -154,6 +154,14 @@ jobs:
         run: |
           DMG_PATH="$(find build -name '*.dmg' | perl -lne 'print tr:/::, " $_"' | sort -n | cut -d' ' -f2 | head -n 1)"
           xcrun stapler staple "$DMG_PATH"
+
+      - name: List all possible artifact files in the repository
+        run: |
+          find build -name '*.zip'
+          find build -name '*.tar.gz'
+          find build -name '*.dmg'
+          find build -name '*.deb'
+          find build -name '*.rpm'
 
       - name: Upload build artifact (package)
         uses: actions/upload-artifact@v4
