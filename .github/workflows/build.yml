@@ -131,7 +131,7 @@ jobs:
 
       - name: Find package file
         run: |
-          PACKAGE_FINAL_PATH=find build -name '*.${{ matrix.config.os_package_extension }}' -depth 1 | head -n 1
+          PACKAGE_FINAL_PATH=$(find build -name '*.${{ matrix.config.os_package_extension }}' -depth 1 | head -n 1)
           echo "PACKAGE_FINAL_PATH=$PACKAGE_FINAL_PATH" >> $GITHUB_ENV
 
       # ----- macOS specific Signing, Notarization, and Stapling -----
