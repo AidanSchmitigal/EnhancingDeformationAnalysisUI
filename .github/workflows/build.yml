@@ -73,11 +73,11 @@ jobs:
 
       - name: Download and setup TensorFlow
         run: |
-          ${{ matrix.config.python_exe }} setup_tensorflow.py ${{ matrix.config.os_name }} ${{ matrix.config.arch }}
+          ${{ matrix.config.python_exe }} scripts/setup_tensorflow.py ${{ matrix.config.os_name }} ${{ matrix.config.arch }}
 
       - name: Download and setup PyTorch
         run: |
-          ${{ matrix.config.python_exe }} setup_pytorch.py ${{ matrix.config.os_name }} ${{ matrix.config.arch }}
+          ${{ matrix.config.python_exe }} scripts/setup_pytorch.py ${{ matrix.config.os_name }} ${{ matrix.config.arch }}
 
       - name: Setup OpenCV
         shell: bash
