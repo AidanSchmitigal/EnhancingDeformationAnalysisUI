@@ -95,7 +95,7 @@ export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
 
 #### Windows
 
-1. Use the setup script `setup.py` to set up the project and install OpenCV and TensorFlow
+1. Use the setup script `scripts/setup_tensorflow.py` and `scripts/setup_pytorch.py` to set up the project and install Pytorch and TensorFlow
 2. Make sure to set the environment variables as instructed in Prerequisites
 3. Open the folder using Visual Studio (assuming Desktop C++ package installed)
 4. Select the correct startup item from the dropdown: `EnhancingDeformationAnalysisUI.exe`
