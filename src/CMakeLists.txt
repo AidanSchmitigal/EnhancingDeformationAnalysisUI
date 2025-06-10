@@ -176,11 +176,14 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       ARCHIVE DESTINATION lib COMPONENT applications
     )
 
-    install(TARGETS EnhancingDeformationAnalysisUI
-      RUNTIME DESTINATION bin COMPONENT applications
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT applications)
+
+    set(CMAKE_RUNTIME_DEPENDENCY_RESOLUTION_SKIP_MISSING TRUE)
+
+    install(
+      TARGETS EnhancingDeformationAnalysisUI
       RUNTIME_DEPENDENCIES
       DIRECTORIES ${BUNDLE_SEARCH_PATHS}
-      DESTINATION bin COMPONENT applications
       PRE_EXCLUDE_REGEXES
       # System API sets and forwarders
       "^api-ms-win-.*\\.dll$"
@@ -202,10 +205,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       "^ucrtbase\\.dll$"
       "^vcruntime[0-9]+\\.dll$"
       "^msvcp[0-9]+\\.dll$"
+      DESTINATION bin
+      COMPONENT applications
     )
-    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
-      DESTINATION assets COMPONENT applications
-      FILES_MATCHING PATTERN "*")
 
     install(CODE "
       include(InstallRequiredSystemLibraries)
