@@ -32,9 +32,71 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CPACK_GENERATOR "ZIP;NSIS")
     set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME} v${PROJECT_VERSION}")
     set(CPACK_NSIS_DISPLAY_NAME "${PROJECT_NAME}")
-    # set(CPACK_NSIS_INSTALLER_ICON_CODE "${CMAKE_SOURCE_DIR}/assets/icons/app_icon.ico") # Example icon
-    # set(CPACK_NSIS_MUI_FINISHPAGE_RUN "${PROJECT_NAME}.exe")
-    # set(CPACK_NSIS_MUI_WELCOMEFINISHPAGE)
+
+    set(CPACK_NSIS_PUBLISHER "Your Organization") # Good to set
+    set(CPACK_NSIS_URL_INFO_ABOUT "Your Project URL") # Good to set
+    set(CPACK_NSIS_HELP_LINK "Your Help URL") # Optional
+    set(CPACK_NSIS_CONTACT "Your Contact Email/User") # Optional
+
+    # This tells NSIS to install all files from the "applications" component.
+    # Ensure your install commands in src/CMakeLists.txt use COMPONENT ${APP_COMPONENT}
+    # where APP_COMPONENT is "applications".
+    set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64") # Install to Program Files (x64)
+    # If your app is 32-bit, use $PROGRAMFILES instead.
+
+    # Key part: Tell NSIS which components to install.
+    # If all your files (bin, assets) are installed under the same component
+    # (e.g., "applications" or the default "Unspecified"), list that component.
+    # CPack will then look at CMAKE_INSTALL_PREFIX for files belonging to this component.
+    set(CPACK_COMPONENT_APPLICATIONS_DISPLAY_NAME "Application Files") # Name for the component in installer UI
+    set(CPACK_COMPONENT_APPLICATIONS_DESCRIPTION "The main application files and associated data.")
+    set(CPACK_COMPONENTS_ALL applications) # Install the 'applications' component
+
+    # Create a Start Menu shortcut for the main executable
+    # Make sure your executable is installed to <CMAKE_INSTALL_PREFIX>/bin/EnhancingDeformationAnalysisUI.exe
+    set(CPACK_NSIS_CREATE_ICONS_EXTRA
+      "CreateShortCut '$SMPROGRAMS\\${CPACK_NSIS_PACKAGE_NAME}.lnk' '$INSTDIR\\bin\\${PROJECT_NAME}.exe'")
+
+    # Optionally, create a desktop shortcut
+    # set(CPACK_NSIS_CREATE_ICONS_EXTRA 
+    #   "${CPACK_NSIS_CREATE_ICONS_EXTRA}"
+    #   "CreateShortCut '$DESKTOP\\${CPACK_NSIS_DISPLAY_NAME}.lnk' '$INSTDIR\\bin\\${PROJECT_NAME}.exe'")
+
+    # Tell NSIS to create a directory for your application under the install root
+    set(CPACK_NSIS_PACKAGE_DIR_ICON "${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns") # Optional: provide an icon for the installer itself
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\${PROJECT_NAME}.exe") # Icon for Add/Remove Programs
+
+    # Include the uninstaller
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL "ON") # Recommended
+
+    set(VCPKG_TARGET_ARCHITECTURE x64)
+    set(VCPKG_CRT_LINKAGE dynamic)
+    set(VCPKG_LIBRARY_LINKAGE dynamic)
+    set(VCPKG_PLATFORM_TOOLSET "v140")
+    set(VCPKG_DEP_INFO_OVERRIDE_VARS "v140")
+
+    # You can also add custom NSIS script sections if needed for very complex installs
+    # set(CPACK_NSIS_CUSTOM_INSTALL_COMMANDS ...)
+
+    # For more complex file installations with NSIS, you might need to specify install groups
+    # or directly manipulate NSIS scripts via CPACK_NSIS_EXTRA_INSTALL_COMMANDS.
+    # However, for a simple bin + assets structure, component installation should work.
+
+    # If components are not working as expected, an alternative is to explicitly list files/dirs
+    # but this is less maintainable than component-based installation.
+    # Example (less recommended if components can work):
+    # set(CPACK_INSTALL_FILES
+    #   "bin/${PROJECT_NAME}.exe"   # Path relative to CMAKE_INSTALL_PREFIX
+    #   # You'd have to list all DLLs here, which is not ideal.
+    # )
+    # set(CPACK_INSTALL_DIRECTORIES
+    #   "bin"     # Path relative to CMAKE_INSTALL_PREFIX
+    #   "assets"  # Path relative to CMAKE_INSTALL_PREFIX
+    # )
+    # This CPACK_INSTALL_FILES/DIRECTORIES is more for basic CPack generators, NSIS
+    # often works better with components or more specific NSIS commands.
+    # Stick with CPACK_COMPONENTS_ALL for now.
+
   elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
     # For a .app bundle, ensure MACOSX_BUNDLE is set on the target in src/CMakeLists.txt

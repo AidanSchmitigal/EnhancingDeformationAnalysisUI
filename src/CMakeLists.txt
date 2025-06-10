@@ -175,17 +175,43 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       LIBRARY DESTINATION lib COMPONENT applications
       ARCHIVE DESTINATION lib COMPONENT applications
     )
-    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT applications)
-    set(CMAKE_RUNTIME_DEPENDENCY_RESOLUTION_SKIP_MISSING TRUE)
-    install(
-      TARGETS EnhancingDeformationAnalysisUI
+
+    install(TARGETS EnhancingDeformationAnalysisUI
+      RUNTIME DESTINATION bin COMPONENT applications
       RUNTIME_DEPENDENCIES
       DIRECTORIES ${BUNDLE_SEARCH_PATHS}
-      PRE_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-.*\\.dll$" "^hvsifiletrust\\.dll$" "^wpaxholder\\.dll$" "^ucrtbase\\.dll$" "^vcruntime[0-9]+\\.dll$" "^msvcp[0-9]+\\.dll$"
-      POST_EXCLUDE_REGEXES "^api-ms-win-.*\\.dll$" "^ext-ms-.*\\.dll$" "^HvsiFileTrust\\.dll$" "^wpaxholder\\.dll$" "^ucrtbase\\.dll$" "^vcruntime[0-9]+\\.dll$" "^msvcp[0-9]+\\.dll$"
-      DESTINATION bin
-      COMPONENT applications
+      DESTINATION bin COMPONENT applications
+      PRE_EXCLUDE_REGEXES
+      # System API sets and forwarders
+      "^api-ms-win-.*\\.dll$"
+      "^ext-ms-.*\\.dll$"
+
+      # Core Windows Media Foundation - DO NOT BUNDLE
+      "^mfplat\\.dll$"
+      "^mfcore\\.dll$"
+      # Add any other MF related DLLs if they appear (e.g., mferror.dll, mfreadwrite.dll)
+      # Generally, anything starting with "mf" that isn't from a third-party library you explicitly use.
+
+      # Other problematic system/dev DLLs
+      "^hvsimobilecore\\.dll$" # Corrected from HvsiFileTrust if that was a typo, or add both
+      "^hvsifiletrust\\.dll$"
+      "^wpaxholder\\.dll$"
+      "^pdmutilities\\.dll$" # From previous fix
+
+      # Standard C/C++ Runtimes (usually handled by VCRedist)
+      "^ucrtbase\\.dll$"
+      "^vcruntime[0-9]+\\.dll$"
+      "^msvcp[0-9]+\\.dll$"
     )
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
+      DESTINATION assets COMPONENT applications
+      FILES_MATCHING PATTERN "*")
+
+    install(CODE "
+      include(InstallRequiredSystemLibraries)
+      include(BundleUtilities)
+      fixup_bundle(${CMAKE_INSTALL_PREFIX}/${SERVICE_INSTALL_PREFIX}/test.exe  \"\" \"\")
+      "      COMPONENT applications)
 
     # ----------------------------------------------------
     #       Apple Specific
