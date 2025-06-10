@@ -214,7 +214,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       "
         include(InstallRequiredSystemLibraries)
         include(BundleUtilities)
-        fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/${SERVICE_INSTALL_PREFIX}/${PROJECT_NAME}.exe\" \"\" \"\")
+        fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.zip\" \"\" \"\")
     "
       DESTINATION .
       COMPONENT Runtime)
