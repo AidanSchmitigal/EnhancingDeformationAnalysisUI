@@ -55,7 +55,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     # Create a Start Menu shortcut for the main executable
     # Make sure your executable is installed to <CMAKE_INSTALL_PREFIX>/bin/EnhancingDeformationAnalysisUI.exe
     set(CPACK_NSIS_CREATE_ICONS_EXTRA
-      "CreateShortCut '$SMPROGRAMS\\\\${CPACK_NSIS_PACKAGE_NAME}.lnk' '$INSTDIR\\\\bin\\\\${PROJECT_NAME}.exe'")
+      "CreateShortCut '$SMPROGRAMS/${CPACK_NSIS_PACKAGE_NAME}.lnk' '$INSTDIR/bin/${PROJECT_NAME}.exe'")
 
     # Optionally, create a desktop shortcut
     # set(CPACK_NSIS_CREATE_ICONS_EXTRA 
