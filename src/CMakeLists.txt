@@ -209,11 +209,15 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       COMPONENT applications
     )
 
-    install(CODE "
-      include(InstallRequiredSystemLibraries)
-      include(BundleUtilities)
-      fixup_bundle(${CMAKE_INSTALL_PREFIX}/build/src/Release/${PROJECT_NAME}.exe  \"\" \"\")
-      "      COMPONENT applications)
+    install(
+      CODE
+      "
+        include(InstallRequiredSystemLibraries)
+        include(BundleUtilities)
+        fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/${SERVICE_INSTALL_PREFIX}/${PROJECT_NAME}.exe\" \"\" \"\")
+    "
+      DESTINATION .
+      COMPONENT Runtime)
 
     # ----------------------------------------------------
     #       Apple Specific
