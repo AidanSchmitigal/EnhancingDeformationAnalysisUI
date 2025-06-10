@@ -64,7 +64,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 
     # Tell NSIS to create a directory for your application under the install root
     set(CPACK_NSIS_PACKAGE_DIR_ICON "${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns") # Optional: provide an icon for the installer itself
-    set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\${PROJECT_NAME}.exe") # Icon for Add/Remove Programs
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "bin/${PROJECT_NAME}.exe") # Icon for Add/Remove Programs
 
     # Include the uninstaller
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL "ON") # Recommended
