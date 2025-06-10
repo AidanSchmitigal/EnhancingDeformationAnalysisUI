@@ -212,7 +212,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     install(CODE "
       include(InstallRequiredSystemLibraries)
       include(BundleUtilities)
-      fixup_bundle(${CMAKE_INSTALL_PREFIX}/${SERVICE_INSTALL_PREFIX}/test.exe  \"\" \"\")
+      fixup_bundle(${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.exe  \"\" \"\")
       "      COMPONENT applications)
 
     # ----------------------------------------------------
