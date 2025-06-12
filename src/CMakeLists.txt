@@ -185,54 +185,95 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       RUNTIME_DEPENDENCIES
       DIRECTORIES ${BUNDLE_SEARCH_PATHS}
       PRE_EXCLUDE_REGEXES
-      # System API sets and forwarders
+      # ---- Your primary regexes that were working ----
       "^api-ms-win-.*\\.dll$"
-      "^ext-ms-.*\\.dll$"
+      "^ext-ms-.*\\.dll$" # This should catch many ext-ms variants.
 
-      # Core Windows Media Foundation - DO NOT BUNDLE
-      "^mfplat\\.dll$"
-      "^mfcore\\.dll$"
-      # Add any other MF related DLLs if they appear (e.g., mferror.dll, mfreadwrite.dll)
-      # Generally, anything starting with "mf" that isn't from a third-party library you explicitly use.
+      # ---- Core C/C++ Runtimes (rely on VCRedist) ----
+      "^ucrtbase\\.dll$"
+      "^vcruntime.*\\.dll$" # Catches vcruntime140.dll, vcruntime140_1.dll, etc.
+      "^msvcp.*\\.dll$" # Catches msvcp140.dll, msvcp_win.dll, msvcp110_win.dll etc.
+      "^msvcrt\\.dll$" # Older C runtime, part of OS
+      "^concrt140\\.dll$" # Concurrency runtime, also part of VCRedist
 
-      # Other problematic system/dev DLLs
-      "^hvsimobilecore\\.dll$" # Corrected from HvsiFileTrust if that was a typo, or add both
+      # ---- Media Foundation (OS Components) ----
+      "^mf.*\\.dll$" # Catches mf.dll, mfplat.dll, mfcore.dll, mfreadwrite.dll, etc.
+      "^rtworkq\\.dll$" # Related to Media Foundation
+
+      # ---- Debugging/Diagnostic Tools (Should not be in release) ----
+      "^dbg.*\\.dll$" # Catches dbgeng.dll, dbghelp.dll, DbgModel.dll
+      "^pdmutilities\\.dll$"
+      "^windowsperformancerecordercontrol\\.dll$"
+
+      # ---- Other common Windows System DLLs (by prefix or common name) ----
+      # Kernel & User mode basics
+      "^kernel32\\.dll$"
+      "^kernelbase\\.dll$"
+      "^ntdll\\.dll$"
+      "^user32\\.dll$"
+      "^gdi32\\.dll$"
+      "^advapi32\\.dll$"
+      "^shell32\\.dll$"
+      "^comctl32\\.dll$"
+      "^comdlg32\\.dll$"
+      "^ole32\\.dll$"
+      "^oleaut32\\.dll$"
+      "^rpcrt4\\.dll$"
+      "^shlwapi\\.dll$"
+      "^ws2_32\\.dll$"
+      "^wininet\\.dll$"
+      "^urlmon\\.dll$"
+      "^version\\.dll$"
+      "^setupapi\\.dll$"
+      "^cfgmgr32\\.dll$"
+      "^crypt32\\.dll$"
+      "^secur32\\.dll$"
+      "^wintrust\\.dll$"
+      "^imagehlp\\.dll$"
+      "^psapi\\.dll$"
+      "^iphlpapi\\.dll$"
+      "^dnsapi\\.dll$"
+      "^userenv\\.dll$"
+      "^propsys\\.dll$"
+      "^dwmapi\\.dll$"
+      "^uxtheme\\.dll$"
+
+      # More specific system components if not caught above
+      "^bcp47.*\\.dll$"
+      "^bcrypt.*\\.dll$"
+      "^cabinet\\.dll$"
+      "^combase\\.dll$" # Very important COM runtime
+      "^dwrite\\.dll$" # DirectWrite
+      "^d2d1\\.dll$" # Direct2D
+      "^d3d11\\.dll$" # Direct3D11
+      "^dxgi\\.dll$"
+      "^icu\\.dll$" # If confirmed to be system version, otherwise needs care
+      # If your TF/PyTorch/OpenCV bundle their OWN icu.dll, you MUST NOT exclude this generally.
+      # You'd only exclude it if it's resolving to C:\Windows\System32\icu.dll
+      # For now, let's assume we exclude the system one.
+      "^normaliz\\.dll$"
+      "^wldap32\\.dll$"
+      "^netapi32\\.dll$"
+      "^winmm\\.dll$"
+      "^powrprof\\.dll$"
+
+      # Ones you specifically listed as problematic if not caught by broader rules
+      "^hvsimobilecore\\.dll$" # Or hvsifiletrust.dll
       "^hvsifiletrust\\.dll$"
       "^wpaxholder\\.dll$"
-      "^pdmutilities\\.dll$" # From previous fix
 
-      # Standard C/C++ Runtimes (usually handled by VCRedist)
-      "^ucrtbase\\.dll$"
-      "^vcruntime[0-9]+\\.dll$"
-      "^msvcp[0-9]+\\.dll$"
+      # DirectUI & Windows UI related
+      "^dui70\\.dll$"
+      "^coreuicomponents\\.dll$"
+      "^textinputframework\\.dll$"
+      "^twinapi\\.appcore\\.dll$"
+
+      "^aepic\\.dll$"
+      "^audioses\\.dll$"
+      "^avrt\\.dll$"
+
       DESTINATION bin
       COMPONENT applications
-    )
-
-    install(
-      CODE
-      "
-        include(InstallRequiredSystemLibraries)
-
-        include(BundleUtilities)
-
-        # The path to your installed executable
-        set(APP_EXE_PATH \"${CMAKE_INSTALL_PREFIX}/bin/$<TARGET_FILE_NAME:EnhancingDeformationAnalysisUI>\")
-
-        # The directory where the executable is located, also where other DLLs should be
-        get_filename_component(APP_EXE_DIR \"\${APP_EXE_PATH}\" DIRECTORY)
-
-        message(STATUS \"Fixing up bundle for \${APP_EXE_PATH}\")
-        message(STATUS \"DLLs expected to be in \${APP_EXE_DIR}\")
-
-        fixup_bundle(
-            \"\${APP_EXE_PATH}\"
-            \"\"
-            \"\${APP_EXE_DIR}\"
-        )
-      "
-      DESTINATION .
-      COMPONENT Runtime
     )
 
     # ----------------------------------------------------
