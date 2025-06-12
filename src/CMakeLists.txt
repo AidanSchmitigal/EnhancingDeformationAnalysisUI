@@ -213,14 +213,27 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
       CODE
       "
         include(InstallRequiredSystemLibraries)
+
         include(BundleUtilities)
-        # List files in the directory
-        file(GLOB_RECURSE BUNDLE_FILES \"${CMAKE_INSTALL_PREFIX}/\")
-        message(\"\${BUNDLE_FILES}\")
-        fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.zip\" \"\" \"\")
-    "
+
+        # The path to your installed executable
+        set(APP_EXE_PATH \"${CMAKE_INSTALL_PREFIX}/bin/$<TARGET_FILE_NAME:EnhancingDeformationAnalysisUI>\")
+
+        # The directory where the executable is located, also where other DLLs should be
+        get_filename_component(APP_EXE_DIR \"\${APP_EXE_PATH}\" DIRECTORY)
+
+        message(STATUS \"Fixing up bundle for \${APP_EXE_PATH}\")
+        message(STATUS \"DLLs expected to be in \${APP_EXE_DIR}\")
+
+        fixup_bundle(
+            \"\${APP_EXE_PATH}\"
+            \"\"
+            \"\${APP_EXE_DIR}\"
+        )
+      "
       DESTINATION .
-      COMPONENT Runtime)
+      COMPONENT Runtime
+    )
 
     # ----------------------------------------------------
     #       Apple Specific
