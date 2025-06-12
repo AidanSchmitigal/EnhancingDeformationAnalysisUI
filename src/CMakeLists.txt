@@ -216,6 +216,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
         include(BundleUtilities)
         # List files in the directory
         file(GLOB_RECURSE BUNDLE_FILES \"${CMAKE_INSTALL_PREFIX}/\")
+        message(\"\${BUNDLE_FILES}\")
         fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.zip\" \"\" \"\")
     "
       DESTINATION .
