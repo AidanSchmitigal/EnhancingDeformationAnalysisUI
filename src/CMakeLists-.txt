@@ -1,5 +1,3 @@
-# THIS FILE SHOULD ONLY BE USED FOR APPLE BUILDS
-
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS *.cpp *.hpp *.h)
 
 file(GLOB IMGUI_LIB_SOURCES CONFIGURE_DEPENDS
@@ -28,12 +26,16 @@ target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE IMGUI_IMPL_OPE
 
 # Set C++ standard to 20
 target_compile_features(EnhancingDeformationAnalysisUI PRIVATE cxx_std_20)
-target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE "-framework CoreFoundation")
+if(APPLE)
+  target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE "-framework CoreFoundation")
+endif()
 
 # --- Options for Subdirectory Libraries (Set BEFORE add_subdirectory) ---
 # GLFW
-set(GLFW_BUILD_X11 ON CACHE BOOL "Build GLFW for X11" FORCE)
-set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build GLFW for Wayland" FORCE)
+if(!WIN32)
+  set(GLFW_BUILD_X11 ON CACHE BOOL "Build GLFW for X11" FORCE)
+  set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build GLFW for Wayland" FORCE)
+endif()
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW docs" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build GLFW examples" FORCE)
@@ -72,8 +74,10 @@ if(UI_INCLUDE_TENSORFLOW)
   target_include_directories(EnhancingDeformationAnalysisUI PRIVATE ${TF_INCLUDE_DIR})
 
   find_library(TF_C_LIB NAMES tensorflow tensorflow.lib PATHS "${TF_LIB_DIR}" REQUIRED)
-  find_library(TF_FRAMEWORK_LIB NAMES tensorflow_framework tensorflow_framework.lib PATHS "${TF_LIB_DIR}" REQUIRED)
-  target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_FRAMEWORK_LIB})
+  if(NOT WIN32)
+    find_library(TF_FRAMEWORK_LIB NAMES tensorflow_framework tensorflow_framework.lib PATHS "${TF_LIB_DIR}" REQUIRED)
+    target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_FRAMEWORK_LIB})
+  endif()
 
 
   target_link_libraries(EnhancingDeformationAnalysisUI PRIVATE ${TF_C_LIB})
@@ -81,6 +85,10 @@ if(UI_INCLUDE_TENSORFLOW)
   # Define for conditional compilation in C++ code
   target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE UI_INCLUDE_TENSORFLOW)
   list(APPEND BUNDLE_SEARCH_PATHS "${TF_LIB_DIR}")
+
+  if(WIN32 AND EXISTS "${TF_ROOT}") # For tensorflow.dll often in root of TF package on Windows
+    list(APPEND BUNDLE_SEARCH_PATHS "${TF_ROOT}")
+  endif()
 endif()
 
 # --- PyTorch (LibTorch) ---
@@ -136,6 +144,12 @@ set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
 message(STATUS "OpenCV version: ${OpenCV_VERSION} at ${OpenCV_DIR}")
 
 # Add OpenCV lib dir to BUNDLE_SEARCH_PATHS if needed for bundling
+if(WIN32 AND OpenCV_DIR)
+  list(APPEND BUNDLE_SEARCH_PATHS "${OpenCV_DIR}/bin")
+  list(APPEND BUNDLE_SEARCH_PATHS "${OpenCV_DIR}/build")
+  list(APPEND BUNDLE_SEARCH_PATHS "${OpenCV_DIR}/x64/vc16/bin")
+endif()
+
 # --- UI_PROFILE Definition ---
 if(UI_PROFILE)
   message(STATUS "-- Building in PROFILE mode (UI_PROFILE defined)")
@@ -152,68 +166,179 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
   message(STATUS "Using CMake ${CMAKE_VERSION} with install(RUNTIME_DEPENDENCIES)")
 
   # ----------------------------------------------------
-  #       Apple Specific
+  #       Windows specific
   # ----------------------------------------------------
 
-  # Apple code
+  if(WIN32)
+    install(TARGETS EnhancingDeformationAnalysisUI
+      RUNTIME DESTINATION bin COMPONENT applications
+      LIBRARY DESTINATION lib COMPONENT applications
+      ARCHIVE DESTINATION lib COMPONENT applications
+    )
 
-  set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
-    MACOSX_BUNDLE TRUE
-    MACOSX_BUNDLE_ICON_FILE "EnhancingDeformationAnalysisUI.icns"
-    MACOSX_BUNDLE_NAME "EnhancingDeformationAnalysisUI"
-    MACOSX_BUNDLE_VERSION ${PROJECT_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist"
-    XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "XVAD456636"
-    XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Developer ID Application"
-    XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual"
-    XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED TRUE
-    XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS "--timestamp=http://timestamp.apple.com/ts01  --options=runtime,library"
-    XCODE_ATTRIBUTE_CODE_SIGN_INJECT_BASE_ENTITLEMENTS "NO"
-  )
-  set(CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "XVAD456636")
-  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Developer ID Application: Aidan Schmitigal (XVAD456636)")
-  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual")
-  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED TRUE)
-  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_SOURCE_DIR}/assets/entitlements.plist")
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT applications)
 
-  install(FILES ${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns DESTINATION "${PROJECT_NAME}.app/Contents/Resources" COMPONENT applications)
-  install(FILES ${CMAKE_SOURCE_DIR}/assets/Info.plist DESTINATION "${PROJECT_NAME}.app/Contents" COMPONENT applications)
-  set_source_files_properties(${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    set(CMAKE_RUNTIME_DEPENDENCY_RESOLUTION_SKIP_MISSING TRUE)
 
-  install(TARGETS EnhancingDeformationAnalysisUI
-    BUNDLE DESTINATION .
-    COMPONENT applications
-  )
+    install(
+      TARGETS EnhancingDeformationAnalysisUI
+      RUNTIME_DEPENDENCIES
+      DIRECTORIES ${BUNDLE_SEARCH_PATHS}
+      PRE_EXCLUDE_REGEXES
+      # ---- Your primary regexes that were working ----
+      "^api-ms-win-.*\\.dll$"
+      "^ext-ms-.*\\.dll$" # This should catch many ext-ms variants.
 
-  install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
-    DESTINATION "${PROJECT_NAME}.app/Contents/MacOS/assets"
-    COMPONENT applications
-    FILES_MATCHING PATTERN "*"
-  )
+      # ---- Core C/C++ Runtimes (rely on VCRedist) ----
+      "^ucrtbase\\.dll$"
+      "^vcruntime.*\\.dll$" # Catches vcruntime140.dll, vcruntime140_1.dll, etc.
+      "^msvcp.*\\.dll$" # Catches msvcp140.dll, msvcp_win.dll, msvcp110_win.dll etc.
+      "^msvcrt\\.dll$" # Older C runtime, part of OS
+      "^concrt140\\.dll$" # Concurrency runtime, also part of VCRedist
 
-  if(EXISTS "/opt/homebrew/lib/gcc/current")
-    message(STATUS "Adding Homebrew GCC lib dir to bundle search paths: ${HOMEBREW_GCC_LIB_DIR}")
-    list(APPEND BUNDLE_SEARCH_PATHS "/opt/homebrew/lib/gcc/current")
-  else()
-    message(WARNING "Could not determine Homebrew GCC library path for bundling libgcc. This might lead to issues.")
-  endif()
+      # ---- Media Foundation (OS Components) ----
+      "^mf.*\\.dll$" # Catches mf.dll, mfplat.dll, mfcore.dll, mfreadwrite.dll, etc.
+      "^rtworkq\\.dll$" # Related to Media Foundation
 
-  if(BUNDLE_SEARCH_PATHS)
-    list(REMOVE_DUPLICATES BUNDLE_SEARCH_PATHS)
-  endif()
+      # ---- Debugging/Diagnostic Tools (Should not be in release) ----
+      "^dbg.*\\.dll$" # Catches dbgeng.dll, dbghelp.dll, DbgModel.dll
+      "^pdmutilities\\.dll$"
+      "^windowsperformancerecordercontrol\\.dll$"
 
-  if(EXISTS "/opt/homebrew/lib")
-    message(STATUS "Adding Homebrew lib dir to bundle search paths: ${HOMEBREW_LIB_DIR}")
-    list(APPEND BUNDLE_SEARCH_PATHS "/opt/homebrew/lib")
-  else()
-    message(WARNING "Could not determine Homebrew lib directory for bundling. This might lead to issues.")
-  endif()
+      # ---- Other common Windows System DLLs (by prefix or common name) ----
+      # Kernel & User mode basics
+      "^kernel32\\.dll$"
+      "^kernelbase\\.dll$"
+      "^ntdll\\.dll$"
+      "^user32\\.dll$"
+      "^gdi32\\.dll$"
+      "^advapi32\\.dll$"
+      "^shell32\\.dll$"
+      "^comctl32\\.dll$"
+      "^comdlg32\\.dll$"
+      "^ole32\\.dll$"
+      "^oleaut32\\.dll$"
+      "^rpcrt4\\.dll$"
+      "^shlwapi\\.dll$"
+      "^ws2_32\\.dll$"
+      "^wininet\\.dll$"
+      "^urlmon\\.dll$"
+      "^version\\.dll$"
+      "^setupapi\\.dll$"
+      "^cfgmgr32\\.dll$"
+      "^crypt32\\.dll$"
+      "^secur32\\.dll$"
+      "^wintrust\\.dll$"
+      "^imagehlp\\.dll$"
+      "^psapi\\.dll$"
+      "^iphlpapi\\.dll$"
+      "^dnsapi\\.dll$"
+      "^userenv\\.dll$"
+      "^propsys\\.dll$"
+      "^dwmapi\\.dll$"
+      "^uxtheme\\.dll$"
 
-  string(JOIN ";" BUNDLE_SEARCH_PATHS_MACOS_STR ${BUNDLE_SEARCH_PATHS})
+      # More specific system components if not caught above
+      "^bcp47.*\\.dll$"
+      "^bcrypt.*\\.dll$"
+      "^cabinet\\.dll$"
+      "^combase\\.dll$" # Very important COM runtime
+      "^dwrite\\.dll$" # DirectWrite
+      "^d2d1\\.dll$" # Direct2D
+      "^d3d11\\.dll$" # Direct3D11
+      "^dxgi\\.dll$"
+      "^icu\\.dll$" # If confirmed to be system version, otherwise needs care
+      # If your TF/PyTorch/OpenCV bundle their OWN icu.dll, you MUST NOT exclude this generally.
+      # You'd only exclude it if it's resolving to C:\Windows\System32\icu.dll
+      # For now, let's assume we exclude the system one.
+      "^normaliz\\.dll$"
+      "^wldap32\\.dll$"
+      "^netapi32\\.dll$"
+      "^winmm\\.dll$"
+      "^powrprof\\.dll$"
 
-  install(CODE "
+      # Ones you specifically listed as problematic if not caught by broader rules
+      "^hvsimobilecore\\.dll$" # Or hvsifiletrust.dll
+      "^hvsifiletrust\\.dll$"
+      "^wpaxholder\\.dll$"
+
+      # DirectUI & Windows UI related
+      "^dui70\\.dll$"
+      "^coreuicomponents\\.dll$"
+      "^textinputframework\\.dll$"
+      "^twinapi\\.appcore\\.dll$"
+
+      "^aepic\\.dll$"
+      "^audioses\\.dll$"
+      "^avrt\\.dll$"
+
+      DESTINATION bin
+      COMPONENT applications
+    )
+
+    # ----------------------------------------------------
+    #       Apple Specific
+    # ----------------------------------------------------
+  elseif(APPLE)
+    # Apple code
+
+    set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+      MACOSX_BUNDLE TRUE
+      MACOSX_BUNDLE_ICON_FILE "EnhancingDeformationAnalysisUI.icns"
+      MACOSX_BUNDLE_NAME "EnhancingDeformationAnalysisUI"
+      MACOSX_BUNDLE_VERSION ${PROJECT_VERSION}
+      MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+      MACOSX_BUNDLE_GUI_IDENTIFIER "com.enhancingdeformationanalysis.ui"
+      MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/Info.plist"
+      XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "XVAD456636"
+      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Developer ID Application"
+      XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual"
+      XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED TRUE
+      XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS "--timestamp=http://timestamp.apple.com/ts01  --options=runtime,library"
+      XCODE_ATTRIBUTE_CODE_SIGN_INJECT_BASE_ENTITLEMENTS "NO"
+    )
+    set(CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "XVAD456636")
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Developer ID Application: Aidan Schmitigal (XVAD456636)")
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual")
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED TRUE)
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_SOURCE_DIR}/assets/entitlements.plist")
+
+    install(FILES ${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns DESTINATION "${PROJECT_NAME}.app/Contents/Resources" COMPONENT applications)
+    install(FILES ${CMAKE_SOURCE_DIR}/assets/Info.plist DESTINATION "${PROJECT_NAME}.app/Contents" COMPONENT applications)
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/assets/EnhancingDeformationAnalysisUI.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
+    install(TARGETS EnhancingDeformationAnalysisUI
+      BUNDLE DESTINATION .
+      COMPONENT applications
+    )
+
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
+      DESTINATION "${PROJECT_NAME}.app/Contents/MacOS/assets"
+      COMPONENT applications
+      FILES_MATCHING PATTERN "*"
+    )
+
+    if(EXISTS "/opt/homebrew/lib/gcc/current")
+      message(STATUS "Adding Homebrew GCC lib dir to bundle search paths: ${HOMEBREW_GCC_LIB_DIR}")
+      list(APPEND BUNDLE_SEARCH_PATHS "/opt/homebrew/lib/gcc/current")
+    else()
+      message(WARNING "Could not determine Homebrew GCC library path for bundling libgcc. This might lead to issues.")
+    endif()
+
+    if(BUNDLE_SEARCH_PATHS)
+      list(REMOVE_DUPLICATES BUNDLE_SEARCH_PATHS)
+    endif()
+
+    if(EXISTS "/opt/homebrew/lib")
+      message(STATUS "Adding Homebrew lib dir to bundle search paths: ${HOMEBREW_LIB_DIR}")
+      list(APPEND BUNDLE_SEARCH_PATHS "/opt/homebrew/lib")
+    else()
+      message(WARNING "Could not determine Homebrew lib directory for bundling. This might lead to issues.")
+    endif()
+
+    string(JOIN ";" BUNDLE_SEARCH_PATHS_MACOS_STR ${BUNDLE_SEARCH_PATHS})
+
+    install(CODE "
             include(BundleUtilities)
             message(STATUS \"FixupBundle: App - \${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}.app\")
             message(STATUS \"FixupBundle: Dirs - ${BUNDLE_SEARCH_PATHS_MACOS_STR}\")
@@ -222,8 +347,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
                 \"\"
                 \"${BUNDLE_SEARCH_PATHS_MACOS_STR}\"
             )
-        "    COMPONENT applications)
-  install(CODE "
+        "      COMPONENT applications)
+    install(CODE "
             message(STATUS \"Signing app with identity: ${CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY}\")
             execute_process(
                 COMMAND codesign --force --deep --verify --verbose --timestamp --options runtime
@@ -239,8 +364,30 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
             else()
                 message(STATUS \"App signed successfully: \${sign_output}\")
             endif()
-        "    COMPONENT applications)
+        "      COMPONENT applications)
 
+    # ----------------------------------------------------
+    #       Linux specific
+    # ----------------------------------------------------
+  elseif(UNIX) # Linux
+    install(TARGETS EnhancingDeformationAnalysisUI
+      RUNTIME DESTINATION bin COMPONENT applications
+      LIBRARY DESTINATION lib COMPONENT applications
+      ARCHIVE DESTINATION lib COMPONENT applications
+    )
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION assets COMPONENT applications)
+    install(
+      TARGETS EnhancingDeformationAnalysisUI
+      RUNTIME_DEPENDENCIES
+      DESTINATION lib COMPONENT applications
+    )
+
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+    set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+      INSTALL_RPATH "$ORIGIN/../lib"
+      BUILD_RPATH "$ORIGIN/../lib")
+  endif()
 else() # CMAKE_BUILD_TYPE = "Debug"
   message(STATUS "Debug mode: Skipping installation, bundling, and CPack steps for src target.")
   # In development mode, the executable is just in ${CMAKE_BINARY_DIR}/src/
@@ -267,10 +414,18 @@ else() # CMAKE_BUILD_TYPE = "Debug"
   # list(APPEND DEV_RPATH_DIRS "${CMAKE_BINARY_DIR}/libs/libtiff")
 
   if(DEV_RPATH_DIRS)
-    set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
-      BUILD_WITH_INSTALL_RPATH ON # Uses INSTALL_RPATH also for build tree
-      INSTALL_RPATH "${DEV_RPATH_DIRS}"
-    )
+    if(APPLE)
+      set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+        BUILD_WITH_INSTALL_RPATH ON # Uses INSTALL_RPATH also for build tree
+        INSTALL_RPATH "${DEV_RPATH_DIRS}"
+      )
+    else() # Linux - $ORIGIN is useful
+      # Convert DEV_RPATH_DIRS to $ORIGIN-relative if possible, or absolute paths
+      string(REPLACE ";" "$ORIGIN/../lib${CMAKE_DIR_SEPARATOR}" RPATH_LINKS "${DEV_RPATH_DIRS}") # Simplistic
+      set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES
+        BUILD_RPATH "${RPATH_LINKS}"
+      )
+    endif()
   endif()
 
   # For finding assets in DEVELOPMENT mode:
