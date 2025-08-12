@@ -32,6 +32,9 @@ SET(tiff-tests OFF CACHE BOOL "libtiff lib only")
 SET(tiff-contrib OFF CACHE BOOL "libtiff lib only")
 SET(tiff-docs OFF CACHE BOOL "libtiff lib only")
 SET(tiff-install OFF CACHE BOOL "libtiff lib only")
+SET(jpeg OFF CACHE BOOL "libtiff lib only")
+SET(lzma OFF CACHE BOOL "libtiff lib only")
+SET(zlib OFF CACHE BOOL "libtiff lib only")
 
 find_package(OpenCV REQUIRED)
 
@@ -52,6 +55,12 @@ SET(GLFW_BUILD_TESTS OFF CACHE BOOL "GLFW lib only")
 SET(GLFW_INSTALL OFF CACHE BOOL "GLFW lib only")
 
 add_executable(EnhancingDeformationAnalysisUI ${SOURCES} libs/glad/src/glad.c ${IMGUI_SOURCES})
+
+if (WIN32)
+	if (UI_RELEASE)
+		set_target_properties(EnhancingDeformationAnalysisUI PROPERTIES WIN32_EXECUTABLE TRUE)
+	endif()
+endif()
 
 # For imgui to not try and load OpenGL itself
 target_compile_definitions(EnhancingDeformationAnalysisUI PRIVATE IMGUI_IMPL_OPENGL_LOADER_CUSTOM)

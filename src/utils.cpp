@@ -191,7 +191,8 @@ void CreateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures,
 	delete[] data;
 }
 
-void UpdateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures, const std::shared_ptr<Texture> &source_texture, const TileConfig &tile_config) {
+void UpdateTileTextures(std::vector<std::shared_ptr<Texture>> &tile_textures,
+			const std::shared_ptr<Texture> &source_texture, const TileConfig &tile_config) {
 	PROFILE_FUNCTION();
 
 	// Get the image data from the source texture
@@ -357,6 +358,18 @@ void DisplayFrameSelectionWindow(const char *window_title, bool &is_open,
 	ImGui::End();
 }
 
+void DisplayTextureWithInfo(std::shared_ptr<Texture> texture, ImVec2 size) {
+	ImGui::Image(texture->GetID(), size);
+	if (ImGui::IsItemHovered()) {
+		ImGui::BeginTooltip();
+		ImGui::Text("Texture Info:");
+		ImGui::Text("Width: %d", texture->GetWidth());
+		ImGui::Text("Height: %d", texture->GetHeight());
+		ImGui::Text("ID: %u", texture->GetID());
+		ImGui::EndTooltip();
+	}
+}
+
 } // namespace ui
 
 namespace io {
@@ -495,8 +508,22 @@ bool WriteGIFOfImageSet(const char *path, std::vector<std::shared_ptr<Texture>> 
 	return true;
 }
 
+// todo: fix these functions to be good, and not bad. (add better names + headers)
 bool WriteCSV(const char *path, std::vector<std::vector<std::vector<float>>> &data) {
 	FILE *f = fopen(path, "w");
+	for (int i = 0; i < data.size(); i++) {
+		if (data[i].empty() || data[i][0].empty()) {
+			printf("Data at index %d is empty, skipping\n", i);
+			continue;
+		}
+		if (i > 0)
+			fprintf(f, "\n"); // separate frames with a newline
+		for (int j = 0; j < data[i][0].size(); j++) {
+			fprintf(f, "%f", data[i][0][j]);
+			if (j < data[i][0].size() - 1)
+				fprintf(f, ",");
+		}
+	}
 	if (!f) {
 		printf("Could not open file %s\n", path);
 		return false;
